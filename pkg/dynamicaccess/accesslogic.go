@@ -17,6 +17,7 @@ type DefaultAccessLogic struct {
 	act           Act
 }
 
+// Will give back Swarm reference with symmertic encryption key (128 byte)
 func (al *DefaultAccessLogic) Get(encryped_ref string, publisher string, tag string) (string, error) {
 	return "", nil
 }
