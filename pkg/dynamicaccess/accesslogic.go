@@ -21,6 +21,7 @@ func (al *DefaultAccessLogic) Get(encryped_ref string, publisher string, tag str
 	return "", nil
 }
 
+// use DiffieHellmanMock
 func NewAccessLogic(key encryption.Key, padding int, initCtr uint32, hashFunc func() hash.Hash) AccessLogic {
 	return &DefaultAccessLogic{
 		diffieHellman: &mock.DiffieHellmanMock{
