@@ -24,3 +24,7 @@ func (act *ActMock) Get(index swarm.Address) (string, error) {
 	}
 	return act.GetFunc(index)
 }
+
+func NewActMock() *ActMock {
+	return &ActMock{data: make(map[string]string)}
+}
