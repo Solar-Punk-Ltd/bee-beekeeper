@@ -1,12 +1,14 @@
 package mock
 
+import "crypto/ecdsa"
+
 type DiffieHellmanMock struct {
-	SharedSecretFunc func(string, string, []byte) (string, error)
+	SharedSecretFunc func(publicKey *ecdsa.PublicKey, tag string, moment []byte) ([]byte, error)
 }
 
-func (ma *DiffieHellmanMock) SharedSecret(publicKey string, tag string, moment []byte) (string, error) {
+func (ma *DiffieHellmanMock) SharedSecret(publicKey *ecdsa.PublicKey, tag string, moment []byte) ([]byte, error) {
 	if ma.SharedSecretFunc == nil {
-		return "", nil
+		return []byte{}, nil
 	}
 	return ma.SharedSecretFunc(publicKey, tag, moment)
 }
