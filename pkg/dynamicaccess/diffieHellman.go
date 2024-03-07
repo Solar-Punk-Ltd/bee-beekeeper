@@ -16,8 +16,8 @@ type defaultDiffieHellman struct {
 	mock *mock.DiffieHellmanMock
 }
 
-func (dhm *defaultDiffieHellman) SharedSecret(publicKey *ecdsa.PublicKey, tag string, moment []byte) ([]byte, error) {
-	return dhm.mock.SharedSecret(publicKey, tag, moment)
+func (dhm *defaultDiffieHellman) SharedSecret(publicKey *ecdsa.PublicKey, tag string, salt []byte) ([]byte, error) {
+	return dhm.mock.SharedSecret(publicKey, tag, salt)
 }
 
 func NewDiffieHellman(key *ecdsa.PrivateKey) DiffieHellman {
