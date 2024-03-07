@@ -25,22 +25,28 @@ type DefaultAccessLogic struct {
 
 // Will give back Swarm reference with symmertic encryption key (128 byte)
 // @publisher: public key
-func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
-
-	// Create byte arrays
+func (al *DefaultAccessLogic) GetLookUpKey(publisher string, tag string) (string, error){
 	zeroByteArray := []byte{0}
-	oneByteArray := []byte{1}
 	// Generate lookup key using Diffie Hellman
 	lookup_key, err := al.diffieHellman.SharedSecret(publisher, tag, zeroByteArray)
 	if err != nil {
 		return "", err
 	}
+	return lookup_key, nil
+
+}
+
+func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag string) (string, error){
+	oneByteArray := []byte{1}
 	// Generate access key decryption key using Diffie Hellman
 	access_key_decryption_key, err := al.diffieHellman.SharedSecret(publisher, tag, oneByteArray)
 	if err != nil {
 		return "", err
 	}
-	// Retrive MANIFEST from ACT
+	return access_key_decryption_key, nil
+}
+
+func (al *DefaultAccessLogic) GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error) {
 	manifest_raw, err := al.act.Get(act_root_hash)
 	if err != nil {
 		return "", err
@@ -57,6 +63,21 @@ func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, pub
 		return "", err
 	}
 	encrypted_access_key, err := manifestObj.Lookup(ctx, lookup_key)
+	if err != nil {
+		return "", err
+	}
+
+	return encrypted_access_key, nil
+}
+
+func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
+
+	lookup_key,err:=al.GetLookUpKey(publisher,tag);
+	access_key_decryption_key,err:=al.GetAccessKeyDecriptionKey(publisher,tag);
+
+	// Lookup encrypted access key from the ACT manifest
+	
+	encrypted_access_key, err := al.GetEncryptedAccessKey(act_root_hash, lookup_key)
 	if err != nil {
 		return "", err
 	}
