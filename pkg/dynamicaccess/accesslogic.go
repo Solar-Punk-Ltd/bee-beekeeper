@@ -31,13 +31,6 @@ func NewAccessLogic(key encryption.Key, padding int, initCtr uint32, hashFunc fu
 			},
 		},
 		encryption: encryption.New(key, padding, initCtr, hashFunc),
-		act: &mock.ContainerMock{
-			AddFunc: func(ref string, publisher string, tag string) error {
-				return nil
-			},
-			GetFunc: func(ref string, publisher string, tag string) (string, error) {
-				return "", nil
-			},
-		},
+		act:        mock.NewActMock(),
 	}
 }
