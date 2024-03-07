@@ -1,6 +1,7 @@
 package dynamicaccess
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"hash"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type AccessLogic interface {
-	Get(encryped_ref string, publisher string, tag string) (string, error)
+	Get(ctx context.Context, act_root_hash string, encryped_ref string, publisher string, tag string) (string, error)
 }
 
 type DefaultAccessLogic struct {
@@ -18,8 +19,31 @@ type DefaultAccessLogic struct {
 	act           Act
 }
 
-func (al *DefaultAccessLogic) Get(encryped_ref string, publisher string, tag string) (string, error) {
-	return "", nil
+// Will give back Swarm reference with symmertic encryption key (128 byte)
+// @publisher: public key
+func (al *DefaultAccessLogic) Get(ctx context.Context, act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
+
+	// Create byte arrays
+	zeroByteArray := []byte{0}
+	oneByteArray := []byte{1}
+	// Generate lookup key using Diffie Hellman
+	lookup_key, err := al.diffieHellman.SharedSecret(publisher, tag, zeroByteArray)
+	if err != nil {
+		return "", err
+	}
+	// Generate access key decryption key using Diffie Hellman
+	access_key_decryption_key, err := al.diffieHellman.SharedSecret(publisher, tag, oneByteArray)
+	if err != nil {
+		return "", err
+	}
+	// Retrive MANIFEST from ACT
+	// Lookup encrypted access key from the ACT manifest
+	ENCRYPTED_ACCESS_KEY, err := al.act.Get(ctx, []byte(act_root_hash), lookup_key)
+
+	// Decrypt access key
+	ACCESS_KEY := DECRYPT(ENCRYPTED_ACCESS_KEY, access_key_decryption_key)
+	// Decrypt reference
+	return DECRYPT(encryped_ref, ACCESS_KEY)
 }
 
 // use DiffieHellmanMock
@@ -31,6 +55,16 @@ func NewAccessLogic(key encryption.Key, padding int, initCtr uint32, hashFunc fu
 			},
 		},
 		encryption: encryption.New(key, padding, initCtr, hashFunc),
-		act:        mock.NewActMock(),
+		act:        NewDefaultAct(),
 	}
 }
+
+// -------
+// act: &mock.ContainerMock{
+// 	AddFunc: func(ref string, publisher string, tag string) error {
+// 		return nil
+// 	},
+// 	GetFunc: func(ref string, publisher string, tag string) (string, error) {
+// 		return "", nil
+// 	},
+// },

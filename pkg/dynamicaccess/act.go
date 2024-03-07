@@ -9,7 +9,7 @@ import (
 
 type Act interface {
 	Add(ctx context.Context, rootHash string, lookupKey []byte, encryptedAccessKey string) (swarm.Address, error)
-	Get(ctx context.Context, index []byte) (string, error)
+	Get(ctx context.Context, rootHash []byte, lookupKey0 []byte) (string, error)
 }
 
 var _ Act = (*defaultAct)(nil)
@@ -22,8 +22,8 @@ func (act *defaultAct) Add(ctx context.Context, rootHash string, lookupKey []byt
 	return act.container.Add(ctx, rootHash, lookupKey, encryptedAccessKey)
 }
 
-func (act *defaultAct) Get(ctx context.Context, index []byte) (string, error) {
-	return act.container.Get(ctx, index)
+func (act *defaultAct) Get(ctx context.Context, rootHash []byte, lookupKey0 []byte) (string, error) {
+	return act.container.Get(ctx, rootHash, lookupKey0)
 }
 
 // TODO: maybe return Act pointer
