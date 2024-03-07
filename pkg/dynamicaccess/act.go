@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
+	"github.com/ethersphere/bee/pkg/manifest"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -26,9 +27,8 @@ func (act *defaultAct) Get(ctx context.Context, rootHash []byte, lookupKey0 []by
 	return act.container.Get(ctx, rootHash, lookupKey0)
 }
 
-// TODO: maybe return Act pointer
-func NewDefaultAct() Act {
+func NewDefaultAct(m manifest.Interface) Act {
 	return &defaultAct{
-		container: mock.NewActMock([]byte{0}),
+		container: mock.NewActMock(m),
 	}
 }

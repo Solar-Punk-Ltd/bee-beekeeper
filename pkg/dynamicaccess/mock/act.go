@@ -25,14 +25,11 @@ func (act *ActMock) Add(ctx context.Context, rootHash string, lookupKey0 []byte,
 		metadata := make(map[string]string)
 		metadata[ContentTypeHeader] = "text/plain"
 		metadata[hex.EncodeToString(lookupKey0)] = encryptedAccessKey
-		err := act.manifest.Add(ctx,
-			rootHash,
-			manifest.NewEntry(swarm.NewAddress(lookupKey0), metadata))
+		err := act.manifest.Add(ctx, manifest.RootPath, manifest.NewEntry(swarm.ZeroAddress, metadata))
 		if err != nil {
 			return swarm.ZeroAddress, err
 		}
 		manifestReference, err := act.manifest.Store(ctx)
-		// TODO putter.Done()
 		return manifestReference, err
 	}
 	return act.AddFunc(ctx, rootHash, lookupKey0, encryptedAccessKey)
@@ -40,9 +37,10 @@ func (act *ActMock) Add(ctx context.Context, rootHash string, lookupKey0 []byte,
 
 func (act *ActMock) Get(ctx context.Context, rootHash []byte, lookupKey0 []byte) (string, error) {
 	if act.GetFunc == nil {
-		me, err := act.manifest.Lookup(ctx, hex.EncodeToString(rootHash))
+		me, err := act.manifest.Lookup(ctx, manifest.RootPath)
 		if err != nil {
-			return swarm.ZeroAddress.ByteString(), err
+			// "not enough bytes for node fork: 64 (96) on byte '61'"
+			return swarm.ZeroAddress.String(), err
 		}
 		encryptedAccessKey := me.Metadata()[hex.EncodeToString(lookupKey0)]
 		return encryptedAccessKey, err
@@ -50,11 +48,7 @@ func (act *ActMock) Get(ctx context.Context, rootHash []byte, lookupKey0 []byte)
 	return act.GetFunc(ctx, rootHash, lookupKey0)
 }
 
-func NewActMock(accessKey []byte) *ActMock {
-	m, err := manifest.NewDefaultManifest(nil, true)
-	if err != nil {
-		return nil
-	}
+func NewActMock(m manifest.Interface) *ActMock {
 	return &ActMock{
 		manifest: m,
 	}
