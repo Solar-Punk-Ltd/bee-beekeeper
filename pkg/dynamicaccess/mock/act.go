@@ -1,30 +1,61 @@
 package mock
 
 import (
+	"context"
+	"encoding/hex"
+
+	"github.com/ethersphere/bee/pkg/manifest"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
+const (
+	ContentTypeHeader = "Content-Type"
+)
+
 type ActMock struct {
-	AddFunc func(ref swarm.Address, oldRootHash string) error
-	GetFunc func(index swarm.Address) (string, error)
-	data    map[string]string
+	AddFunc  func(ctx context.Context, rootHash string, lookupKey0 []byte, encryptedAccessKey string) (swarm.Address, error)
+	GetFunc  func(ctx context.Context, rootHash []byte, key []byte) (string, error)
+	manifest manifest.Interface
+	// TODO putter
 }
 
-func (act *ActMock) Add(ref swarm.Address, value string) error {
+// TODO: check length of keys, publisher etc.
+func (act *ActMock) Add(ctx context.Context, rootHash string, lookupKey0 []byte, encryptedAccessKey string) (swarm.Address, error) {
 	if act.AddFunc == nil {
-		act.data[ref.String()] = value
+		metadata := make(map[string]string)
+		metadata[ContentTypeHeader] = "text/plain"
+		metadata[hex.EncodeToString(lookupKey0)] = encryptedAccessKey
+		err := act.manifest.Add(ctx,
+			rootHash,
+			manifest.NewEntry(swarm.NewAddress(lookupKey0), metadata))
+		if err != nil {
+			return swarm.ZeroAddress, err
+		}
+		manifestReference, err := act.manifest.Store(ctx)
+		// TODO putter.Done()
+		return manifestReference, err
+	}
+	return act.AddFunc(ctx, rootHash, lookupKey0, encryptedAccessKey)
+}
+
+func (act *ActMock) Get(ctx context.Context, rootHash []byte, lookupKey0 []byte) (string, error) {
+	if act.GetFunc == nil {
+		me, err := act.manifest.Lookup(ctx, hex.EncodeToString(rootHash))
+		if err != nil {
+			return swarm.ZeroAddress.ByteString(), err
+		}
+		encryptedAccessKey := me.Metadata()[hex.EncodeToString(lookupKey0)]
+		return encryptedAccessKey, err
+	}
+	return act.GetFunc(ctx, rootHash, lookupKey0)
+}
+
+func NewActMock(accessKey []byte) *ActMock {
+	m, err := manifest.NewDefaultManifest(nil, true)
+	if err != nil {
 		return nil
 	}
-	return act.AddFunc(ref, value)
-}
-
-func (act *ActMock) Get(index swarm.Address) (string, error) {
-	if act.GetFunc == nil {
-		return act.data[index.String()], nil
+	return &ActMock{
+		manifest: m,
 	}
-	return act.GetFunc(index)
-}
-
-func NewActMock() *ActMock {
-	return &ActMock{data: make(map[string]string)}
 }
