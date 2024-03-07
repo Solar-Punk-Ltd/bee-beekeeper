@@ -1,6 +1,7 @@
 package dynamicaccess
 
-type Act interface{}
+type Act interface{
+}
 
 type defaultAct struct {
 }

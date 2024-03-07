@@ -8,4 +8,8 @@ func TestXxx(t *testing.T) {
 	if al == nil {
 		t.Errorf("Error creating access logic")
 	}
+	newObj,err:=al.Get("rootKey", "encryped_ref", "publisher", "tag")
+	if err!=nil {
+	println(newObj)
+	}
 }
