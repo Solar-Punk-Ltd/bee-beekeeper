@@ -10,6 +10,8 @@ type Act interface {
 	Get(index swarm.Address) (string, error)
 }
 
+var _ Act = (*defaultAct)(nil)
+
 type defaultAct struct {
 	container *mock.ActMock
 }

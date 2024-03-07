@@ -10,6 +10,8 @@ type DiffieHellman interface {
 	SharedSecret(publicKey *ecdsa.PublicKey, tag string, moment []byte) ([]byte, error) // tag- topic?
 }
 
+var _ DiffieHellman = (*defaultDiffieHellman)(nil)
+
 type defaultDiffieHellman struct {
 	mock *mock.DiffieHellmanMock
 }
@@ -20,7 +22,7 @@ func (dhm *defaultDiffieHellman) SharedSecret(publicKey *ecdsa.PublicKey, tag st
 
 func NewDiffieHellman(key *ecdsa.PrivateKey) DiffieHellman {
 	return &defaultDiffieHellman{
-		mock: mock.NewDiffieHellmanMock(),
+		mock: mock.NewDiffieHellmanMock(key),
 	}
 
 }

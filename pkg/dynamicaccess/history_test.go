@@ -8,7 +8,7 @@ import (
 )
 
 func TestHistoryFirstAdd(t *testing.T) {
-	storer := inmemchunkstore.New()
+	_ = inmemchunkstore.New()
 
 	topicStr := "testtopic"
 	topic, err := crypto.LegacyKeccak256([]byte(topicStr))
@@ -18,7 +18,7 @@ func TestHistoryFirstAdd(t *testing.T) {
 
 	pk, _ := crypto.GenerateSecp256k1Key()
 	signer := crypto.NewDefaultSigner(pk)
-	owner, err := signer.EthereumAddress()
+	owner, _ := signer.EthereumAddress()
 
 	// updater, err := mock.HistoryUpdater(storer, signer, topic)
 	// if err != nil {
