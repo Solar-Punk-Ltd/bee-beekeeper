@@ -1,22 +1,31 @@
 package dynamicaccess
 
-// TODO FROM BEE!!!!
-// timestamp alapú history
+import (
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethersphere/bee/pkg/feeds"
+)
+
 type History interface {
-	Add(oldItemKey string, oldRootHash string) (newRootHash string, err error)
-	Get(rootKey string) (value string, err error)
+	Add(topic []byte, owner common.Address, timestamp int64, payload, sig []byte) error
+	Get(topic []byte, owner common.Address, timestamp int64) error
 }
 
-type defaultHistory struct{}
+var _ History = (*history)(nil)
 
-func (h *defaultHistory) Add(oldItemKey string, oldRootHash string) (newRootHash string, err error) {
-	return "", nil
+type history struct {
+	Feed *feeds.Feed
 }
 
-func (h *defaultHistory) Get(rootKey string) (value string, err error) {
-	return "", nil
+func NewHistory(topic []byte, owner common.Address) *history {
+	return &history{Feed: &feeds.Feed{Topic: topic, Owner: owner}}
 }
 
-func NewHistory() History {
-	return &defaultHistory{}
+func (h *history) Add(topic []byte, owner common.Address, timestamp int64, payload, sig []byte) error {
+	// use timestamp based feed update
+	return nil
+}
+
+func (h *history) Get(topic []byte, owner common.Address, timestamp int64) error {
+	// get the feed
+	return nil
 }
