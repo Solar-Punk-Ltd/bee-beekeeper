@@ -23,6 +23,22 @@ func TestGetLookupKey_Success(t *testing.T) {
 	}
 }
 
+func TestGetLookupKey_Error(t *testing.T) {
+	al := NewAccessLogic(encryption.Key{0}, 4096, uint32(0), hashFunc)
+
+	invalidPublisher := ""
+	tag := "exampleTag"
+
+	lookupKey, err := al.GetLookUpKey(invalidPublisher, tag)
+	if err != nil {
+		t.Errorf("There was an error while fetching lookup key")
+	}
+
+	if lookupKey != "" {
+		t.Errorf("Expected lookup key to be empty for invalid input")
+	}
+}
+
 func TestXxx(t *testing.T) {
 	/*var loadSaver file.LoadSaver
 	var ctx context.Context
