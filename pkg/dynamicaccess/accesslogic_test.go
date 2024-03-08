@@ -95,22 +95,63 @@ func TestGetEncryptedAccessKey_Error(t *testing.T) {
 	actRootHash := "0xabcexample"
 	lookupKey := "exampleLookupKey"
 
-	empty_act_result, err := al.GetEncryptedAccessKey("", lookupKey)
-	if err != nil {
-		t.Errorf("There was an error while executing GetEncryptedAccessKey")
-	}
-
+	empty_act_result, _ := al.GetEncryptedAccessKey("", lookupKey)
 	if empty_act_result != nil {
 		t.Errorf("GetEncryptedAccessKey should give back nil for empty act root hash!")
 	}
 
-	empty_lookup_result, err := al.GetEncryptedAccessKey(actRootHash, "")
-	if err != nil {
-		t.Errorf("There was an error while executing GetEncryptedAccessKey")
-	}
+	empty_lookup_result, _ := al.GetEncryptedAccessKey(actRootHash, "")
 
 	if empty_lookup_result != nil {
 		t.Errorf("GetEncryptedAccessKey should give back nil for empty lookup key!")
+	}
+}
+
+func TestGet_Success(t *testing.T) {
+	al := NewAccessLogic(encryption.Key{0}, 4096, uint32(0), hashFunc)
+
+	actRootHash := "0xabcexample"
+	encryptedRef := "bzzabcasab"
+	publisher := "examplePublisher"
+	tag := "exampleTag"
+
+	ref, err := al.Get(actRootHash, encryptedRef, publisher, tag)
+	if err != nil {
+		t.Errorf("There was an error while calling Get")
+	}
+
+	expectedRef := "bzzNotEncrypted128long"
+	if ref != expectedRef {
+		t.Errorf("Get gave back wrong Swarm reference!")
+	}
+}
+
+func TestGet_Error(t *testing.T) {
+	al := NewAccessLogic(encryption.Key{0}, 4096, uint32(0), hashFunc)
+
+	actRootHash := "0xabcexample"
+	encryptedRef := "bzzabcasab"
+	publisher := "examplePublisher"
+	tag := "exampleTag"
+
+	refOne, _ := al.Get("", encryptedRef, publisher, tag)
+	if refOne != "" {
+		t.Errorf("Get should give back empty string if ACT root hash not provided!")
+	}
+
+	refTwo, _ := al.Get(actRootHash, "", publisher, tag)
+	if refTwo != "" {
+		t.Errorf("Get should give back empty string if encrypted ref not provided!")
+	}
+
+	refThree, _ := al.Get(actRootHash, encryptedRef, "", tag)
+	if refThree != "" {
+		t.Errorf("Get should give back empty string if publisher not provided!")
+	}
+
+	refFour, _ := al.Get(actRootHash, encryptedRef, publisher, "")
+	if refFour != "" {
+		t.Errorf("Get should give back empty string if tag was not provided!")
 	}
 }
 

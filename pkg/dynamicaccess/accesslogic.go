@@ -2,6 +2,7 @@ package dynamicaccess
 
 import (
 	"context"
+	"errors"
 	"hash"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
@@ -50,6 +51,13 @@ func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag st
 }
 
 func (al *DefaultAccessLogic) GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error) {
+	if act_root_hash == "" {
+		return nil, errors.New("no ACT root hash was provided")
+	}
+	if lookup_key == "" {
+		return nil, errors.New("no lookup key")
+	}
+
 	manifest_raw, err := al.act.Get(act_root_hash)
 	if err != nil {
 		return nil, err
