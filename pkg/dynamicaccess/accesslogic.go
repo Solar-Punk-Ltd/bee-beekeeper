@@ -16,6 +16,7 @@ var hashFunc = sha3.NewLegacyKeccak256
 type AccessLogic interface {
 	Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error)
 	GetLookUpKey(publisher string, tag string) (string, error)
+	GetAccessKeyDecriptionKey(publisher string, tag string) (string, error)
 }
 
 type DefaultAccessLogic struct {

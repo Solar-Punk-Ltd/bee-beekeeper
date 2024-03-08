@@ -19,7 +19,7 @@ func TestGetLookupKey_Success(t *testing.T) {
 
 	expectedLookupKey := "expectedLookupKey"
 	if lookupKey != expectedLookupKey {
-		t.Errorf("The lookup key that was returned is not correct")
+		t.Errorf("The lookup key that was returned is not correct!")
 	}
 }
 
@@ -36,6 +36,39 @@ func TestGetLookupKey_Error(t *testing.T) {
 
 	if lookupKey != "" {
 		t.Errorf("Expected lookup key to be empty for invalid input")
+	}
+}
+
+func TestGetAccessKeyDecriptionKey_Success(t *testing.T) {
+	al := NewAccessLogic(encryption.Key{0}, 4096, uint32(0), hashFunc)
+
+	publisher := "examplePublisher"
+	tag := "exampleTag"
+
+	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(publisher, tag)
+	if err != nil {
+		t.Errorf("GetAccessKeyDecriptionKey gave back error")
+	}
+
+	expectedResult := "we-dont-know"
+	if access_key_decryption_key != expectedResult {
+		t.Errorf("The access key decryption key is not correct!")
+	}
+}
+
+func TestGetAccessKeyDecriptionKey_Error(t *testing.T) {
+	al := NewAccessLogic(encryption.Key{0}, 4096, uint32(0), hashFunc)
+
+	invalidPublisher := ""
+	tag := "exampleTag"
+
+	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(invalidPublisher, tag)
+	if err != nil {
+		t.Errorf("GetAccessKeyDecriptionKey gave back error")
+	}
+
+	if access_key_decryption_key != "" {
+		t.Errorf("GetAccessKeyDecriptionKey should give back empty string for invalid input!")
 	}
 }
 
