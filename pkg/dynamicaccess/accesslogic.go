@@ -17,6 +17,7 @@ type AccessLogic interface {
 	Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error)
 	GetLookUpKey(publisher string, tag string) (string, error)
 	GetAccessKeyDecriptionKey(publisher string, tag string) (string, error)
+	GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error)
 }
 
 type DefaultAccessLogic struct {

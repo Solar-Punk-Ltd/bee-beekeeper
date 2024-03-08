@@ -72,6 +72,48 @@ func TestGetAccessKeyDecriptionKey_Error(t *testing.T) {
 	}
 }
 
+func TestGetEncryptedAccessKey_Success(t *testing.T) {
+	al := NewAccessLogic(encryption.Key{0}, 4096, uint32(0), hashFunc)
+
+	actRootHash := "0xabcexample"
+	lookupKey := "exampleLookupKey"
+
+	encrypted_access_key, err := al.GetEncryptedAccessKey(actRootHash, lookupKey)
+	if err != nil {
+		t.Errorf("There was an error while executing GetEncryptedAccessKey")
+	}
+
+	expectedEncryptedKey := "abc013encryptedkey"
+	if encrypted_access_key != expectedEncryptedKey {
+		t.Errorf("GetEncryptedAccessKey didn't give back the expected value!")
+	}
+}
+
+func TestGetEncryptedAccessKey_Error(t *testing.T) {
+	al := NewAccessLogic(encryption.Key{0}, 4096, uint32(0), hashFunc)
+
+	actRootHash := "0xabcexample"
+	lookupKey := "exampleLookupKey"
+
+	empty_act_result, err := al.GetEncryptedAccessKey("", lookupKey)
+	if err != nil {
+		t.Errorf("There was an error while executing GetEncryptedAccessKey")
+	}
+
+	if empty_act_result != nil {
+		t.Errorf("GetEncryptedAccessKey should give back nil for empty act root hash!")
+	}
+
+	empty_lookup_result, err := al.GetEncryptedAccessKey(actRootHash, "")
+	if err != nil {
+		t.Errorf("There was an error while executing GetEncryptedAccessKey")
+	}
+
+	if empty_lookup_result != nil {
+		t.Errorf("GetEncryptedAccessKey should give back nil for empty lookup key!")
+	}
+}
+
 func TestXxx(t *testing.T) {
 	/*var loadSaver file.LoadSaver
 	var ctx context.Context
