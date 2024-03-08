@@ -1,7 +1,6 @@
 package mock
 
 import (
-	"context"
 	"encoding/hex"
 
 	"github.com/ethersphere/bee/pkg/manifest"
@@ -13,43 +12,37 @@ const (
 )
 
 type ActMock struct {
-	AddFunc  func(ctx context.Context, rootHash string, lookupKey0 []byte, encryptedAccessKey string) (swarm.Address, error)
-	GetFunc  func(ctx context.Context, rootHash []byte, key []byte) (string, error)
-	manifest manifest.Interface
-	// TODO putter
+	AddFunc      func(rootHash string, lookupKey []byte, encryptedAccessKey []byte) (swarm.Address, error)
+	GetFunc      func(rootHash string, lookpupkey []byte) (string, error)
+	manifestMock map[string]map[string]string
 }
 
 // TODO: check length of keys, publisher etc.
-func (act *ActMock) Add(ctx context.Context, rootHash string, lookupKey0 []byte, encryptedAccessKey string) (swarm.Address, error) {
+func (act *ActMock) Add(rootHash string, lookupKey []byte, encryptedAccessKey []byte) (swarm.Address, error) {
 	if act.AddFunc == nil {
 		metadata := make(map[string]string)
 		metadata[ContentTypeHeader] = "text/plain"
-		metadata[hex.EncodeToString(lookupKey0)] = encryptedAccessKey
-		err := act.manifest.Add(ctx, manifest.RootPath, manifest.NewEntry(swarm.ZeroAddress, metadata))
-		if err != nil {
-			return swarm.ZeroAddress, err
-		}
-		manifestReference, err := act.manifest.Store(ctx)
-		return manifestReference, err
+		metadata[hex.EncodeToString(lookupKey)] = hex.EncodeToString(encryptedAccessKey)
+		act.manifestMock[rootHash] = metadata
+		return swarm.ZeroAddress, nil
 	}
-	return act.AddFunc(ctx, rootHash, lookupKey0, encryptedAccessKey)
+	return act.AddFunc(rootHash, lookupKey, encryptedAccessKey)
 }
 
-func (act *ActMock) Get(ctx context.Context, rootHash []byte, lookupKey0 []byte) (string, error) {
+func (act *ActMock) Get(rootHash string, lookupKey []byte) (string, error) {
 	if act.GetFunc == nil {
-		me, err := act.manifest.Lookup(ctx, manifest.RootPath)
-		if err != nil {
-			// "not enough bytes for node fork: 64 (96) on byte '61'"
-			return swarm.ZeroAddress.String(), err
+		metadata := act.manifestMock[rootHash]
+		if metadata == nil {
+			return swarm.ZeroAddress.String(), manifest.ErrNotFound
 		}
-		encryptedAccessKey := me.Metadata()[hex.EncodeToString(lookupKey0)]
-		return encryptedAccessKey, err
+		encryptedAccessKey := metadata[hex.EncodeToString(lookupKey)]
+		return encryptedAccessKey, nil
 	}
-	return act.GetFunc(ctx, rootHash, lookupKey0)
+	return act.GetFunc(rootHash, lookupKey)
 }
 
-func NewActMock(m manifest.Interface) *ActMock {
+func NewActMock() *ActMock {
 	return &ActMock{
-		manifest: m,
+		manifestMock: make(map[string]map[string]string),
 	}
 }
