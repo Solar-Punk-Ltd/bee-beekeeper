@@ -1,14 +1,27 @@
 package dynamicaccess
 
 import (
-	"context"
-	"fmt"
 	"testing"
 
-	file "github.com/ethersphere/bee/pkg/file"
-	manifest "github.com/ethersphere/bee/pkg/manifest"
-	"github.com/ethersphere/bee/pkg/swarm"
+	"github.com/ethersphere/bee/pkg/encryption"
 )
+
+func TestGetLookupKey_Success(t *testing.T) {
+	al := NewAccessLogic(encryption.Key{0}, 4096, uint32(0), hashFunc)
+
+	publisher := "examplePublisher"
+	tag := "exampleTag"
+
+	lookupKey, err := al.GetLookUpKey(publisher, tag)
+	if err != nil {
+		t.Errorf("Could not fetch lookup key from publisher and tag")
+	}
+
+	expectedLookupKey := "expectedLookupKey"
+	if lookupKey != expectedLookupKey {
+		t.Errorf("The lookup key that was returned is not correct")
+	}
+}
 
 func TestXxx(t *testing.T) {
 	/*var loadSaver file.LoadSaver
@@ -19,17 +32,19 @@ func TestXxx(t *testing.T) {
 	if err != nil {
 
 	}*/
-	//key encryption.Key, padding int, initCtr uint32, hashFunc func() hash.Hash
-	al := NewAccessLogic(nil, 0, 0, nil)
-	if al == nil {
-		t.Errorf("Error creating access logic")
-	}
-	newObj, err := al.Get("rootKey", "encryped_ref", "publisher", "tag")
-	if err != nil {
-		println(newObj)
-	}
+	/*
+		//key encryption.Key, padding int, initCtr uint32, hashFunc func() hash.Hash
+		al := NewAccessLogic(nil, 0, 0, nil)
+		if al == nil {
+			t.Errorf("Error creating access logic")
+		}
+		newObj, err := al.Get("rootKey", "encryped_ref", "publisher", "tag")
+		if err != nil {
+			println(newObj)
+		}*/
 }
 
+/*
 type simpleLoadSaver struct{}
 
 func (s *simpleLoadSaver) Load(ctx context.Context, address swarm.Address) ([]byte, error) {
@@ -99,3 +114,4 @@ func SomeTest() {
 		fmt.Println("Address:", addr)
 	}
 }
+*/

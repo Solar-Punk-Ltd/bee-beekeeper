@@ -15,6 +15,7 @@ var hashFunc = sha3.NewLegacyKeccak256
 
 type AccessLogic interface {
 	Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error)
+	GetLookUpKey(publisher string, tag string) (string, error)
 }
 
 type DefaultAccessLogic struct {
@@ -25,7 +26,7 @@ type DefaultAccessLogic struct {
 
 // Will give back Swarm reference with symmertic encryption key (128 byte)
 // @publisher: public key
-func (al *DefaultAccessLogic) GetLookUpKey(publisher string, tag string) (string, error){
+func (al *DefaultAccessLogic) GetLookUpKey(publisher string, tag string) (string, error) {
 	zeroByteArray := []byte{0}
 	// Generate lookup key using Diffie Hellman
 	lookup_key, err := al.diffieHellman.SharedSecret(publisher, tag, zeroByteArray)
@@ -36,7 +37,7 @@ func (al *DefaultAccessLogic) GetLookUpKey(publisher string, tag string) (string
 
 }
 
-func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag string) (string, error){
+func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag string) (string, error) {
 	oneByteArray := []byte{1}
 	// Generate access key decryption key using Diffie Hellman
 	access_key_decryption_key, err := al.diffieHellman.SharedSecret(publisher, tag, oneByteArray)
@@ -49,7 +50,7 @@ func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag st
 func (al *DefaultAccessLogic) GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error) {
 	manifest_raw, err := al.act.Get(act_root_hash)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	al.act.Get(act_root_hash)
 
@@ -60,11 +61,11 @@ func (al *DefaultAccessLogic) GetEncryptedAccessKey(act_root_hash string, lookup
 	//y, err := x.Load(ctx, []byte(manifest_obj))
 	manifestObj, err := manifest.NewDefaultManifest(loadSaver, false)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	encrypted_access_key, err := manifestObj.Lookup(ctx, lookup_key)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	return encrypted_access_key, nil
@@ -72,11 +73,17 @@ func (al *DefaultAccessLogic) GetEncryptedAccessKey(act_root_hash string, lookup
 
 func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
 
-	lookup_key,err:=al.GetLookUpKey(publisher,tag);
-	access_key_decryption_key,err:=al.GetAccessKeyDecriptionKey(publisher,tag);
+	lookup_key, err := al.GetLookUpKey(publisher, tag)
+	if err != nil {
+		return "", err
+	}
+	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(publisher, tag)
+	if err != nil {
+		return "", err
+	}
 
 	// Lookup encrypted access key from the ACT manifest
-	
+
 	encrypted_access_key, err := al.GetEncryptedAccessKey(act_root_hash, lookup_key)
 	if err != nil {
 		return "", err
