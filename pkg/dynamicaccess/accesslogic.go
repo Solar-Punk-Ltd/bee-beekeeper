@@ -2,9 +2,9 @@ package dynamicaccess
 
 import (
 	"context"
-	"hash"
+	"crypto/ecdsa"
+	"errors"
 
-	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
 	encryption "github.com/ethersphere/bee/pkg/encryption"
 	file "github.com/ethersphere/bee/pkg/file"
 	manifest "github.com/ethersphere/bee/pkg/manifest"
@@ -15,35 +15,51 @@ var hashFunc = sha3.NewLegacyKeccak256
 
 type AccessLogic interface {
 	Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error)
+	GetLookUpKey(publisher string, tag string) (string, error)
+	GetAccessKeyDecriptionKey(publisher string, tag string) (string, error)
+	GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error)
 }
 
 type DefaultAccessLogic struct {
 	diffieHellman DiffieHellman
-	encryption    encryption.Interface
-	act           defaultAct
+	//encryption    encryption.Interface
+	act defaultAct
 }
 
 // Will give back Swarm reference with symmertic encryption key (128 byte)
 // @publisher: public key
-func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
-
-	// Create byte arrays
+func (al *DefaultAccessLogic) GetLookUpKey(publisher string, tag string) (string, error) {
 	zeroByteArray := []byte{0}
-	oneByteArray := []byte{1}
 	// Generate lookup key using Diffie Hellman
 	lookup_key, err := al.diffieHellman.SharedSecret(publisher, tag, zeroByteArray)
 	if err != nil {
 		return "", err
 	}
+	return lookup_key, nil
+
+}
+
+func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag string) (string, error) {
+	oneByteArray := []byte{1}
 	// Generate access key decryption key using Diffie Hellman
 	access_key_decryption_key, err := al.diffieHellman.SharedSecret(publisher, tag, oneByteArray)
 	if err != nil {
 		return "", err
 	}
-	// Retrive MANIFEST from ACT
+	return access_key_decryption_key, nil
+}
+
+func (al *DefaultAccessLogic) GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error) {
+	if act_root_hash == "" {
+		return nil, errors.New("no ACT root hash was provided")
+	}
+	if lookup_key == "" {
+		return nil, errors.New("no lookup key")
+	}
+
 	manifest_raw, err := al.act.Get(act_root_hash)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	al.act.Get(act_root_hash)
 
@@ -54,9 +70,30 @@ func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, pub
 	//y, err := x.Load(ctx, []byte(manifest_obj))
 	manifestObj, err := manifest.NewDefaultManifest(loadSaver, false)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	encrypted_access_key, err := manifestObj.Lookup(ctx, lookup_key)
+	if err != nil {
+		return nil, err
+	}
+
+	return encrypted_access_key, nil
+}
+
+func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
+
+	lookup_key, err := al.GetLookUpKey(publisher, tag)
+	if err != nil {
+		return "", err
+	}
+	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(publisher, tag)
+	if err != nil {
+		return "", err
+	}
+
+	// Lookup encrypted access key from the ACT manifest
+
+	encrypted_access_key, err := al.GetEncryptedAccessKey(act_root_hash, lookup_key)
 	if err != nil {
 		return "", err
 	}
@@ -78,15 +115,11 @@ func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, pub
 	return string(ref), nil
 }
 
-func NewAccessLogic(key encryption.Key, padding int, initCtr uint32, hashFunc func() hash.Hash) AccessLogic {
+func NewAccessLogic(diffieHellmanPrivateKey *ecdsa.PrivateKey) AccessLogic {
 	return &DefaultAccessLogic{
-		diffieHellman: &mock.DiffieHellmanMock{
-			SharedSecretFunc: func(publicKey string, tag string, moment []byte) (string, error) {
-				return publicKey, nil
-			},
-		},
-		encryption: encryption.New(key, padding, initCtr, hashFunc),
-		act:        defaultAct{},
+		diffieHellman: NewDiffieHellman(diffieHellmanPrivateKey),
+		//encryption:    encryption.New(key, padding, initCtr, hashFunc),
+		act: defaultAct{},
 
 		// {
 		// 	AddFunc: func(ref string, publisher string, tag string) error {
