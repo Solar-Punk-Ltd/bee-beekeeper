@@ -15,6 +15,8 @@ var hashFunc = sha3.NewLegacyKeccak256
 
 type AccessLogic interface {
 	Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error)
+	Add(act_root_hash string, ref string, publisher string, tag string) (string, error)
+
 	GetLookUpKey(publisher string, tag string) (string, error)
 	GetAccessKeyDecriptionKey(publisher string, tag string) (string, error)
 	GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error)
@@ -115,29 +117,21 @@ func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, pub
 	return string(ref), nil
 }
 
+func (al *DefaultAccessLogic) Add(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
+	lookup_key, err := al.GetLookUpKey(publisher, tag)
+	if err != nil {
+		return "", err
+	}
+	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(publisher, tag)
+	if err != nil {
+		return "", err
+	}
+
+}
+
 func NewAccessLogic(diffieHellmanPrivateKey *ecdsa.PrivateKey) AccessLogic {
 	return &DefaultAccessLogic{
 		diffieHellman: NewDiffieHellman(diffieHellmanPrivateKey),
-		//encryption:    encryption.New(key, padding, initCtr, hashFunc),
-		act: defaultAct{},
-
-		// {
-		// 	AddFunc: func(ref string, publisher string, tag string) error {
-		// 		return nil
-		// 	},
-		// 	GetFunc: func(ref string, publisher string, tag string) (string, error) {
-		// 		return "", nil
-		// 	},
-		// },
+		act:           defaultAct{},
 	}
 }
-
-// -------
-// act: &mock.ContainerMock{
-// 	AddFunc: func(ref string, publisher string, tag string) error {
-// 		return nil
-// 	},
-// 	GetFunc: func(ref string, publisher string, tag string) (string, error) {
-// 		return "", nil
-// 	},
-// },
