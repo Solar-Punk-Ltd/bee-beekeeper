@@ -15,11 +15,13 @@ var hashFunc = sha3.NewLegacyKeccak256
 
 type AccessLogic interface {
 	Get(act *Act, encryped_ref string, publisher string, tag string) (string, error)
-	Add(act_root_hash string, ref string, publisher string, tag string) (string, error)
+	Add(act *Act, ref string, publisher string, tag string) (string, error)
 
 	GetLookUpKey(publisher string, tag string) (string, error)
 	GetAccessKeyDecriptionKey(publisher string, tag string) (string, error)
 	GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error)
+	CreateEncryptedAccessKey(ref string)
+	// CreateAccessKey()
 }
 
 type DefaultAccessLogic struct {
@@ -30,6 +32,33 @@ type DefaultAccessLogic struct {
 
 // Will give back Swarm reference with symmertic encryption key (128 byte)
 // @publisher: public key
+
+func (al *DefaultAccessLogic) Add_Grantee(ref string) {
+
+	//pseudo code like code
+if publisher () {
+	ak := encryption.GenerateRandomKey(encryption.KeyLength)
+
+} else {
+	lookup_key := al.GetLookUpKey(publisher_public_key, tag)
+	akdk := al.GetAccessKeyDecriptionKey(publisher_public_key, tag)
+	encrypted_ak := al.GetEncryptedAccessKey(act*Act, lookup_key)
+	cipher := encryption.New(akdk, 4096, uint32(0), hashFunc)
+	ak := cipher.Decrypt(encrypted_ak)
+
+
+}
+	access_key_cipher := encryption.New(ak, 4096, uint32(0), hashFunc)
+	encrypted_access_key := access_key_cipher.Encrypt([]byte(ak))
+	ref_cipher := encryption.New(ak, 4096, uint32(0), hashFunc).Encrypt([]byte(ref))
+	encrypted_ref := ref_cipher.Encrypt([]byte(ref))
+	
+}
+// end of pseudo code like code
+
+// func (al *DefaultAccessLogic) CreateAccessKey(reference string) {
+// }
+
 func (al *DefaultAccessLogic) GetLookUpKey(publisher string, tag string) (string, error) {
 	zeroByteArray := []byte{0}
 	// Generate lookup key using Diffie Hellman
@@ -118,6 +147,8 @@ func (al *DefaultAccessLogic) Get(act *Act, encryped_ref string, publisher strin
 }
 
 func (al *DefaultAccessLogic) Add(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
+	//generrate access key
+	access_key := encryption.GenerateRandomKey(10)
 	lookup_key, err := al.GetLookUpKey(publisher, tag)
 	if err != nil {
 		return "", err
