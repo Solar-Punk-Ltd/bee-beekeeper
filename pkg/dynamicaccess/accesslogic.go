@@ -63,7 +63,7 @@ func (al *DefaultAccessLogic) GetEncryptedAccessKey(act *Act, lookup_key string)
 	if err != nil {
 		return nil, err
 	}
-	al.act.Get(act_root_hash)
+	//al.act.Get(act_root_hash)
 
 	// Lookup encrypted access key from the ACT manifest
 	var loadSaver file.LoadSaver
