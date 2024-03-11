@@ -1,48 +1,40 @@
 package mock
 
-import (
-	"encoding/hex"
-
-	"github.com/ethersphere/bee/pkg/manifest"
-	"github.com/ethersphere/bee/pkg/swarm"
-)
-
-const (
-	ContentTypeHeader = "Content-Type"
-)
-
 type ActMock struct {
-	AddFunc      func(rootHash string, lookupKey []byte, encryptedAccessKey []byte) (swarm.Address, error)
-	GetFunc      func(rootHash string, lookpupkey []byte) (string, error)
-	manifestMock map[string]map[string]string
+	AddFunc   func(lookupKey []byte, encryptedAccessKey []byte) *ActMock
+	GetFunc   func(lookupKey []byte) string
+	LoadFunc  func(data string) error
+	StoreFunc func() (string, error)
 }
 
-// TODO: check length of keys, publisher etc.
-func (act *ActMock) Add(rootHash string, lookupKey []byte, encryptedAccessKey []byte) (swarm.Address, error) {
+func (act *ActMock) Add(lookupKey []byte, encryptedAccessKey []byte) *ActMock {
 	if act.AddFunc == nil {
-		metadata := make(map[string]string)
-		metadata[ContentTypeHeader] = "text/plain"
-		metadata[hex.EncodeToString(lookupKey)] = hex.EncodeToString(encryptedAccessKey)
-		act.manifestMock[rootHash] = metadata
-		return swarm.ZeroAddress, nil
+		return act
 	}
-	return act.AddFunc(rootHash, lookupKey, encryptedAccessKey)
+	return act.AddFunc(lookupKey, encryptedAccessKey)
 }
 
-func (act *ActMock) Get(rootHash string, lookupKey []byte) (string, error) {
+func (act *ActMock) Get(rootHash string, lookupKey []byte) string {
 	if act.GetFunc == nil {
-		metadata := act.manifestMock[rootHash]
-		if metadata == nil {
-			return swarm.ZeroAddress.String(), manifest.ErrNotFound
-		}
-		encryptedAccessKey := metadata[hex.EncodeToString(lookupKey)]
-		return encryptedAccessKey, nil
+		return ""
 	}
-	return act.GetFunc(rootHash, lookupKey)
+	return act.GetFunc(lookupKey)
+}
+
+func (act *ActMock) Load(data string) error {
+	if act.LoadFunc == nil {
+		return nil
+	}
+	return act.LoadFunc(data)
+}
+
+func (act *ActMock) Store() (string, error) {
+	if act.StoreFunc == nil {
+		return "", nil
+	}
+	return act.StoreFunc()
 }
 
 func NewActMock() *ActMock {
-	return &ActMock{
-		manifestMock: make(map[string]map[string]string),
-	}
+	return &ActMock{}
 }

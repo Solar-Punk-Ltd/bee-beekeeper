@@ -10,18 +10,14 @@ import (
 
 func TestAddGet(t *testing.T) {
 	act := dynamicaccess.NewDefaultAct()
-	rootHashString := swarm.RandAddress(t).String()
 	lookupKey := swarm.RandAddress(t).Bytes()
 	encryptedAccesskey := swarm.RandAddress(t).Bytes()
-	_, err := act.Add(rootHashString, lookupKey, encryptedAccesskey)
-	if err != nil {
-		t.Error("Add() should not return an error")
+	act2 := act.Add(lookupKey, encryptedAccesskey)
+	if act2 == nil {
+		t.Error("Add() should return an act")
 	}
 
-	key, err := act.Get(rootHashString, lookupKey)
-	if err != nil {
-		t.Error("Get() should not return an error")
-	}
+	key := act.Get(lookupKey)
 	if key != hex.EncodeToString(encryptedAccesskey) {
 		t.Errorf("Get() value is not the expected %s != %s", key, encryptedAccesskey)
 	}
