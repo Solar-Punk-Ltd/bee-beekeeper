@@ -14,7 +14,7 @@ import (
 var hashFunc = sha3.NewLegacyKeccak256
 
 type AccessLogic interface {
-	Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error)
+	Get(act *Act, encryped_ref string, publisher string, tag string) (string, error)
 	Add(act_root_hash string, ref string, publisher string, tag string) (string, error)
 
 	GetLookUpKey(publisher string, tag string) (string, error)
@@ -51,15 +51,15 @@ func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag st
 	return access_key_decryption_key, nil
 }
 
-func (al *DefaultAccessLogic) GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error) {
-	if act_root_hash == "" {
+func (al *DefaultAccessLogic) GetEncryptedAccessKey(act *Act, lookup_key string) (manifest.Entry, error) {
+	if act == nil {
 		return nil, errors.New("no ACT root hash was provided")
 	}
 	if lookup_key == "" {
 		return nil, errors.New("no lookup key")
 	}
 
-	manifest_raw, err := al.act.Get(act_root_hash)
+	manifest_raw, err := act.Get(lookup_key)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (al *DefaultAccessLogic) GetEncryptedAccessKey(act_root_hash string, lookup
 	return encrypted_access_key, nil
 }
 
-func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
+func (al *DefaultAccessLogic) Get(act *Act, encryped_ref string, publisher string, tag string) (string, error) {
 
 	lookup_key, err := al.GetLookUpKey(publisher, tag)
 	if err != nil {
@@ -95,7 +95,7 @@ func (al *DefaultAccessLogic) Get(act_root_hash string, encryped_ref string, pub
 
 	// Lookup encrypted access key from the ACT manifest
 
-	encrypted_access_key, err := al.GetEncryptedAccessKey(act_root_hash, lookup_key)
+	encrypted_access_key, err := al.GetEncryptedAccessKey(act*Act, lookup_key)
 	if err != nil {
 		return "", err
 	}
@@ -127,6 +127,7 @@ func (al *DefaultAccessLogic) Add(act_root_hash string, encryped_ref string, pub
 		return "", err
 	}
 
+	x, err := al.act.Add(oldItemKey, act_root_hash)
 }
 
 func NewAccessLogic(diffieHellmanPrivateKey *ecdsa.PrivateKey) AccessLogic {
