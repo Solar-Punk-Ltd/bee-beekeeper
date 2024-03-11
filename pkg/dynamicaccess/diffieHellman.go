@@ -11,6 +11,7 @@ type DiffieHellman interface {
 }
 
 var _ DiffieHellman = (*defaultDiffieHellman)(nil)
+var _ DiffieHellman = (*mock.DiffieHellmanMock)(nil)
 
 type defaultDiffieHellman struct {
 	mock *mock.DiffieHellmanMock
