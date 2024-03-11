@@ -32,7 +32,6 @@ func (act *defaultAct) Get(lookupKey []byte) string {
 }
 
 func (act *defaultAct) Load(data string) error {
-	act.container = make(map[string]string)
 	b := new(bytes.Buffer)
 	b.WriteString(data)
 	d := gob.NewDecoder(b)
