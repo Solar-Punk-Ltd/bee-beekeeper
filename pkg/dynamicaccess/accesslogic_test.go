@@ -23,7 +23,7 @@ func TestGetLookupKey_Success(t *testing.T) {
 	publisher := "examplePublisher"
 	tag := "exampleTag"
 
-	lookupKey, err := al.GetLookUpKey(publisher, tag)
+	lookupKey, err := al.getLookUpKey(publisher, tag)
 	if err != nil {
 		t.Errorf("Could not fetch lookup key from publisher and tag")
 	}
@@ -34,13 +34,13 @@ func TestGetLookupKey_Success(t *testing.T) {
 	}
 }
 
-func TestGetLookupKey_Error(t *testing.T) {
+func TestGetLookUpKey_Error(t *testing.T) {
 	al := setupAccessLogic()
 
 	invalidPublisher := ""
 	tag := "exampleTag"
 
-	lookupKey, err := al.GetLookUpKey(invalidPublisher, tag)
+	lookupKey, err := al.getLookUpKey(invalidPublisher, tag)
 	if err != nil {
 		t.Errorf("There was an error while fetching lookup key")
 	}
@@ -56,7 +56,7 @@ func TestGetAccessKeyDecriptionKey_Success(t *testing.T) {
 	publisher := "examplePublisher"
 	tag := "exampleTag"
 
-	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(publisher, tag)
+	access_key_decryption_key, err := al.getAccessKeyDecriptionKey(publisher, tag)
 	if err != nil {
 		t.Errorf("GetAccessKeyDecriptionKey gave back error")
 	}
@@ -73,7 +73,7 @@ func TestGetAccessKeyDecriptionKey_Error(t *testing.T) {
 	invalidPublisher := ""
 	tag := "exampleTag"
 
-	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(invalidPublisher, tag)
+	access_key_decryption_key, err := al.getAccessKeyDecriptionKey(invalidPublisher, tag)
 	if err != nil {
 		t.Errorf("GetAccessKeyDecriptionKey gave back error")
 	}
@@ -89,7 +89,7 @@ func TestGetEncryptedAccessKey_Success(t *testing.T) {
 	actRootHash := "0xabcexample"
 	lookupKey := "exampleLookupKey"
 
-	encrypted_access_key, err := al.GetEncryptedAccessKey(actRootHash, lookupKey)
+	encrypted_access_key, err := al.getEncryptedAccessKey(actRootHash, lookupKey)
 	if err != nil {
 		t.Errorf("There was an error while executing GetEncryptedAccessKey")
 	}
@@ -106,12 +106,12 @@ func TestGetEncryptedAccessKey_Error(t *testing.T) {
 	actRootHash := "0xabcexample"
 	lookupKey := "exampleLookupKey"
 
-	empty_act_result, _ := al.GetEncryptedAccessKey("", lookupKey)
+	empty_act_result, _ := al.getEncryptedAccessKey("", lookupKey)
 	if empty_act_result != nil {
 		t.Errorf("GetEncryptedAccessKey should give back nil for empty act root hash!")
 	}
 
-	empty_lookup_result, _ := al.GetEncryptedAccessKey(actRootHash, "")
+	empty_lookup_result, _ := al.getEncryptedAccessKey(actRootHash, "")
 
 	if empty_lookup_result != nil {
 		t.Errorf("GetEncryptedAccessKey should give back nil for empty lookup key!")

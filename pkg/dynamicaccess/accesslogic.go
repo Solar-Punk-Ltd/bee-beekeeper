@@ -2,7 +2,6 @@ package dynamicaccess
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 
 	encryption "github.com/ethersphere/bee/pkg/encryption"
@@ -17,10 +16,10 @@ type AccessLogic interface {
 	Get(act *Act, encryped_ref string, publisher string, tag string) (string, error)
 	Add(act *Act, ref string, publisher string, tag string) (string, error)
 
-	GetLookUpKey(publisher string, tag string) (string, error)
-	GetAccessKeyDecriptionKey(publisher string, tag string) (string, error)
-	GetEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error)
-	CreateEncryptedAccessKey(ref string)
+	getLookUpKey(publisher string, tag string) (string, error)
+	getAccessKeyDecriptionKey(publisher string, tag string) (string, error)
+	getEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error)
+	createEncryptedAccessKey(ref string)
 	// CreateAccessKey()
 }
 
@@ -33,33 +32,33 @@ type DefaultAccessLogic struct {
 // Will give back Swarm reference with symmertic encryption key (128 byte)
 // @publisher: public key
 
+// publisher is public key
 func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(ref string, publisher string) {
 
 	//pseudo code like code
-if publisher () {
-	ak := encryption.GenerateRandomKey(encryption.KeyLength)
+	if self_public_key == publisher {
+		ak := encryption.GenerateRandomKey(encryption.KeyLength)
+	} else {
+		lookup_key := al.getLookUpKey(publisher_public_key, tag)
+		akdk := al.getAccessKeyDecriptionKey(publisher_public_key, tag)
+		encrypted_ak := al.getEncryptedAccessKey(act*Act, lookup_key)
+		cipher := encryption.New(akdk, 4096, uint32(0), hashFunc)
+		ak := cipher.Decrypt(encrypted_ak)
+	}
 
-} else {
-	lookup_key := al.GetLookUpKey(publisher_public_key, tag)
-	akdk := al.GetAccessKeyDecriptionKey(publisher_public_key, tag)
-	encrypted_ak := al.GetEncryptedAccessKey(act*Act, lookup_key)
-	cipher := encryption.New(akdk, 4096, uint32(0), hashFunc)
-	ak := cipher.Decrypt(encrypted_ak)
-
-
-}
 	access_key_cipher := encryption.New(ak, 4096, uint32(0), hashFunc)
 	encrypted_access_key := access_key_cipher.Encrypt([]byte(ak))
 	ref_cipher := encryption.New(ak, 4096, uint32(0), hashFunc).Encrypt([]byte(ref))
 	encrypted_ref := ref_cipher.Encrypt([]byte(ref))
-	
+
 }
+
 // end of pseudo code like code
 
 // func (al *DefaultAccessLogic) CreateAccessKey(reference string) {
 // }
 
-func (al *DefaultAccessLogic) GetLookUpKey(publisher string, tag string) (string, error) {
+func (al *DefaultAccessLogic) getLookUpKey(publisher string, tag string) (string, error) {
 	zeroByteArray := []byte{0}
 	// Generate lookup key using Diffie Hellman
 	lookup_key, err := al.diffieHellman.SharedSecret(publisher, tag, zeroByteArray)
@@ -70,7 +69,7 @@ func (al *DefaultAccessLogic) GetLookUpKey(publisher string, tag string) (string
 
 }
 
-func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag string) (string, error) {
+func (al *DefaultAccessLogic) getAccessKeyDecriptionKey(publisher string, tag string) (string, error) {
 	oneByteArray := []byte{1}
 	// Generate access key decryption key using Diffie Hellman
 	access_key_decryption_key, err := al.diffieHellman.SharedSecret(publisher, tag, oneByteArray)
@@ -80,7 +79,7 @@ func (al *DefaultAccessLogic) GetAccessKeyDecriptionKey(publisher string, tag st
 	return access_key_decryption_key, nil
 }
 
-func (al *DefaultAccessLogic) GetEncryptedAccessKey(act *Act, lookup_key string) (manifest.Entry, error) {
+func (al *DefaultAccessLogic) getEncryptedAccessKey(act *Act, lookup_key string) (manifest.Entry, error) {
 	if act == nil {
 		return nil, errors.New("no ACT root hash was provided")
 	}
@@ -113,18 +112,18 @@ func (al *DefaultAccessLogic) GetEncryptedAccessKey(act *Act, lookup_key string)
 
 func (al *DefaultAccessLogic) Get(act *Act, encryped_ref string, publisher string, tag string) (string, error) {
 
-	lookup_key, err := al.GetLookUpKey(publisher, tag)
+	lookup_key, err := al.getLookUpKey(publisher, tag)
 	if err != nil {
 		return "", err
 	}
-	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(publisher, tag)
+	access_key_decryption_key, err := al.getAccessKeyDecriptionKey(publisher, tag)
 	if err != nil {
 		return "", err
 	}
 
 	// Lookup encrypted access key from the ACT manifest
 
-	encrypted_access_key, err := al.GetEncryptedAccessKey(act*Act, lookup_key)
+	encrypted_access_key, err := al.getEncryptedAccessKey(act*Act, lookup_key)
 	if err != nil {
 		return "", err
 	}
@@ -146,14 +145,14 @@ func (al *DefaultAccessLogic) Get(act *Act, encryped_ref string, publisher strin
 	return string(ref), nil
 }
 
-func (al *DefaultAccessLogic) Add(act_root_hash string, encryped_ref string, publisher string, tag string) (string, error) {
+func (al *DefaultAccessLogic) Add(act *Act, encryped_ref string, publisher string, tag string) (string, error) {
 	//generrate access key
 	access_key := encryption.GenerateRandomKey(10)
-	lookup_key, err := al.GetLookUpKey(publisher, tag)
+	lookup_key, err := al.getLookUpKey(publisher, tag)
 	if err != nil {
 		return "", err
 	}
-	access_key_decryption_key, err := al.GetAccessKeyDecriptionKey(publisher, tag)
+	access_key_decryption_key, err := al.getAccessKeyDecriptionKey(publisher, tag)
 	if err != nil {
 		return "", err
 	}
@@ -161,9 +160,9 @@ func (al *DefaultAccessLogic) Add(act_root_hash string, encryped_ref string, pub
 	x, err := al.act.Add(oldItemKey, act_root_hash)
 }
 
-func NewAccessLogic(diffieHellmanPrivateKey *ecdsa.PrivateKey) AccessLogic {
+func NewAccessLogic(diffieHellman DiffieHellman) AccessLogic {
 	return &DefaultAccessLogic{
-		diffieHellman: NewDiffieHellman(diffieHellmanPrivateKey),
+		diffieHellman: diffieHellman,
 		act:           defaultAct{},
 	}
 }
