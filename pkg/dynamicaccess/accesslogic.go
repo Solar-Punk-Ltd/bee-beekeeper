@@ -33,7 +33,7 @@ type DefaultAccessLogic struct {
 // Will give back Swarm reference with symmertic encryption key (128 byte)
 // @publisher: public key
 
-func (al *DefaultAccessLogic) Add_Grantee(ref string) {
+func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(ref string, publisher string) {
 
 	//pseudo code like code
 if publisher () {
