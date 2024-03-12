@@ -182,7 +182,7 @@ func TestNewAccessLogic(t *testing.T) {
 func addGranteeTest(t *testing.T) {
 	al := setupAccessLogic()
 	ref := "example_ref"
-	examplePublisher := "example_publisher"
+	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	testGranteeList := NewGrantee()
 
 	id1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -195,11 +195,11 @@ func addGranteeTest(t *testing.T) {
 	// 3. encrypted ref is returned
 	// 4. now encrypted ref and act with oine element exits
 
-	act, encyptedRef, err := actInit(ref, examplePublisher, "")
-	// now we have an empty act
+	act, encyptedRef, err := al.ActInit(ref, id0.PublicKey, "")
+	// now we have an empty acts
 	// for loop go through grantee list (start with a one element act)
 	for i := 0; i < len(testGranteeList.GetGrantees()); i++ {
-		act, _ = al.Add_New_Grantee_To_Content(act, encyptedRef, testGranteeList.GetGrantees()[i])
+		act, _ = al.Add_New_Grantee_To_Content(act, encyptedRef, id0.PublicKey, testGranteeList.GetGrantees()[i])
 	}
 
 	if err != nil {

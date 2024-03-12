@@ -21,7 +21,8 @@ type AccessLogic interface {
 	getAccessKeyDecriptionKey(publisher ecdsa.PublicKey, tag string) (string, error)
 	getEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error)
 	createEncryptedAccessKey(ref string)
-	Add_New_Grantee_To_Content(act *Act, ref string, publisher ecdsa.PublicKey) (*Act, error)
+	Add_New_Grantee_To_Content(act *Act, encryptedRef swarm.Address, publisherPubKey ecdsa.PublicKey, granteePubKey ecdsa.PublicKey) (*Act, error)
+	ActInit(ref string, publisher ecdsa.PublicKey, tag string) (*Act, swarm.Address, error)
 	// CreateAccessKey()
 }
 
@@ -34,7 +35,7 @@ type DefaultAccessLogic struct {
 // Will give back Swarm reference with symmertic encryption key (128 byte)
 // @publisher: public key
 
-func (al *DefaultAccessLogic) actInit(ref string, publisher ecdsa.PublicKey, tag string) (*Act, swarm.Address, error) {
+func (al *DefaultAccessLogic) ActInit(ref string, publisher ecdsa.PublicKey, tag string) (*Act, swarm.Address, error) {
 	act := NewDefaultAct()
 
 	lookup_key, _ := al.getLookUpKey(publisher, "")
@@ -53,24 +54,31 @@ func (al *DefaultAccessLogic) actInit(ref string, publisher ecdsa.PublicKey, tag
 }
 
 // publisher is public key
-func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act *Act, ref swarm.Address, publisher ecdsa.PublicKey) (*Act, error) {
-	lookup_key, _ := al.getLookUpKey(publisher_public_key, tag)
-	akdk, _ := al.getAccessKeyDecriptionKey(publisher_public_key, tag)
-	//pseudo code like code
-	if self_public_key == publisher {
-		//		ak := encryption.GenerateRandomKey(encryption.KeyLength)
-	} else {
-		lookup_key := al.getLookUpKey(publisher_public_key, tag)
-		akdk := al.getAccessKeyDecriptionKey(publisher_public_key, tag)
-		encrypted_ak := al.getEncryptedAccessKey(act*Act, lookup_key)
-		cipher := encryption.New(akdk, 0, uint32(0), hashFunc)
-		ak := cipher.Decrypt(encrypted_ak)
-	}
+func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act *Act, encryptedRef swarm.Address, publisherPubKey ecdsa.PublicKey, granteePubKey ecdsa.PublicKey) (*Act, error) {
 
-	access_key_cipher := encryption.New(ak, 0, uint32(0), hashFunc)
-	encrypted_access_key := access_key_cipher.Encrypt([]byte(ak))
-	ref_cipher := encryption.New(ak, 0, uint32(0), hashFunc).Encrypt([]byte(ref))
-	encrypted_ref := ref_cipher.Encrypt([]byte(ref))
+	// error handling no encrypted_ref
+
+	// 2 Diffie-Hellman for the publisher (the Creator)
+	publisher_lookup_key, _ := al.getLookUpKey(publisherPubKey, "")
+	publisher_ak_decryption_key, _ := al.getAccessKeyDecriptionKey(publisherPubKey, "")
+
+	// Get previously generated access key
+	access_key_decryption_cipher := encryption.New(encryption.Key(publisher_ak_decryption_key), 0, uint32(0), hashFunc)
+	encrypted_ak, _ := al.getEncryptedAccessKey(act, publisher_lookup_key)
+	access_key, _ := access_key_decryption_cipher.Decrypt(encrypted_ak.Reference().Bytes())
+
+	// --Encrypt access key for new Grantee--
+
+	// 2 Diffie-Hellman for the Grantee
+	lookup_key, _ := al.getLookUpKey(granteePubKey, "")
+	access_key_encryption_key, _ := al.getAccessKeyDecriptionKey(granteePubKey, "")
+
+	cipher := encryption.New(encryption.Key(access_key_encryption_key), 0, uint32(0), hashFunc)
+	granteeEncryptedAccessKey, _ := cipher.Encrypt(access_key)
+	actObj := *act
+	actObj.Add([]byte(lookup_key), granteeEncryptedAccessKey)
+
+	return &actObj, nil
 
 }
 
