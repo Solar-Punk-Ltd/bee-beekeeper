@@ -73,8 +73,10 @@ func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act *Act, encryptedRef 
 	lookup_key, _ := al.getLookUpKey(granteePubKey, "")
 	access_key_encryption_key, _ := al.getAccessKeyDecriptionKey(granteePubKey, "")
 
+	// Encrypt the access key for the new Grantee
 	cipher := encryption.New(encryption.Key(access_key_encryption_key), 0, uint32(0), hashFunc)
 	granteeEncryptedAccessKey, _ := cipher.Encrypt(access_key)
+	// Add the new encrypted access key for the Act
 	actObj := *act
 	actObj.Add([]byte(lookup_key), granteeEncryptedAccessKey)
 
