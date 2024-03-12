@@ -1,34 +1,58 @@
-package dynamicaccess
+package dynamicaccess_test
 
 import (
+	"encoding/hex"
 	"testing"
+	"time"
 
-	"github.com/ethersphere/bee/pkg/crypto"
-	"github.com/ethersphere/bee/pkg/storage/inmemchunkstore"
+	"github.com/ethersphere/bee/pkg/dynamicaccess"
+	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestHistoryFirstAdd(t *testing.T) {
-	storer := inmemchunkstore.New()
+func TestHistoryLookup(t *testing.T) {
+	h := pretareTestHistory()
+	now := time.Now()
 
-	topicStr := "testtopic"
-	topic, err := crypto.LegacyKeccak256([]byte(topicStr))
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		input    int64
+		expected string
+	}{
+		{input: 0, expected: "value3"},
+		{input: now.Unix(), expected: "value3"},
+		{input: now.AddDate(0, -5, 0).Unix(), expected: "value3"},
+		{input: now.AddDate(0, -6, 0).Unix(), expected: "value3"},
+		{input: now.AddDate(-1, 0, 0).Unix(), expected: "value3"},
+		{input: now.AddDate(-1, -6, 0).Unix(), expected: "value2"},
+		{input: now.AddDate(-2, -0, 0).Unix(), expected: "value2"},
+		{input: now.AddDate(-2, -6, 0).Unix(), expected: "value1"},
+		{input: now.AddDate(-3, -0, 0).Unix(), expected: "value1"},
 	}
 
-	pk, _ := crypto.GenerateSecp256k1Key()
-	signer := crypto.NewDefaultSigner(pk)
-	owner, err := signer.EthereumAddress()
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			actAt, _ := h.Lookup(tt.input)
+			output := actAt.Get([]byte("key1"))
+			assert.Equal(t, output, hex.EncodeToString([]byte(tt.expected)))
+		})
+	}
+}
 
-	// updater, err := mock.HistoryUpdater(storer, signer, topic)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
+func pretareTestHistory() dynamicaccess.History {
+	var (
+		h    = mock.NewHistory()
+		now  = time.Now()
+		act1 = dynamicaccess.NewDefaultAct()
+		act2 = dynamicaccess.NewDefaultAct()
+		act3 = dynamicaccess.NewDefaultAct()
+	)
+	act1.Add([]byte("key1"), []byte("value1"))
+	act2.Add([]byte("key1"), []byte("value2"))
+	act3.Add([]byte("key1"), []byte("value3"))
 
-	// finder := mock.HistoryFinder(storer, updater.Feed())
+	h.Insert(now.AddDate(-3, 0, 0).Unix(), act1)
+	h.Insert(now.AddDate(-2, 0, 0).Unix(), act2)
+	h.Insert(now.AddDate(-1, 0, 0).Unix(), act3)
 
-	history := NewHistory(topic, owner)
-
-	history.Add(topic, owner, 0, []byte("payload"), []byte("sig"))
-
+	return h
 }
