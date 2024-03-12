@@ -1,16 +1,17 @@
 package dynamicaccess
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/hex"
+
+	"github.com/ethersphere/bee/pkg/manifest"
+	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 type Act interface {
 	Add(lookupKey []byte, encryptedAccessKey []byte) *defaultAct
-	Get(lookupKey []byte) string
-	Load(data string) error
-	Store() (string, error)
+	Get(lookupKey []byte) string // TODO: return []byte
+	Load(lookupKey []byte) manifest.Entry
+	Store(me manifest.Entry)
 }
 
 var _ Act = (*defaultAct)(nil)
@@ -31,30 +32,17 @@ func (act *defaultAct) Get(lookupKey []byte) string {
 	return ""
 }
 
-func (act *defaultAct) Load(data string) error {
-	b := new(bytes.Buffer)
-	b.WriteString(data)
-	d := gob.NewDecoder(b)
-
-	// Decoding the serialized data
-	err := d.Decode(&act.container)
-	if err != nil {
-		return err
-	}
-	return nil
+// to manifestEntry
+func (act *defaultAct) Load(lookupKey []byte) manifest.Entry {
+	return manifest.NewEntry(swarm.NewAddress(lookupKey), act.container)
 }
 
-func (act *defaultAct) Store() (string, error) {
-	b := new(bytes.Buffer)
-	e := gob.NewEncoder(b)
-
-	// Encoding the map
-	err := e.Encode(act.container)
-	if err != nil {
-		return "", err
+// from manifestEntry
+func (act *defaultAct) Store(me manifest.Entry) {
+	if act.container == nil {
+		act.container = make(map[string]string)
 	}
-
-	return b.String(), nil
+	act.container = me.Metadata()
 }
 
 func NewDefaultAct() Act {

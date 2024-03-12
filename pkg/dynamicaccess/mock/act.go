@@ -1,10 +1,12 @@
 package mock
 
+import "github.com/ethersphere/bee/pkg/manifest"
+
 type ActMock struct {
 	AddFunc   func(lookupKey []byte, encryptedAccessKey []byte) *ActMock
-	GetFunc   func(lookupKey []byte) string
-	LoadFunc  func(data string) error
-	StoreFunc func() (string, error)
+	GetFunc   func(lookupKey []byte) string // TODO: return []byte
+	LoadFunc  func(lookupKey []byte) manifest.Entry
+	StoreFunc func(me manifest.Entry)
 }
 
 func (act *ActMock) Add(lookupKey []byte, encryptedAccessKey []byte) *ActMock {
@@ -21,18 +23,18 @@ func (act *ActMock) Get(rootHash string, lookupKey []byte) string {
 	return act.GetFunc(lookupKey)
 }
 
-func (act *ActMock) Load(data string) error {
+func (act *ActMock) Load(lookupKey []byte) manifest.Entry {
 	if act.LoadFunc == nil {
 		return nil
 	}
-	return act.LoadFunc(data)
+	return act.LoadFunc(lookupKey)
 }
 
-func (act *ActMock) Store() (string, error) {
+func (act *ActMock) Store(me manifest.Entry) {
 	if act.StoreFunc == nil {
-		return "", nil
+		return
 	}
-	return act.StoreFunc()
+	act.StoreFunc(me)
 }
 
 func NewActMock() *ActMock {
