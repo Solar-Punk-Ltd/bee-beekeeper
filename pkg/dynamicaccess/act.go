@@ -1,31 +1,64 @@
 package dynamicaccess
 
 import (
-	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
-	"github.com/ethersphere/bee/pkg/swarm"
+	"bytes"
+	"encoding/gob"
+	"encoding/hex"
 )
 
 type Act interface {
-	Add(rootHash string, lookupKey []byte, encryptedAccessKey []byte) (swarm.Address, error)
-	Get(rootHash string, lookupKey []byte) (string, error)
+	Add(lookupKey []byte, encryptedAccessKey []byte) *defaultAct
+	Get(lookupKey []byte) string
+	Load(data string) error
+	Store() (string, error)
 }
 
 var _ Act = (*defaultAct)(nil)
 
 type defaultAct struct {
-	container *mock.ActMock
+	container map[string]string
 }
 
-func (act *defaultAct) Add(rootHash string, lookupKey []byte, encryptedAccessKey []byte) (swarm.Address, error) {
-	return act.container.Add(rootHash, lookupKey, encryptedAccessKey)
+func (act *defaultAct) Add(lookupKey []byte, encryptedAccessKey []byte) *defaultAct {
+	act.container[hex.EncodeToString(lookupKey)] = hex.EncodeToString(encryptedAccessKey)
+	return act
 }
 
-func (act *defaultAct) Get(rootHash string, lookupKey0 []byte) (string, error) {
-	return act.container.Get(rootHash, lookupKey0)
+func (act *defaultAct) Get(lookupKey []byte) string {
+	if key, ok := act.container[hex.EncodeToString(lookupKey)]; ok {
+		return key
+	}
+	return ""
+}
+
+func (act *defaultAct) Load(data string) error {
+	b := new(bytes.Buffer)
+	b.WriteString(data)
+	d := gob.NewDecoder(b)
+
+	// Decoding the serialized data
+	err := d.Decode(&act.container)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (act *defaultAct) Store() (string, error) {
+	b := new(bytes.Buffer)
+	e := gob.NewEncoder(b)
+
+	// Encoding the map
+	err := e.Encode(act.container)
+	if err != nil {
+		return "", err
+	}
+
+	return b.String(), nil
 }
 
 func NewDefaultAct() Act {
 	return &defaultAct{
-		container: mock.NewActMock(),
+		container: make(map[string]string),
 	}
 }

@@ -36,12 +36,20 @@ type DefaultAccessLogic struct {
 
 func (al *DefaultAccessLogic) actInit(ref string, publisher ecdsa.PublicKey, tag string) (*Act, swarm.Address, error) {
 	act := NewDefaultAct()
+
 	lookup_key, _ := al.getLookUpKey(publisher, "")
 	access_key_encryption_key, _ := al.getAccessKeyDecriptionKey(publisher, "")
+
 	access_key_cipher := encryption.New(encryption.Key(access_key_encryption_key), 0, uint32(0), hashFunc)
 	access_key := encryption.GenerateRandomKey(encryption.KeyLength)
 	encrypted_access_key, _ := access_key_cipher.Encrypt([]byte(access_key))
-	act.Add(lookup_key, encrypted_access_key)
+
+	ref_cipher := encryption.New(access_key, 0, uint32(0), hashFunc)
+	encrypted_ref, _ := ref_cipher.Encrypt([]byte(ref))
+
+	act.Add([]byte(lookup_key), encrypted_access_key)
+
+	return &act, swarm.NewAddress(encrypted_ref), nil
 }
 
 // publisher is public key
