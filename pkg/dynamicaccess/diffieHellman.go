@@ -3,29 +3,27 @@ package dynamicaccess
 import (
 	"crypto/ecdsa"
 
-	Crypto "github.com/ethersphere/bee/pkg/crypto"
-	"github.com/ethersphere/bee/pkg/keystore"
-	KeyStoreMem "github.com/ethersphere/bee/pkg/keystore/mem"
+	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
 )
 
 type DiffieHellman interface {
-	SharedSecret(pubKey, tag string, moment []byte) (string, error)
+	SharedSecret(publicKey *ecdsa.PublicKey, tag string, moment []byte) ([]byte, error) // tag- topic?
 }
+
+var _ DiffieHellman = (*defaultDiffieHellman)(nil)
+var _ DiffieHellman = (*mock.DiffieHellmanMock)(nil)
 
 type defaultDiffieHellman struct {
-	key             *ecdsa.PrivateKey
-	keyStoreService keystore.Service
-	keyStoreEdg     keystore.EDG
+	mock *mock.DiffieHellmanMock
 }
 
-func (d *defaultDiffieHellman) SharedSecret(pubKey string, tag string, moment []byte) (string, error) {
-	return "", nil
+func (dhm *defaultDiffieHellman) SharedSecret(publicKey *ecdsa.PublicKey, tag string, salt []byte) ([]byte, error) {
+	return dhm.mock.SharedSecret(publicKey, tag, salt)
 }
 
 func NewDiffieHellman(key *ecdsa.PrivateKey) DiffieHellman {
 	return &defaultDiffieHellman{
-		key:             key,
-		keyStoreService: KeyStoreMem.New(),
-		keyStoreEdg:     Crypto.EDGSecp256_K1,
+		mock: mock.NewDiffieHellmanMock(key),
 	}
+
 }

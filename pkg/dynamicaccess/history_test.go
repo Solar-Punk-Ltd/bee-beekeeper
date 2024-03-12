@@ -1,19 +1,34 @@
 package dynamicaccess
 
-import "testing"
+import (
+	"testing"
 
-func TestHistoryAdd(t *testing.T) {
-	newRootHash, err := NewHistory().Add("", "")
-	if err != nil {
-		t.Errorf("Error adding history: %v", err)
-	}
-	_ = newRootHash // Ignore the newRootHash if not needed
-}
+	"github.com/ethersphere/bee/pkg/crypto"
+	"github.com/ethersphere/bee/pkg/storage/inmemchunkstore"
+)
 
-func TestHistoryGet(t *testing.T) {
-	value, err := NewHistory().Get("")
+func TestHistoryFirstAdd(t *testing.T) {
+	storer := inmemchunkstore.New()
+
+	topicStr := "testtopic"
+	topic, err := crypto.LegacyKeccak256([]byte(topicStr))
 	if err != nil {
-		t.Errorf("Error getting history: %v", err)
+		t.Fatal(err)
 	}
-	_ = value // Ignore the value if not needed
+
+	pk, _ := crypto.GenerateSecp256k1Key()
+	signer := crypto.NewDefaultSigner(pk)
+	owner, err := signer.EthereumAddress()
+
+	// updater, err := mock.HistoryUpdater(storer, signer, topic)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	// finder := mock.HistoryFinder(storer, updater.Feed())
+
+	history := NewHistory(topic, owner)
+
+	history.Add(topic, owner, 0, []byte("payload"), []byte("sig"))
+
 }

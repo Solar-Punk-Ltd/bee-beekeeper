@@ -1,12 +1,32 @@
 package mock
 
+import (
+	"crypto/ecdsa"
+	"errors"
+
+	"github.com/ethersphere/bee/pkg/crypto"
+)
+
 type DiffieHellmanMock struct {
-	SharedSecretFunc func(string, string, []byte) (string, error)
+	key *ecdsa.PrivateKey
+	//keyStoreService  keystore.Service
+	SharedSecretFunc func(publicKey *ecdsa.PublicKey, tag string, salt []byte) ([]byte, error)
 }
 
-func (ma *DiffieHellmanMock) SharedSecret(publicKey string, tag string, moment []byte) (string, error) {
-	if ma.SharedSecretFunc == nil {
-		return "", nil
+func (dhm *DiffieHellmanMock) SharedSecret(publicKey *ecdsa.PublicKey, tag string, salt []byte) ([]byte, error) {
+	if dhm.SharedSecretFunc == nil {
+		//_, _, _ = dhm.keyStoreService.Key("test", "test", crypto.EDGSecp256_K1)
+		x, _ := publicKey.Curve.ScalarMult(publicKey.X, publicKey.Y, dhm.key.D.Bytes())
+		if x == nil {
+			return nil, errors.New("shared secret is point at infinity")
+		}
+		return crypto.LegacyKeccak256(append(x.Bytes(), salt...))
 	}
-	return ma.SharedSecretFunc(publicKey, tag, moment)
+	return dhm.SharedSecretFunc(publicKey, tag, salt)
+
+}
+
+func NewDiffieHellmanMock(key *ecdsa.PrivateKey) *DiffieHellmanMock {
+	// return &DiffieHellmanMock{keyStoreService: KeyStoreMem.New()}
+	return &DiffieHellmanMock{key: key}
 }
