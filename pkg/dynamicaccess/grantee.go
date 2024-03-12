@@ -8,16 +8,16 @@ type Grantee interface {
 	// RevokeList(topic string, removeList []string, addList []string) (string, error)
 	// RevokeGrantees(topic string, removeList []string) (string, error)
 	AddGrantees(addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error)
-	GetGrantees() ([]ecdsa.PublicKey)
+	GetGrantees() []ecdsa.PublicKey
 }
 
 type defaultGrantee struct {
-	topic    string
+	topic    string            //lint:ignore U1000 Ignore unused struct field
 	grantees []ecdsa.PublicKey // Modified field name to start with an uppercase letter
 }
 
 func (g *defaultGrantee) GetGrantees() []ecdsa.PublicKey {
-    return g.grantees
+	return g.grantees
 }
 
 func (g *defaultGrantee) Revoke(topic string) error {
