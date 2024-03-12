@@ -32,9 +32,15 @@ type DefaultAccessLogic struct {
 // Will give back Swarm reference with symmertic encryption key (128 byte)
 // @publisher: public key
 
-// publisher is public key
-func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(ref string, publisher string) {
 
+func actInit(ref string, publisher string, tag string) (*Act, encryptedRef string, error) {
+	//act := NewAct()
+}
+
+// publisher is public key
+func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act *Act,ref string, publisher string) (*act , error){
+	lookup_key := al.getLookUpKey(publisher_public_key, tag)
+	akdk := al.getAccessKeyDecriptionKey(publisher_public_key, tag)
 	//pseudo code like code
 	if self_public_key == publisher {
 		ak := encryption.GenerateRandomKey(encryption.KeyLength)
@@ -42,16 +48,20 @@ func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(ref string, publisher s
 		lookup_key := al.getLookUpKey(publisher_public_key, tag)
 		akdk := al.getAccessKeyDecriptionKey(publisher_public_key, tag)
 		encrypted_ak := al.getEncryptedAccessKey(act*Act, lookup_key)
-		cipher := encryption.New(akdk, 4096, uint32(0), hashFunc)
+		cipher := encryption.New(akdk, 0, uint32(0), hashFunc)
 		ak := cipher.Decrypt(encrypted_ak)
 	}
 
-	access_key_cipher := encryption.New(ak, 4096, uint32(0), hashFunc)
+	access_key_cipher := encryption.New(ak, 0, uint32(0), hashFunc)
 	encrypted_access_key := access_key_cipher.Encrypt([]byte(ak))
-	ref_cipher := encryption.New(ak, 4096, uint32(0), hashFunc).Encrypt([]byte(ref))
+	ref_cipher := encryption.New(ak, 0, uint32(0), hashFunc).Encrypt([]byte(ref))
 	encrypted_ref := ref_cipher.Encrypt([]byte(ref))
 
 }
+
+
+//
+// act[lookupKey] := valamilyen_cipher.Encrypt(access_key)
 
 // end of pseudo code like code
 

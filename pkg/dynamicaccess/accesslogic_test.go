@@ -174,3 +174,28 @@ func TestNewAccessLogic(t *testing.T) {
 		t.Errorf("NewAccessLogic: expected type *DefaultAccessLogic, got %T", logic)
 	}
 }
+
+func addGranteeTest(t *testing.T) {
+	al := setupAccessLogic()
+	ref:="example_ref"
+	examplePublisher :="example_publisher"
+	testGranteeList := NewGrantee()
+	testGranteeList.AddGrantees([]string{"grantee1", "grantee2"})
+	// create empty act
+		// 1. non encrypted ref goes in parameter list
+		// 2. access key nedd to be created (this is non unique)
+		// 3. encrypted ref is returned
+		// 4. now encrypted ref and act with oine element exits
+
+		act, encyptedRef, err := actInit(ref, examplePublisher, "")
+
+		if err != nil {}
+		
+
+
+
+	// for loop go through grantee list (start with a one element act)
+
+
+	// check resulting act
+}
