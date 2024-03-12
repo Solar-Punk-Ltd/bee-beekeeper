@@ -1,6 +1,9 @@
 package dynamicaccess
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"errors"
 	"testing"
 
@@ -180,7 +183,11 @@ func addGranteeTest(t *testing.T) {
 	ref:="example_ref"
 	examplePublisher :="example_publisher"
 	testGranteeList := NewGrantee()
-	testGranteeList.AddGrantees([]string{"grantee1", "grantee2"})
+	
+	id1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	id2, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	id3, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	testGranteeList.AddGrantees([]ecdsa.PublicKey{id1.PublicKey, id2.PublicKey, id3.PublicKey})
 	// create empty act
 		// 1. non encrypted ref goes in parameter list
 		// 2. access key nedd to be created (this is non unique)
@@ -188,13 +195,17 @@ func addGranteeTest(t *testing.T) {
 		// 4. now encrypted ref and act with oine element exits
 
 		act, encyptedRef, err := actInit(ref, examplePublisher, "")
+		// now we have an empty act
+		// for loop go through grantee list (start with a one element act)
+		for i := 0; i < len(testGranteeList.GetGrantees()); i++ {
+			act, _ = al.Add_New_Grantee_To_Content(act, encyptedRef, testGranteeList.GetGrantees()[i])
+		}
 
 		if err != nil {}
 		
 
 
 
-	// for loop go through grantee list (start with a one element act)
 
 
 	// check resulting act

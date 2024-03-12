@@ -2,11 +2,13 @@ package dynamicaccess
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 
 	encryption "github.com/ethersphere/bee/pkg/encryption"
 	file "github.com/ethersphere/bee/pkg/file"
 	manifest "github.com/ethersphere/bee/pkg/manifest"
+	"github.com/ethersphere/bee/pkg/swarm"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -15,11 +17,11 @@ var hashFunc = sha3.NewLegacyKeccak256
 type AccessLogic interface {
 	Get(act *Act, encryped_ref string, publisher string, tag string) (string, error)
 	Add(act *Act, ref string, publisher string, tag string) (string, error)
-
 	getLookUpKey(publisher string, tag string) (string, error)
 	getAccessKeyDecriptionKey(publisher string, tag string) (string, error)
 	getEncryptedAccessKey(act_root_hash string, lookup_key string) (manifest.Entry, error)
 	createEncryptedAccessKey(ref string)
+	Add_New_Grantee_To_Content(act *Act,ref string, publisher ecdsa.PublicKey) (*Act, error)
 	// CreateAccessKey()
 }
 
@@ -38,7 +40,7 @@ func actInit(ref string, publisher string, tag string) (*Act, encryptedRef strin
 }
 
 // publisher is public key
-func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act *Act,ref string, publisher string) (*act , error){
+func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act *Act, ref swarm.Address, publisher ecdsa.PublicKey) (*act , error){
 	lookup_key := al.getLookUpKey(publisher_public_key, tag)
 	akdk := al.getAccessKeyDecriptionKey(publisher_public_key, tag)
 	//pseudo code like code
