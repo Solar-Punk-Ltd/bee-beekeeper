@@ -4,11 +4,10 @@ import (
 	"testing"
 
 	"github.com/ethersphere/bee/pkg/crypto"
-	"github.com/ethersphere/bee/pkg/storage/inmemchunkstore"
 )
 
 func TestHistoryFirstAdd(t *testing.T) {
-	storer := inmemchunkstore.New()
+	// storer := inmemchunkstore.New()
 
 	topicStr := "testtopic"
 	topic, err := crypto.LegacyKeccak256([]byte(topicStr))
