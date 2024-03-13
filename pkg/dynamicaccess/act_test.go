@@ -1,6 +1,7 @@
 package dynamicaccess_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"testing"
@@ -26,7 +27,7 @@ func TestActAddGet(t *testing.T) {
 	}
 
 	key := act.Get(lookupKey)
-	if key != hex.EncodeToString(encryptedAccesskey) {
+	if !bytes.Equal(key, encryptedAccesskey) {
 		t.Errorf("Get() value is not the expected %s != %s", key, encryptedAccesskey)
 	}
 }
@@ -73,7 +74,7 @@ func TestActWithManifest(t *testing.T) {
 	actualAct := dynamicaccess.NewDefaultAct()
 	actualAct.Store(actualMe)
 	actualEak := actualAct.Get(lookupKey)
-	if actualEak != hex.EncodeToString(encryptedAccesskey) {
+	if !bytes.Equal(actualEak, encryptedAccesskey) {
 		t.Errorf("actualAct.Store() value is not the expected %s != %s", actualEak, encryptedAccesskey)
 	}
 }
@@ -90,7 +91,7 @@ func TestActStore(t *testing.T) {
 	act.Store(me)
 	eak := act.Get(lookupKey)
 
-	if eak != hex.EncodeToString(encryptedAccesskey) {
+	if !bytes.Equal(eak, encryptedAccesskey) {
 		t.Errorf("Store() value is not the expected %s != %s", eak, encryptedAccesskey)
 	}
 

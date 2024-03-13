@@ -7,7 +7,7 @@ import (
 
 type ActMock struct {
 	AddFunc   func(lookupKey []byte, encryptedAccessKey []byte) dynamicaccess.Act
-	GetFunc   func(lookupKey []byte) string // TODO: return []byte
+	GetFunc   func(lookupKey []byte) []byte
 	LoadFunc  func(lookupKey []byte) manifest.Entry
 	StoreFunc func(me manifest.Entry)
 }
@@ -21,9 +21,9 @@ func (act *ActMock) Add(lookupKey []byte, encryptedAccessKey []byte) dynamicacce
 	return act.AddFunc(lookupKey, encryptedAccessKey)
 }
 
-func (act *ActMock) Get(lookupKey []byte) string {
+func (act *ActMock) Get(lookupKey []byte) []byte {
 	if act.GetFunc == nil {
-		return ""
+		return make([]byte, 0)
 	}
 	return act.GetFunc(lookupKey)
 }

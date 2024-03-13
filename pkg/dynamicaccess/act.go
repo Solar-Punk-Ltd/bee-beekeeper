@@ -9,7 +9,7 @@ import (
 
 type Act interface {
 	Add(lookupKey []byte, encryptedAccessKey []byte) Act
-	Get(lookupKey []byte) string // TODO: return []byte
+	Get(lookupKey []byte) []byte
 	Load(lookupKey []byte) manifest.Entry
 	Store(me manifest.Entry)
 }
@@ -25,11 +25,14 @@ func (act *defaultAct) Add(lookupKey []byte, encryptedAccessKey []byte) Act {
 	return act
 }
 
-func (act *defaultAct) Get(lookupKey []byte) string {
+func (act *defaultAct) Get(lookupKey []byte) []byte {
 	if key, ok := act.container[hex.EncodeToString(lookupKey)]; ok {
-		return key
+		bytes, err := hex.DecodeString(key)
+		if err == nil {
+			return bytes
+		}
 	}
-	return ""
+	return make([]byte, 0)
 }
 
 // to manifestEntry
