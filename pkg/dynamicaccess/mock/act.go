@@ -1,48 +1,47 @@
 package mock
 
 import (
-	"encoding/hex"
-
+	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/manifest"
-	"github.com/ethersphere/bee/pkg/swarm"
-)
-
-const (
-	ContentTypeHeader = "Content-Type"
 )
 
 type ActMock struct {
-	AddFunc      func(rootHash string, lookupKey []byte, encryptedAccessKey []byte) (swarm.Address, error)
-	GetFunc      func(rootHash string, lookpupkey []byte) (string, error)
-	manifestMock map[string]map[string]string
+	AddFunc   func(lookupKey []byte, encryptedAccessKey []byte) dynamicaccess.Act
+	GetFunc   func(lookupKey []byte) []byte
+	LoadFunc  func(lookupKey []byte) manifest.Entry
+	StoreFunc func(me manifest.Entry)
 }
 
-// TODO: check length of keys, publisher etc.
-func (act *ActMock) Add(rootHash string, lookupKey []byte, encryptedAccessKey []byte) (swarm.Address, error) {
+var _ dynamicaccess.Act = (*ActMock)(nil)
+
+func (act *ActMock) Add(lookupKey []byte, encryptedAccessKey []byte) dynamicaccess.Act {
 	if act.AddFunc == nil {
-		metadata := make(map[string]string)
-		metadata[ContentTypeHeader] = "text/plain"
-		metadata[hex.EncodeToString(lookupKey)] = hex.EncodeToString(encryptedAccessKey)
-		act.manifestMock[rootHash] = metadata
-		return swarm.ZeroAddress, nil
+		return act
 	}
-	return act.AddFunc(rootHash, lookupKey, encryptedAccessKey)
+	return act.AddFunc(lookupKey, encryptedAccessKey)
 }
 
-func (act *ActMock) Get(rootHash string, lookupKey []byte) (string, error) {
+func (act *ActMock) Get(lookupKey []byte) []byte {
 	if act.GetFunc == nil {
-		metadata := act.manifestMock[rootHash]
-		if metadata == nil {
-			return swarm.ZeroAddress.String(), manifest.ErrNotFound
-		}
-		encryptedAccessKey := metadata[hex.EncodeToString(lookupKey)]
-		return encryptedAccessKey, nil
+		return make([]byte, 0)
 	}
-	return act.GetFunc(rootHash, lookupKey)
+	return act.GetFunc(lookupKey)
 }
 
-func NewActMock() *ActMock {
-	return &ActMock{
-		manifestMock: make(map[string]map[string]string),
+func (act *ActMock) Load(lookupKey []byte) manifest.Entry {
+	if act.LoadFunc == nil {
+		return nil
 	}
+	return act.LoadFunc(lookupKey)
+}
+
+func (act *ActMock) Store(me manifest.Entry) {
+	if act.StoreFunc == nil {
+		return
+	}
+	act.StoreFunc(me)
+}
+
+func NewActMock() dynamicaccess.Act {
+	return &ActMock{}
 }

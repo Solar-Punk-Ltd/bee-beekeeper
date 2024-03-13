@@ -3,9 +3,9 @@ package dynamicaccess
 import "crypto/ecdsa"
 
 type Grantee interface {
-//? ÁTBESZÉLNI
-// Revoke(topic string) error
-// Publish(topic string) error
+	//? ÁTBESZÉLNI
+	// Revoke(topic string) error
+	// Publish(topic string) error
 
 	// RevokeList(topic string, removeList []string, addList []string) (string, error)
 	// RevokeGrantees(topic string, removeList []string) (string, error)
@@ -48,6 +48,11 @@ func (g *defaultGrantee) RemoveGrantees(removeList []ecdsa.PublicKey) ([]ecdsa.P
 			}
 		}
 	}
+	return g.grantees, nil
+}
+
+func (g *defaultGrantee) AddGrantees(addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error) {
+	g.grantees = append(g.grantees, addList...)
 	return g.grantees, nil
 }
 

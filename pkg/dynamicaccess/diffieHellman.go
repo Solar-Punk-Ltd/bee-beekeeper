@@ -2,8 +2,9 @@ package dynamicaccess
 
 import (
 	"crypto/ecdsa"
+	"errors"
 
-	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
+	"github.com/ethersphere/bee/pkg/crypto"
 )
 
 type DiffieHellman interface {
@@ -11,19 +12,20 @@ type DiffieHellman interface {
 }
 
 var _ DiffieHellman = (*defaultDiffieHellman)(nil)
-var _ DiffieHellman = (*mock.DiffieHellmanMock)(nil)
 
 type defaultDiffieHellman struct {
-	mock *mock.DiffieHellmanMock
+	key *ecdsa.PrivateKey
 }
 
-func (dhm *defaultDiffieHellman) SharedSecret(publicKey *ecdsa.PublicKey, tag string, salt []byte) ([]byte, error) {
-	return dhm.mock.SharedSecret(publicKey, tag, salt)
+func (dh *defaultDiffieHellman) SharedSecret(publicKey *ecdsa.PublicKey, tag string, salt []byte) ([]byte, error) {
+	x, _ := publicKey.Curve.ScalarMult(publicKey.X, publicKey.Y, dh.key.D.Bytes())
+	if x == nil {
+		return nil, errors.New("shared secret is point at infinity")
+	}
+	return crypto.LegacyKeccak256(append(x.Bytes(), salt...))
 }
 
 func NewDiffieHellman(key *ecdsa.PrivateKey) DiffieHellman {
-	return &defaultDiffieHellman{
-		mock: mock.NewDiffieHellmanMock(key),
-	}
+	return &defaultDiffieHellman{key: key}
 
 }

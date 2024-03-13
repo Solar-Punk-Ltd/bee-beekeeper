@@ -2,7 +2,6 @@ package dynamicaccess_test
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
 	"io"
@@ -13,7 +12,8 @@ import (
 )
 
 func TestSharedSecret(t *testing.T) {
-	_, err := dynamicaccess.NewDiffieHellman(nil).SharedSecret(&ecdsa.PublicKey{}, "", nil)
+	pk, _ := crypto.GenerateSecp256k1Key()
+	_, err := dynamicaccess.NewDiffieHellman(pk).SharedSecret(&pk.PublicKey, "", nil)
 	if err != nil {
 		t.Errorf("Error generating shared secret: %v", err)
 	}
