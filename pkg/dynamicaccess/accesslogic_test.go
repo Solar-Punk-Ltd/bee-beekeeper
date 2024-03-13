@@ -151,8 +151,8 @@ func TestGet_Success(t *testing.T) {
 	}
 }
 
-// func TestGet_Error(t *testing.T) {
-// 	al := setupAccessLogic()
+func TestGet_Error(t *testing.T) {
+	al := setupAccessLogic()
 
 	//actRootHash := "0xabcexample"
 	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

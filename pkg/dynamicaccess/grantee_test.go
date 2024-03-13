@@ -101,25 +101,4 @@ func TestGetGrantees(t *testing.T) {
 	}
 }
 
-func TestGetGrantees(t *testing.T) {
-    // Create a new Grantee
-    grantee := NewGrantee()
-
-    // Generate some dummy ecdsa.PublicKey values
-    key1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-    key2, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-
-    // Add the keys to the grantee
-    addList := []ecdsa.PublicKey{key1.PublicKey, key2.PublicKey}
-    grantee.AddGrantees(addList)
-
-    // Get the grantees
-    grantees := grantee.GetGrantees()
-
-    // Check if the grantees were returned correctly
-    if !reflect.DeepEqual(grantees, addList) {
-        t.Errorf("Expected grantees %v, got %v", addList, grantees)
-    }
-}
-
 
