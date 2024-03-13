@@ -2,30 +2,34 @@ package dynamicaccess
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethersphere/bee/pkg/feeds"
 )
 
 type History interface {
-	Add(topic []byte, owner common.Address, timestamp int64, payload, sig []byte) error
-	Get(topic []byte, owner common.Address, timestamp int64) error
+	Add(timestamp int64, act Act) error
+	Get(timestamp int64) (Act, error)
+	Lookup(at int64) (Act, error)
 }
 
 var _ History = (*history)(nil)
 
 type history struct {
-	Feed *feeds.Feed
+	history map[int64]*Act
 }
 
 func NewHistory(topic []byte, owner common.Address) *history {
-	return &history{Feed: &feeds.Feed{Topic: topic, Owner: owner}}
+	return &history{history: make(map[int64]*Act)}
 }
 
-func (h *history) Add(topic []byte, owner common.Address, timestamp int64, payload, sig []byte) error {
-	// use timestamp based feed update
+func (h *history) Add(timestamp int64, act Act) error {
+
 	return nil
 }
 
-func (h *history) Get(topic []byte, owner common.Address, timestamp int64) error {
+func (h *history) Lookup(at int64) (Act, error) {
+	return nil, nil
+}
+
+func (h *history) Get(timestamp int64) (Act, error) {
 	// get the feed
-	return nil
+	return nil, nil
 }
