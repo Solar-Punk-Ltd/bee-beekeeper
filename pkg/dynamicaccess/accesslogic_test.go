@@ -4,8 +4,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/ethersphere/bee/pkg/crypto"
@@ -21,6 +23,20 @@ func setupAccessLogic() AccessLogic {
 	al := NewAccessLogic(diffieHellman)
 
 	return al
+}
+
+func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
+	fixedD := big.NewInt(input) // Replace 42 with your desired fixed value
+	privateKey := ecdsa.PrivateKey{
+		PublicKey: ecdsa.PublicKey{
+			Curve: elliptic.P256(), // Use the desired elliptic curve
+			X:     big.NewInt(0),   // These values can be anything since they're not used for testing GetEncryptedAccessKey
+			Y:     big.NewInt(0),
+		},
+		D: fixedD, // Set the fixed value for the private key's D field
+	}
+
+	return privateKey
 }
 
 func TestGetLookupKey_Success(t *testing.T) {
@@ -98,12 +114,13 @@ func TestGetAccessKeyDecriptionKey_Error(t *testing.T) {
 func TestGetEncryptedAccessKey_Success(t *testing.T) {
 	al := setupAccessLogic()
 
-	lookupKey := "exampleLookupKey"
-	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	lookupKey, _ := hex.DecodeString("bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a")
+	id0 := generateFixPrivateKey(0)
 
 	act, _, _ := al.ActInit(swarm.NewAddress([]byte("42")), id0.PublicKey, "")
 
-	encrypted_access_key, err := al.getEncryptedAccessKey(*act, lookupKey)
+	encrypted_access_key, err := al.getEncryptedAccessKey(*act, string(lookupKey))
+	fmt.Println("Encrypted access key: ", encrypted_access_key)
 	if err != nil {
 		t.Errorf("There was an error while executing GetEncryptedAccessKey")
 	}

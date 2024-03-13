@@ -3,7 +3,9 @@ package dynamicaccess
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"errors"
+	"fmt"
 
 	encryption "github.com/ethersphere/bee/pkg/encryption"
 	file "github.com/ethersphere/bee/pkg/file"
@@ -37,6 +39,7 @@ func (al *DefaultAccessLogic) ActInit(ref swarm.Address, publisher ecdsa.PublicK
 	act := NewDefaultAct()
 
 	lookup_key, _ := al.getLookUpKey(publisher, "")
+	fmt.Println("Lookup key: ", hex.EncodeToString([]byte(lookup_key)))
 	access_key_encryption_key, _ := al.getAccessKeyDecriptionKey(publisher, "")
 
 	access_key_cipher := encryption.New(encryption.Key(access_key_encryption_key), 0, uint32(0), hashFunc)
