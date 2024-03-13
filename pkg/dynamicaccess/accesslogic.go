@@ -180,3 +180,13 @@ func NewAccessLogic(diffieHellman DiffieHellman) AccessLogic {
 		act:           defaultAct{},
 	}
 }
+
+// -------
+// act: &mock.ContainerMock{
+// 	AddFunc: func(ref string, publisher string, tag string) error {
+// 		return nil
+// 	},
+// 	GetFunc: func(ref string, publisher string, tag string) (string, error) {
+// 		return "", nil
+// 	},
+// },
