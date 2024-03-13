@@ -1,22 +1,27 @@
 package mock
 
-import "github.com/ethersphere/bee/pkg/manifest"
+import (
+	"github.com/ethersphere/bee/pkg/dynamicaccess"
+	"github.com/ethersphere/bee/pkg/manifest"
+)
 
 type ActMock struct {
-	AddFunc   func(lookupKey []byte, encryptedAccessKey []byte) *ActMock
+	AddFunc   func(lookupKey []byte, encryptedAccessKey []byte) dynamicaccess.Act
 	GetFunc   func(lookupKey []byte) string // TODO: return []byte
 	LoadFunc  func(lookupKey []byte) manifest.Entry
 	StoreFunc func(me manifest.Entry)
 }
 
-func (act *ActMock) Add(lookupKey []byte, encryptedAccessKey []byte) *ActMock {
+var _ dynamicaccess.Act = (*ActMock)(nil)
+
+func (act *ActMock) Add(lookupKey []byte, encryptedAccessKey []byte) dynamicaccess.Act {
 	if act.AddFunc == nil {
 		return act
 	}
 	return act.AddFunc(lookupKey, encryptedAccessKey)
 }
 
-func (act *ActMock) Get(rootHash string, lookupKey []byte) string {
+func (act *ActMock) Get(lookupKey []byte) string {
 	if act.GetFunc == nil {
 		return ""
 	}
@@ -37,6 +42,6 @@ func (act *ActMock) Store(me manifest.Entry) {
 	act.StoreFunc(me)
 }
 
-func NewActMock() *ActMock {
+func NewActMock() dynamicaccess.Act {
 	return &ActMock{}
 }

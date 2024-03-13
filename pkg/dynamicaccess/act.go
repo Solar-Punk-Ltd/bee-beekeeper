@@ -8,7 +8,7 @@ import (
 )
 
 type Act interface {
-	Add(lookupKey []byte, encryptedAccessKey []byte) *defaultAct
+	Add(lookupKey []byte, encryptedAccessKey []byte) Act
 	Get(lookupKey []byte) string // TODO: return []byte
 	Load(lookupKey []byte) manifest.Entry
 	Store(me manifest.Entry)
@@ -20,7 +20,7 @@ type defaultAct struct {
 	container map[string]string
 }
 
-func (act *defaultAct) Add(lookupKey []byte, encryptedAccessKey []byte) *defaultAct {
+func (act *defaultAct) Add(lookupKey []byte, encryptedAccessKey []byte) Act {
 	act.container[hex.EncodeToString(lookupKey)] = hex.EncodeToString(encryptedAccessKey)
 	return act
 }
