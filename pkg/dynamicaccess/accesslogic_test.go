@@ -5,9 +5,11 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/ethersphere/bee/pkg/crypto"
+	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 func setupAccessLogic() AccessLogic {
@@ -25,6 +27,10 @@ func TestGetLookupKey_Success(t *testing.T) {
 	al := setupAccessLogic()
 
 	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	// ! this will be random, we can not know the lookup key for a randomly generated key
+	act, encryptedRef, _ := al.ActInit(swarm.NewAddress([]byte("42")), id0.PublicKey, "")
+	fmt.Println(act, encryptedRef)
+
 	tag := "exampleTag"
 
 	lookupKey, err := al.getLookUpKey(id0.PublicKey, tag)
@@ -34,6 +40,7 @@ func TestGetLookupKey_Success(t *testing.T) {
 
 	expectedLookupKey := "expectedLookupKey"
 	if lookupKey != expectedLookupKey {
+		fmt.Println(string(lookupKey))
 		t.Errorf("The lookup key that was returned is not correct!")
 	}
 }
@@ -94,7 +101,7 @@ func TestGetEncryptedAccessKey_Success(t *testing.T) {
 	lookupKey := "exampleLookupKey"
 	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
-	act, _, _ := al.ActInit("ref", id0.PublicKey, "")
+	act, _, _ := al.ActInit(swarm.NewAddress([]byte("42")), id0.PublicKey, "")
 
 	encrypted_access_key, err := al.getEncryptedAccessKey(*act, lookupKey)
 	if err != nil {
@@ -113,7 +120,7 @@ func TestGetEncryptedAccessKey_Error(t *testing.T) {
 	lookupKey := "exampleLookupKey"
 	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
-	act, _, _ := al.ActInit("ref", id0.PublicKey, "")
+	act, _, _ := al.ActInit(swarm.NewAddress([]byte("42")), id0.PublicKey, "")
 	empty_act_result, _ := al.getEncryptedAccessKey(*act, lookupKey)
 	if empty_act_result != nil {
 		t.Errorf("GetEncryptedAccessKey should give back nil for empty act root hash!")
@@ -129,9 +136,8 @@ func TestGetEncryptedAccessKey_Error(t *testing.T) {
 func TestGet_Success(t *testing.T) {
 	al := setupAccessLogic()
 
-	encryptedRef := "bzzabcasab"
 	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	act, _, _ := al.ActInit("ref", id0.PublicKey, "")
+	act, encryptedRef, _ := al.ActInit(swarm.NewAddress([]byte("42")), id0.PublicKey, "")
 	tag := "exampleTag"
 
 	ref, err := al.Get(act, encryptedRef, id0.PublicKey, tag)
@@ -145,34 +151,42 @@ func TestGet_Success(t *testing.T) {
 	}
 }
 
-// func TestGet_Error(t *testing.T) {
-// 	al := setupAccessLogic()
+func TestGet_Error(t *testing.T) {
+	al := setupAccessLogic()
 
-// 	actRootHash := "0xabcexample"
-// 	encryptedRef := "bzzabcasab"
-// 	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-// 	tag := "exampleTag"
+	//actRootHash := "0xabcexample"
+	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	act, encrypredRef, err := al.ActInit(swarm.NewAddress([]byte("42")), id0.PublicKey, "")
+	if err != nil {
+		t.Errorf("Error initializing Act")
+		t.Errorf(err.Error())
+	}
+	//encryptedRef := "bzzabcasab"
+	tag := "exampleTag"
 
-// 	refOne, _ := al.Get("", encryptedRef, id0.PublicKey, tag)
-// 	if refOne != "" {
-// 		t.Errorf("Get should give back empty string if ACT root hash not provided!")
-// 	}
+	refOne, err := al.Get(act, encrypredRef, id0.PublicKey, tag)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	if refOne != "" {
+		t.Errorf("Get should give back empty string if ACT root hash not provided!")
+	}
 
-// 	refTwo, _ := al.Get(actRootHash, "", id0.PublicKey, tag)
-// 	if refTwo != "" {
-// 		t.Errorf("Get should give back empty string if encrypted ref not provided!")
-// 	}
+	refTwo, _ := al.Get(act, swarm.EmptyAddress, id0.PublicKey, tag)
+	if refTwo != "" {
+		t.Errorf("Get should give back empty string if encrypted ref not provided!")
+	}
 
-// 	refThree, _ := al.Get(actRootHash, encryptedRef, "", tag)
-// 	if refThree != "" {
-// 		t.Errorf("Get should give back empty string if publisher not provided!")
-// 	}
+	refThree, _ := al.Get(act, encrypredRef, ecdsa.PublicKey{}, tag)
+	if refThree != "" {
+		t.Errorf("Get should give back empty string if publisher not provided!")
+	}
 
-// 	refFour, _ := al.Get(actRootHash, encryptedRef, id0.PublicKey, "")
-// 	if refFour != "" {
-// 		t.Errorf("Get should give back empty string if tag was not provided!")
-// 	}
-// }
+	refFour, _ := al.Get(act, encrypredRef, id0.PublicKey, "")
+	if refFour != "" {
+		t.Errorf("Get should give back empty string if tag was not provided!")
+	}
+}
 
 func TestNewAccessLogic(t *testing.T) {
 	logic := setupAccessLogic()
@@ -183,33 +197,41 @@ func TestNewAccessLogic(t *testing.T) {
 	}
 }
 
-func addGranteeTest(t *testing.T) {
-	al := setupAccessLogic()
-	ref := "example_ref"
-	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	testGranteeList := NewGrantee()
+// func TestAddGrantee(t *testing.T) {
+// 	al := setupAccessLogic()
+// 	//	ref := "example_ref"
+// 	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// 	testGranteeList := NewGrantee()
 
-	id1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	id2, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	id3, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	testGranteeList.AddGrantees([]ecdsa.PublicKey{id1.PublicKey, id2.PublicKey, id3.PublicKey})
-	// create empty act
-	// 1. non encrypted ref goes in parameter list
-	// 2. access key nedd to be created (this is non unique)
-	// 3. encrypted ref is returned
-	// 4. now encrypted ref and act with oine element exits
+// 	// Add grantee keys to the testGranteeList
+// 	id1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// 	id2, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// 	id3, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// 	testGranteeList.AddGrantees([]ecdsa.PublicKey{id1.PublicKey, id2.PublicKey, id3.PublicKey})
 
-	act, encyptedRef, err := al.ActInit(ref, id0.PublicKey, "")
-	// now we have an empty acts
-	// for loop go through grantee list (start with a one element act)
-	for i := 0; i < len(testGranteeList.GetGrantees()); i++ {
-		act, _ = al.Add_New_Grantee_To_Content(act, encyptedRef, id0.PublicKey, testGranteeList.GetGrantees()[i])
-	}
+// 	// Initialize empty ACT
+// 	actMock := MockAct.NewActMock()
+// 	actMockRootHash := "exampleRootHash"
 
-	if err != nil {
-	}
+// 	// Add each grantee to content using ActMock and validate the resulting ACT
+// 	for i := 0; i < len(testGranteeList.GetGrantees()); i++ {
+// 		lookupKey, _ := al.getLookUpKey(testGranteeList.GetGrantees()[i], "")
+// 		encryptedAccessKey := "exampleEncryptedAccessKey"
+// 		_, err := actMock.Add(actMockRootHash, []byte(lookupKey), []byte(encryptedAccessKey))
+// 		if err != nil {
+// 			t.Fatalf("Failed to add grantee to content using ActMock: %v", err)
+// 		}
 
-	// check resulting act
-	//actInterface := *act
+// 		// Validate the resulting ACT
+// 		encryptedAccessKeyFromMock, err := actMock.Get(actMockRootHash, []byte(lookupKey))
+// 		if err != nil {
+// 			t.Fatalf("Failed to retrieve encrypted access key from ActMock: %v", err)
+// 		}
+// 		encryptedAccessKeyFromMockBytes, _ := hex.DecodeString(encryptedAccessKeyFromMock)
+// 		if string(encryptedAccessKeyFromMockBytes) != encryptedAccessKey {
+// 			t.Errorf("Encrypted access key retrieved from ActMock doesn't match expected value")
+// 		}
+// 	}
 
-}
+// 	al.Add_New_Grantee_To_Content(actMock, encryptedRef, id0.PublicKey, testGranteeList.GetGrantees()[i])
+// }
