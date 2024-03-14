@@ -2,6 +2,8 @@ package dynamicaccess
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
+	"fmt"
 
 	encryption "github.com/ethersphere/bee/pkg/encryption"
 	"github.com/ethersphere/bee/pkg/swarm"
@@ -63,12 +65,15 @@ func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act Act, publisherPubKe
 	// --Encrypt access key for new Grantee--
 
 	// 2 Diffie-Hellman for the Grantee
+	fmt.Println("granteePubKey: ", granteePubKey)
 	lookup_key, _ := al.getLookUpKey(granteePubKey, "")
+	fmt.Println("current lookup key: ", hex.EncodeToString([]byte(lookup_key)))
 	access_key_encryption_key, _ := al.getAccessKeyDecriptionKey(granteePubKey, "")
 
 	// Encrypt the access key for the new Grantee
 	cipher := encryption.New(encryption.Key(access_key_encryption_key), 0, uint32(0), hashFunc)
 	granteeEncryptedAccessKey, _ := cipher.Encrypt(access_key)
+	fmt.Println("granteeEncryptedAccessKey ", granteeEncryptedAccessKey)
 	// Add the new encrypted access key for the Act
 	act.Add([]byte(lookup_key), granteeEncryptedAccessKey)
 
