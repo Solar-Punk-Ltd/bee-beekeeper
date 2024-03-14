@@ -18,6 +18,7 @@ func setupAccessLogic() dynamicaccess.AccessLogic {
 	privateKey, err := crypto.GenerateSecp256k1Key()
 	if err != nil {
 		errors.New("error creating private key")
+		fmt.Println(err)
 	}
 	diffieHellman := dynamicaccess.NewDiffieHellman(privateKey)
 	al := dynamicaccess.NewAccessLogic(diffieHellman)
@@ -161,20 +162,18 @@ func TestGet_Success(t *testing.T) {
 
 	act := dynamicaccess.NewDefaultAct()
 	act, _ = al.AddPublisher(act, id0.PublicKey, "")
+	expectedRef := "39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559"
 
-	encryptedRef, _ := al.EncryptRef(act, id0.PublicKey, swarm.NewAddress([]byte("42")))
+	encryptedRef, _ := al.EncryptRef(act, id0.PublicKey, swarm.NewAddress([]byte(expectedRef)))
 	tag := "exampleTag"
 
 	ref, err := al.Get(act, encryptedRef, id0.PublicKey, tag)
 	if err != nil {
-		t.Errorf("There was an error while calling Get")
+		t.Errorf("There was an error while calling Get: ")
+		t.Error(err)
 	}
 
-	expectedRef := "bzzNotEncrypted128long"
 	if ref != expectedRef {
-		fmt.Println("expectedRef ", expectedRef)
-		fmt.Println("encrypted ref ", encryptedRef)
-		fmt.Println("ref ", ref)
 		t.Errorf("Get gave back wrong Swarm reference!")
 	}
 }

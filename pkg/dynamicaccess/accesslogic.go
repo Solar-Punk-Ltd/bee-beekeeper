@@ -123,7 +123,6 @@ func (al *DefaultAccessLogic) getEncryptedAccessKey(act Act, lookup_key string) 
 }
 
 func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, publisher ecdsa.PublicKey, tag string) (string, error) {
-
 	lookup_key, err := al.getLookUpKey(publisher, tag)
 	if err != nil {
 		return "", err
@@ -141,14 +140,14 @@ func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, publisher
 	}
 
 	// Decrypt access key
-	access_key_cipher := encryption.New(encryption.Key(access_key_decryption_key), 4096, uint32(0), hashFunc)
+	access_key_cipher := encryption.New(encryption.Key(access_key_decryption_key), 0, uint32(0), hashFunc)
 	access_key, err := access_key_cipher.Decrypt(encrypted_access_key)
 	if err != nil {
 		return "", err
 	}
 
 	// Decrypt reference
-	ref_cipher := encryption.New(access_key, 4096, uint32(0), hashFunc)
+	ref_cipher := encryption.New(access_key, 0, uint32(0), hashFunc)
 	ref, err := ref_cipher.Decrypt(encryped_ref.Bytes())
 	if err != nil {
 		return "", err
