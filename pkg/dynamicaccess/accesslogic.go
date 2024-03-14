@@ -47,6 +47,7 @@ func (al *DefaultAccessLogic) EncryptRef(act Act, publisherPubKey ecdsa.PublicKe
 	access_key := al.getAccessKey(act, publisherPubKey)
 	ref_cipher := encryption.New(access_key, 0, uint32(0), hashFunc)
 	encrypted_ref, _ := ref_cipher.Encrypt(ref.Bytes())
+
 	return swarm.NewAddress(encrypted_ref), nil
 }
 
@@ -82,6 +83,7 @@ func (al *DefaultAccessLogic) getAccessKey(act Act, publisherPubKey ecdsa.Public
 	access_key_decryption_cipher := encryption.New(encryption.Key(publisher_ak_decryption_key), 0, uint32(0), hashFunc)
 	encrypted_ak, _ := al.getEncryptedAccessKey(act, publisher_lookup_key)
 	access_key, _ := access_key_decryption_cipher.Decrypt(encrypted_ak)
+
 	return access_key
 }
 
@@ -106,11 +108,13 @@ func (al *DefaultAccessLogic) getLookUpKey(publisher ecdsa.PublicKey, tag string
 
 func (al *DefaultAccessLogic) getAccessKeyDecriptionKey(publisher ecdsa.PublicKey, tag string) (string, error) {
 	oneByteArray := []byte{1}
+
 	// Generate access key decryption key using Diffie Hellman
 	access_key_decryption_key, err := al.diffieHellman.SharedSecret(&publisher, tag, oneByteArray)
 	if err != nil {
 		return "", err
 	}
+
 	return string(access_key_decryption_key), nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -156,12 +157,12 @@ func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
 
 func TestGet_Success(t *testing.T) {
 	al := setupAccessLogic()
+	id0 := generateFixPrivateKey(0)
 
-	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	act := dynamicaccess.NewDefaultAct()
+	act, _ = al.AddPublisher(act, id0.PublicKey, "")
 
 	encryptedRef, _ := al.EncryptRef(act, id0.PublicKey, swarm.NewAddress([]byte("42")))
-	act, _ = al.AddPublisher(act, id0.PublicKey, "")
 	tag := "exampleTag"
 
 	ref, err := al.Get(act, encryptedRef, id0.PublicKey, tag)
@@ -171,6 +172,9 @@ func TestGet_Success(t *testing.T) {
 
 	expectedRef := "bzzNotEncrypted128long"
 	if ref != expectedRef {
+		fmt.Println("expectedRef ", expectedRef)
+		fmt.Println("encrypted ref ", encryptedRef)
+		fmt.Println("ref ", ref)
 		t.Errorf("Get gave back wrong Swarm reference!")
 	}
 }
