@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -184,8 +185,8 @@ func TestGet_Error(t *testing.T) {
 	id0, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	act := dynamicaccess.NewDefaultAct()
 
-	encryptedRef, _ := al.EncryptRef(act, id0.PublicKey, swarm.NewAddress([]byte("42")))
 	act, err = al.AddPublisher(act, id0.PublicKey, "")
+	encryptedRef, _ := al.EncryptRef(act, id0.PublicKey, swarm.NewAddress([]byte("42")))
 
 	if err != nil {
 		t.Errorf("Error initializing Act")
@@ -225,6 +226,49 @@ func TestNewAccessLogic(t *testing.T) {
 	if !ok {
 		t.Errorf("NewAccessLogic: expected type *DefaultAccessLogic, got %T", logic)
 	}
+}
+
+func TestAddPublisher(t *testing.T) {
+	al := setupAccessLogic()
+	id0 := generateFixPrivateKey(0)
+	fmt.Println("id0", id0)
+	savedLookupKey := "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
+	act := dynamicaccess.NewDefaultAct()
+	act, _ = al.AddPublisher(act, id0.PublicKey, "")
+	decodedSavedLookupKey, _ := hex.DecodeString(savedLookupKey)
+	encryptedAccessKey := act.Get(decodedSavedLookupKey)
+	fmt.Println("encryptedAccessKey", encryptedAccessKey)
+	decodedEncryptedAccessKey := hex.EncodeToString(encryptedAccessKey)
+	// A random value is returned so it is only possibly to check the length of the returned value
+	// We know the lookup key because the generated private key is fixed
+	if len(decodedEncryptedAccessKey) != 64 {
+		t.Errorf("AddPublisher: expected encrypted access key length 64, got %d", len(decodedEncryptedAccessKey))
+	
+	}
+	if act == nil {
+		t.Errorf("AddPublisher: expected act, got nil")
+	}
+}
+
+func TestAdd_New_Grantee_To_Content(t *testing.T) {
+	al := setupAccessLogic()
+	id0 := generateFixPrivateKey(0)
+	id1 := generateFixPrivateKey(1)
+
+	act := dynamicaccess.NewDefaultAct()
+	act, _ = al.AddPublisher(act, id0.PublicKey, "")
+
+	act, _ = al.Add_New_Grantee_To_Content(act, id0.PublicKey, id1.PublicKey)
+}
+
+func TestEncryptRef(t *testing.T) {
+	al := setupAccessLogic()
+	id0 := generateFixPrivateKey(0)
+	act := dynamicaccess.NewDefaultAct()
+	act, _ = al.AddPublisher(act, id0.PublicKey, "")
+	// ref := swarm.NewAddress([]byte("42"))
+
+	// encryptedRef, _ := al.EncryptRef(act, id0.PublicKey, ref)
 }
 
 // func TestAddGrantee(t *testing.T) {
