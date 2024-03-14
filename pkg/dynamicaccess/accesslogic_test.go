@@ -118,7 +118,6 @@ func TestGetEncryptedAccessKey_Success(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 
 	act, _, _ := al.ActInit(swarm.NewAddress([]byte("42")), id0.PublicKey, "")
-
 	encrypted_access_key, err := al.getEncryptedAccessKey(*act, string(lookupKey))
 	fmt.Println("Encrypted access key: ", encrypted_access_key)
 	if err != nil {

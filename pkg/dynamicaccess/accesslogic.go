@@ -115,6 +115,7 @@ func (al *DefaultAccessLogic) getAccessKeyDecriptionKey(publisher ecdsa.PublicKe
 }
 
 func (al *DefaultAccessLogic) getEncryptedAccessKey(act Act, lookup_key string) (manifest.Entry, error) {
+	fmt.Println("Lookup key inside getEncryptedAccessKey: ", hex.EncodeToString([]byte(lookup_key)))
 	if act == nil {
 		return nil, errors.New("no ACT root hash was provided")
 	}
@@ -123,12 +124,14 @@ func (al *DefaultAccessLogic) getEncryptedAccessKey(act Act, lookup_key string) 
 	}
 
 	manifest_raw := act.Get([]byte(lookup_key))
+	fmt.Println("manifest raw: ", manifest_raw)
 	//al.act.Get(act_root_hash)
 
 	// Lookup encrypted access key from the ACT manifest
 	var loadSaver file.LoadSaver
 	var ctx context.Context
 	loadSaver.Load(ctx, []byte(manifest_raw)) // Load the manifest file into loadSaver
+	fmt.Println("after act.Get")
 	//y, err := x.Load(ctx, []byte(manifest_obj))
 	manifestObj, err := manifest.NewDefaultManifest(loadSaver, false)
 	if err != nil {
