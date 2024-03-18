@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"time"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
@@ -70,7 +69,7 @@ func (c *controllerMock) Store(act dynamicaccess.Act) (swarm.Address, error) {
 	}
 
 	actManifEntry := act.Load()
-	err = rootManifest.Add(ctx, hex.EncodeToString(nil), actManifEntry)
+	err = rootManifest.Add(ctx, manifest.RootPath, actManifEntry)
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
