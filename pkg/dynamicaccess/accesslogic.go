@@ -17,12 +17,6 @@ type AccessLogic interface {
 	Add_New_Grantee_To_Content(act Act, publisherPubKey, granteePubKey ecdsa.PublicKey) (Act, error)
 	Get(act Act, encryped_ref swarm.Address, publisher ecdsa.PublicKey, tag string) (string, error)
 	EncryptRef(act Act, publisherPubKey ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
-	//Add(act *Act, ref string, publisher ecdsa.PublicKey, tag string) (string, error)
-	//createEncryptedAccessKey(ref string)
-	// CreateAccessKey()
-	//getLookUpKey(publisher ecdsa.PublicKey, tag string) (string, error)
-	//getAccessKeyDecriptionKey(publisher ecdsa.PublicKey, tag string) (string, error)
-	//getEncryptedAccessKey(act Act, lookup_key string) ([]byte, error)
 }
 
 type DefaultAccessLogic struct {
@@ -81,6 +75,7 @@ func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act Act, publisherPubKe
 
 }
 
+// Will return the access key for a publisher (public key)
 func (al *DefaultAccessLogic) getAccessKey(act Act, publisherPubKey ecdsa.PublicKey) []byte {
 	publisher_lookup_key, _ := al.getLookUpKey(publisherPubKey, "")
 	publisher_ak_decryption_key, _ := al.getAccessKeyDecriptionKey(publisherPubKey, "")
@@ -91,14 +86,6 @@ func (al *DefaultAccessLogic) getAccessKey(act Act, publisherPubKey ecdsa.Public
 
 	return access_key
 }
-
-//
-// act[lookupKey] := valamilyen_cipher.Encrypt(access_key)
-
-// end of pseudo code like code
-
-// func (al *DefaultAccessLogic) CreateAccessKey(reference string) {
-// }
 
 func (al *DefaultAccessLogic) getLookUpKey(publisher ecdsa.PublicKey, tag string) (string, error) {
 	zeroByteArray := []byte{0}
@@ -127,12 +114,13 @@ func (al *DefaultAccessLogic) getEncryptedAccessKey(act Act, lookup_key string) 
 	return act.Get([]byte(lookup_key)), nil
 }
 
-func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, publisher ecdsa.PublicKey, tag string) (string, error) {
-	lookup_key, err := al.getLookUpKey(publisher, tag)
+// Get will return a decrypted reference, for given encrypted reference and grantee
+func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, grantee ecdsa.PublicKey, tag string) (string, error) {
+	lookup_key, err := al.getLookUpKey(grantee, tag)
 	if err != nil {
 		return "", err
 	}
-	access_key_decryption_key, err := al.getAccessKeyDecriptionKey(publisher, tag)
+	access_key_decryption_key, err := al.getAccessKeyDecriptionKey(grantee, tag)
 	if err != nil {
 		return "", err
 	}
@@ -166,13 +154,3 @@ func NewAccessLogic(diffieHellman DiffieHellman) AccessLogic {
 		diffieHellman: diffieHellman,
 	}
 }
-
-// -------
-// act: &mock.ContainerMock{
-// 	AddFunc: func(ref string, publisher string, tag string) error {
-// 		return nil
-// 	},
-// 	GetFunc: func(ref string, publisher string, tag string) (string, error) {
-// 		return "", nil
-// 	},
-// },
