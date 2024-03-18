@@ -111,11 +111,19 @@ func (al *DefaultAccessLogic) getAccessKeyDecriptionKey(publisher ecdsa.PublicKe
 }
 
 func (al *DefaultAccessLogic) getEncryptedAccessKey(act Act, lookup_key string) ([]byte, error) {
-	return act.Get([]byte(lookup_key)), nil
+	byteResult := act.Get([]byte(lookup_key))
+	if len(byteResult) == 0 {
+		return nil, fmt.Errorf("encrypted access key not found")
+	}
+	return byteResult, nil
 }
 
 // Get will return a decrypted reference, for given encrypted reference and grantee
 func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, grantee ecdsa.PublicKey, tag string) (string, error) {
+	if encryped_ref.Compare(swarm.EmptyAddress) == 0 {
+		return "", nil
+	}
+
 	lookup_key, err := al.getLookUpKey(grantee, tag)
 	if err != nil {
 		return "", err
