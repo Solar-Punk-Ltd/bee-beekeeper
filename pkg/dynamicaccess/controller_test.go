@@ -56,6 +56,47 @@ func TestControllerUploadHandler(t *testing.T) {
 	}
 }
 
+func TestControllerGranteeDecrypt(t *testing.T) {
+	pk := getPrivateKey()
+	ak := encryption.Key([]byte("cica"))
+
+	dh := dynamicaccess.NewDiffieHellman(pk)
+	aek, _ := dh.SharedSecret(&pk.PublicKey, "tag", []byte{1})
+	e2 := encryption.New(aek, 0, uint32(0), hashFunc)
+	peak, _ := e2.Encrypt(ak)
+
+	h := mockTestHistory(nil, peak)
+	al := setupAccessLogicWithPk(pk)
+	gm := dynamicaccess.NewGranteeManager(al)
+	c := dynamicaccess.NewController(h, gm, al)
+	eref, ref := prepareEncryptedChunkReference(ak)
+	// ech := al.EncryptRef(ch, "tag")
+
+	key1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	err := gm.Add("topic", []*ecdsa.PublicKey{&key1.PublicKey})
+	if err != nil {
+		t.Fatalf("gm.Add() returned an error: %v", err)
+	}
+	act, _ := h.Lookup(0)
+	al.Add_New_Grantee_To_Content(act, pk.PublicKey, key1.PublicKey)
+
+	ts := int64(0)
+	addr, err := c.DownloadHandler(ts, eref, &pk.PublicKey, "tag")
+	if err != nil {
+		t.Fatalf("DownloadHandler() returned an error: %v", err)
+	}
+	if !addr.Equal(ref) {
+		t.Fatalf("Decrypted chunk address: %s is not the expected: %s", addr, ref)
+	}
+	addr2, err := c.DownloadHandler(ts, eref, &key1.PublicKey, "tag")
+	if err != nil {
+		t.Fatalf("DownloadHandler() returned an error: %v", err)
+	}
+	if !addr.Equal(ref) {
+		t.Fatalf("Decrypted chunk address: %s is not the expected: %s", addr2, ref)
+	}
+}
+
 func TestControllerEncrypt(t *testing.T) {
 	pk := getPrivateKey()
 	ak := encryption.Key([]byte("cica"))
