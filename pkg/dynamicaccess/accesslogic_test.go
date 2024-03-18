@@ -78,7 +78,6 @@ func TestGet_Error(t *testing.T) {
 
 	_, err := al.Get(dynamicaccess.NewDefaultAct(), encryptedRef, id0.PublicKey, tag)
 	if err == nil {
-		t.Errorf(err.Error())
 		t.Errorf("Get should give back encrypted access key not found error!")
 	}
 
@@ -87,10 +86,10 @@ func TestGet_Error(t *testing.T) {
 		t.Errorf("Get should give back empty string if encrypted ref not provided!")
 	}
 
-	// refThree, _ := al.Get(act, encryptedRef, ecdsa.PublicKey{}, tag)
-	// if refThree != "" {
-	// 	t.Errorf("Get should give back empty string if publisher not provided!")
-	// }
+	_, err = al.Get(act, encryptedRef, ecdsa.PublicKey{}, tag)
+	if err == nil {
+		t.Errorf("Get should give back error if grantee not provided!")
+	}
 
 	// refFour, _ := al.Get(act, encryptedRef, id0.PublicKey, "")
 	// if refFour != "" {

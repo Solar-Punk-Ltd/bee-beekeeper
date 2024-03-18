@@ -87,12 +87,15 @@ func (al *DefaultAccessLogic) getAccessKey(act Act, publisherPubKey ecdsa.Public
 	return access_key
 }
 
-func (al *DefaultAccessLogic) getLookUpKey(publisher ecdsa.PublicKey, tag string) (string, error) {
+func (al *DefaultAccessLogic) getLookUpKey(grantee ecdsa.PublicKey, tag string) (string, error) {
 	zeroByteArray := []byte{0}
 	// Generate lookup key using Diffie Hellman
-	lookup_key, err := al.diffieHellman.SharedSecret(&publisher, tag, zeroByteArray)
+	lookup_key, err := al.diffieHellman.SharedSecret(&grantee, tag, zeroByteArray)
 	if err != nil {
 		return "", err
+	}
+	if len(lookup_key) != 32 {
+		return "", fmt.Errorf("lookup key length is not 32 (not found)")
 	}
 	return string(lookup_key), nil
 
@@ -122,6 +125,9 @@ func (al *DefaultAccessLogic) getEncryptedAccessKey(act Act, lookup_key string) 
 func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, grantee ecdsa.PublicKey, tag string) (string, error) {
 	if encryped_ref.Compare(swarm.EmptyAddress) == 0 {
 		return "", nil
+	}
+	if grantee == (ecdsa.PublicKey{}) {
+		return "", fmt.Errorf("grantee not provided")
 	}
 
 	lookup_key, err := al.getLookUpKey(grantee, tag)
