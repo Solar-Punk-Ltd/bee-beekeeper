@@ -4,12 +4,14 @@ import (
 	"crypto/ecdsa"
 
 	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
+	"github.com/ethersphere/bee/pkg/manifest"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 type Controller interface {
 	DownloadHandler(timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, tag string) (swarm.Address, error)
 	UploadHandler(ref swarm.Address, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error)
+	Store(publicKey *ecdsa.PublicKey, timestamp int64) (manifest.Interface, error)
 }
 
 type defaultController struct {

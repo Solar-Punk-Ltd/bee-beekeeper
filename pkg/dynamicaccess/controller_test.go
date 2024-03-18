@@ -30,7 +30,7 @@ func mockTestHistory(key, val []byte) dynamicaccess.History {
 	return h
 }
 
-func TestDecrypt(t *testing.T) {
+func TestControllerUploadHandler(t *testing.T) {
 	pk := getPrivateKey()
 	ak := encryption.Key([]byte("cica"))
 
@@ -56,7 +56,7 @@ func TestDecrypt(t *testing.T) {
 	}
 }
 
-func TestEncrypt(t *testing.T) {
+func TestControllerEncrypt(t *testing.T) {
 	pk := getPrivateKey()
 	ak := encryption.Key([]byte("cica"))
 
@@ -72,11 +72,14 @@ func TestEncrypt(t *testing.T) {
 	eref, ref := prepareEncryptedChunkReference(ak)
 
 	key1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	gm.Add("topic", []*ecdsa.PublicKey{&key1.PublicKey})
+	err := gm.Add("topic", []*ecdsa.PublicKey{&key1.PublicKey})
+	if err != nil {
+		t.Fatalf("gm.Add() returned an error: %v", err)
+	}
 
 	addr, _ := c.UploadHandler(ref, &pk.PublicKey, "topic")
 	if !addr.Equal(eref) {
-		t.Fatalf("Decrypted chunk address: %s is not the expected: %s", addr, eref)
+		t.Fatalf("Encrypted chunk address: %s is not the expected: %s", addr, eref)
 	}
 }
 
