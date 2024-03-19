@@ -14,7 +14,7 @@ import (
 // Generates a new test environment with a fix private key
 func setupAccessLogic2() dynamicaccess.AccessLogic {
 	privateKey := generateFixPrivateKey(1000)
-	diffieHellman := dynamicaccess.NewDiffieHellman(&privateKey)
+	diffieHellman := dynamicaccess.NewDefaultSession(&privateKey)
 	al := dynamicaccess.NewAccessLogic(diffieHellman)
 
 	return al
