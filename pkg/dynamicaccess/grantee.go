@@ -1,6 +1,8 @@
 package dynamicaccess
 
-import "crypto/ecdsa"
+import (
+	"crypto/ecdsa"
+)
 
 type Grantee interface {
 	AddGrantees(addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error)
@@ -13,8 +15,8 @@ type defaultGrantee struct {
 	grantees []ecdsa.PublicKey
 }
 
-func (g *defaultGrantee) GetGrantees() []ecdsa.PublicKey {
-	return g.grantees
+func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
+	return g.grantees[topic]
 }
 
 func (g *defaultGrantee) AddGrantees(addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error) {
@@ -22,17 +24,17 @@ func (g *defaultGrantee) AddGrantees(addList []ecdsa.PublicKey) ([]ecdsa.PublicK
 	return g.grantees, nil
 }
 
-func (g *defaultGrantee) RemoveGrantees(removeList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error) {
+func (g *defaultGrantee) RemoveGrantees(topic string, removeList []*ecdsa.PublicKey) error {
 	for _, remove := range removeList {
-		for i, grantee := range g.grantees {
+		for i, grantee := range g.grantees[topic] {
 			if grantee == remove {
-				g.grantees = append(g.grantees[:i], g.grantees[i+1:]...)
+				g.grantees[topic] = append(g.grantees[topic][:i], g.grantees[topic][i+1:]...)
 			}
 		}
 	}
-	return g.grantees, nil
+	return nil
 }
 
 func NewGrantee() Grantee {
-	return &defaultGrantee{}
+	return &defaultGrantee{grantees: make(map[string][]*ecdsa.PublicKey)}
 }

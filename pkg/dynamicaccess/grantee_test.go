@@ -1,4 +1,4 @@
-package dynamicaccess
+package dynamicaccess_test
 
 import (
 	"crypto/ecdsa"
@@ -84,5 +84,3 @@ func TestGetGrantees(t *testing.T) {
 		t.Errorf("Expected grantees %v, got %v", addList, grantees)
 	}
 }
-
-

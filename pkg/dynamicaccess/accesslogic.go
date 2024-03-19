@@ -118,7 +118,7 @@ func (al *DefaultAccessLogic) getLookUpKey(grantee ecdsa.PublicKey) (string, err
 	// Generate lookup key using Diffie Hellman
 	lookupKey, err := al.diffieHellman.SharedSecret(&grantee, "", zeroByteArray)
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 	if len(lookupKey) != 32 {
 		return "", fmt.Errorf("lookup key length is not 32 (not found)")
@@ -134,7 +134,7 @@ func (al *DefaultAccessLogic) getAccessKeyDecriptionKey(publisher ecdsa.PublicKe
 	// Generate access key decryption key using Diffie Hellman
 	accessKeyDecryptionKey, err := al.diffieHellman.SharedSecret(&publisher, "", oneByteArray)
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
 	return string(accessKeyDecryptionKey), nil
@@ -160,35 +160,35 @@ func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, grantee e
 
 	lookupKey, err := al.getLookUpKey(grantee)
 	if err != nil {
-		return "", err
+		return swarm.EmptyAddress, err
 	}
 	accessKeyDecryptionKey, err := al.getAccessKeyDecriptionKey(grantee)
 	if err != nil {
-		return "", err
+		return swarm.EmptyAddress, err
 	}
 
 	// Lookup encrypted access key from the ACT manifest
 
 	encryptedAccessKey, err := al.getEncryptedAccessKey(act, lookupKey)
 	if err != nil {
-		return "", err
+		return swarm.EmptyAddress, err
 	}
 
 	// Decrypt access key
 	accessKeyCipher := encryption.New(encryption.Key(accessKeyDecryptionKey), 0, uint32(0), hashFunc)
 	accessKey, err := accessKeyCipher.Decrypt(encryptedAccessKey)
 	if err != nil {
-		return "", err
+		return swarm.EmptyAddress, err
 	}
 
 	// Decrypt reference
 	refCipher := encryption.New(accessKey, 0, uint32(0), hashFunc)
 	ref, err := refCipher.Decrypt(encryped_ref.Bytes())
 	if err != nil {
-		return "", err
+		return swarm.EmptyAddress, err
 	}
 
-	return string(ref), nil
+	return swarm.NewAddress(ref), nil
 }
 
 func NewAccessLogic(diffieHellman DiffieHellman) AccessLogic {

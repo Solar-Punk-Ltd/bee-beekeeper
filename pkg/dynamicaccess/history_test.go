@@ -11,7 +11,7 @@ import (
 )
 
 func TestHistoryLookup(t *testing.T) {
-	h := pretareTestHistory()
+	h := prepareTestHistory()
 	now := time.Now()
 
 	tests := []struct {
@@ -32,13 +32,13 @@ func TestHistoryLookup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
 			actAt, _ := h.Lookup(tt.input)
-			output := actAt.Get([]byte("key1"))
+			output, _ := actAt.Lookup([]byte("key1"))
 			assert.Equal(t, output, hex.EncodeToString([]byte(tt.expected)))
 		})
 	}
 }
 
-func pretareTestHistory() dynamicaccess.History {
+func prepareTestHistory() dynamicaccess.History {
 	var (
 		h    = mock.NewHistory()
 		now  = time.Now()
