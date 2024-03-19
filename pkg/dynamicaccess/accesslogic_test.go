@@ -120,7 +120,6 @@ func TestAddPublisher(t *testing.T) {
 	// We know the lookup key because the generated private key is fixed
 	if len(decodedEncryptedAccessKey) != 64 {
 		t.Errorf("AddPublisher: expected encrypted access key length 64, got %d", len(decodedEncryptedAccessKey))
-
 	}
 	if act == nil {
 		t.Errorf("AddPublisher: expected act, got nil")
@@ -134,8 +133,8 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	id1 := generateFixPrivateKey(1)
 	id2 := generateFixPrivateKey(2)
 	publisherLookupKey := "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
-	firstAddedGranteeLookupKey := "55cb0b2ee9a2028df92dcb61e152e407f37cca141c8d9d25feacbc6691290895"
-	secondAddedGranteeLookupKey := "6ca9afe0f4d0a4b05806a013fa6d98939d1578b5dc2c93a6d559996c2d38c1dc"
+	firstAddedGranteeLookupKey := "e221a2abf64357260e8f2c937ee938aed98dce097e537c1a3fd4caf73510dbe4"
+	secondAddedGranteeLookupKey := "8fe8dff7cd15a6a0095c1b25071a5691e7c901fd0b95857a96c0e4659b48716a"
 
 	act := dynamicaccess.NewDefaultAct()
 	act, _ = al.AddPublisher(act, id0.PublicKey, "")
@@ -143,21 +142,25 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	act, _ = al.Add_New_Grantee_To_Content(act, id0.PublicKey, id1.PublicKey)
 	act, _ = al.Add_New_Grantee_To_Content(act, id0.PublicKey, id2.PublicKey)
 
-	// lookup key is changing, altough it should change at all, input public key does not change
 	lookupKeyAsByte, _ := hex.DecodeString(publisherLookupKey)
-	actFirstResult := act.Get(lookupKeyAsByte)
-	fmt.Println("encrypted access key for publisher: ", actFirstResult)
+	result := act.Get(lookupKeyAsByte)
+	hexEncodedEncryptedAK := hex.EncodeToString(result)
+	if len(hexEncodedEncryptedAK) != 64 {
+		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
+	}
 
 	lookupKeyAsByte, _ = hex.DecodeString(firstAddedGranteeLookupKey)
-	actSecondResult := act.Get(lookupKeyAsByte)
-	fmt.Println("encrypted access key for publisher: ", actSecondResult)
+	result = act.Get(lookupKeyAsByte)
+	hexEncodedEncryptedAK = hex.EncodeToString(result)
+	if len(hexEncodedEncryptedAK) != 64 {
+		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
+	}
 
 	lookupKeyAsByte, _ = hex.DecodeString(secondAddedGranteeLookupKey)
-	actThirdResult := act.Get(lookupKeyAsByte)
-	fmt.Println("encrypted access key for publisher: ", actThirdResult)
-
-	if 2 == 2 {
-		t.Errorf("act result %s", hex.EncodeToString(actFirstResult))
+	result = act.Get(lookupKeyAsByte)
+	hexEncodedEncryptedAK = hex.EncodeToString(result)
+	if len(hexEncodedEncryptedAK) != 64 {
+		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
 	}
 }
 

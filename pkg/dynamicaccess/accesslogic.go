@@ -59,7 +59,6 @@ func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act Act, publisherPubKe
 
 	// 2 Diffie-Hellman for the Grantee
 	lookup_key, _ := al.getLookUpKey(granteePubKey, "")
-	fmt.Println("Lookup key: ", lookup_key)
 	access_key_encryption_key, _ := al.getAccessKeyDecriptionKey(granteePubKey, "")
 
 	// Encrypt the access key for the new Grantee
