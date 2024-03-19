@@ -26,11 +26,11 @@ func TestGranteeAddGrantees(t *testing.T) {
 	addList := []ecdsa.PublicKey{key1.PublicKey, key2.PublicKey}
 	exampleTopic := "topic"
 	grantees, err := grantee.AddGrantees(exampleTopic, addList)
-	
+
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-	
+
 	if !reflect.DeepEqual(grantees, addList) {
 		t.Errorf("Expected grantees %v, got %v", addList, grantees)
 	}
@@ -38,31 +38,34 @@ func TestGranteeAddGrantees(t *testing.T) {
 
 func TestRemoveGrantees(t *testing.T) {
 	grantee := dynamicaccess.NewGrantee()
-	
+
 	key1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-	
+
 	key2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
-	
+
 	addList := []ecdsa.PublicKey{key1.PublicKey, key2.PublicKey}
 	exampleTopic := "topic"
 	grantee.AddGrantees(exampleTopic, addList)
 
 	removeList := []*ecdsa.PublicKey{&key1.PublicKey}
-	grantees := grantee.RemoveGrantees(exampleTopic, removeList)
-
+	err = grantee.RemoveGrantees(exampleTopic, removeList)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
+	grantees := grantee.GetGrantees(exampleTopic)
 	expectedGrantees := []ecdsa.PublicKey{key2.PublicKey}
-	if !reflect.DeepEqual(grantees, expectedGrantees) {
-		t.Errorf("Expected grantees %v, got %v", expectedGrantees, grantees)
+
+	for i, grantee := range grantees {
+		if grantee != expectedGrantees[i] {
+			t.Errorf("Expected grantee %v, got %v", expectedGrantees[i], grantee)
+		}
 	}
 }
 
@@ -85,8 +88,8 @@ func TestGetGrantees(t *testing.T) {
 
 	grantees := grantee.GetGrantees(exampleTopic)
 	for i, grantee := range grantees {
-		if *grantee != addList[i] {
-			t.Errorf("Expected grantee %v, got %v", addList[i], *grantee)
+		if grantee != addList[i] {
+			t.Errorf("Expected grantee %v, got %v", addList[i], grantee)
 		}
 	}
 }
