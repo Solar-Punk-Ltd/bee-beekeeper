@@ -12,24 +12,32 @@ import (
 var hashFunc = sha3.NewLegacyKeccak256
 
 type AccessLogic interface {
-	AddPublisher(act Act, publisher ecdsa.PublicKey) (Act, error)
+	Get(act Act, encryped_ref swarm.Address, publisher ecdsa.PublicKey, tag string) (swarm.Address, error)
+	EncryptRef(act Act, publisherPubKey ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
+	//Add(act *Act, ref string, publisher ecdsa.PublicKey, tag string) (string, error)
+	getKeys(publicKey ecdsa.PublicKey) ([][]byte, error)
+	getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, error)
+	//createEncryptedAccessKey(ref string)
 	Add_New_Grantee_To_Content(act Act, publisherPubKey, granteePubKey ecdsa.PublicKey) (Act, error)
 	Get(act Act, encryped_ref swarm.Address, publisher ecdsa.PublicKey) (swarm.Address, error)
 	EncryptRef(act Act, publisherPubKey ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
 }
 
 type DefaultAccessLogic struct {
-	diffieHellman DiffieHellman
+	session Session
+	//encryption    encryption.Interface
 }
 
 // Adds a new publisher to an empty act
 func (al *DefaultAccessLogic) AddPublisher(act Act, publisher ecdsa.PublicKey) (Act, error) {
 	accessKey := encryption.GenerateRandomKey(encryption.KeyLength)
 
-	lookupKey, err := al.getLookUpKey(publisher)
+	keys, err := al.getKeys(publisher)
 	if err != nil {
 		return nil, err
 	}
+	lookup_key := keys[0]
+	access_key_encryption_key := keys[1]
 
 	accessKeyEncryptionKey, err := al.getAccessKeyDecriptionKey(publisher)
 	if err != nil {
@@ -67,10 +75,13 @@ func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act Act, publisherPubKe
 		return nil, err
 	}
 
-	accessKeyEncryptionKey, err := al.getAccessKeyDecriptionKey(granteePubKey)
+	// 2 Diffie-Hellman for the Grantee
+	keys, err := al.getKeys(granteePubKey)
 	if err != nil {
 		return nil, err
 	}
+	lookup_key := keys[0]
+	access_key_encryption_key := keys[1]
 
 	// Encrypt the access key for the new Grantee
 	cipher := encryption.New(encryption.Key(accessKeyEncryptionKey), 0, uint32(0), hashFunc)
@@ -88,10 +99,12 @@ func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act Act, publisherPubKe
 
 // Will return the access key for a publisher (public key)
 func (al *DefaultAccessLogic) getAccessKey(act Act, publisherPubKey ecdsa.PublicKey) []byte {
-	publisherLookupKey, err := al.getLookUpKey(publisherPubKey)
+	keys, err := al.getKeys(publisherPubKey)
 	if err != nil {
 		return nil
 	}
+	publisher_lookup_key := keys[0]
+	publisher_ak_decryption_key := keys[1]
 
 	publisherAKDecryptionKey, err := al.getAccessKeyDecriptionKey(publisherPubKey)
 	if err != nil {
@@ -112,41 +125,33 @@ func (al *DefaultAccessLogic) getAccessKey(act Act, publisherPubKey ecdsa.Public
 	return accessKey
 }
 
-// Gets the lookup key for a given grantee
-func (al *DefaultAccessLogic) getLookUpKey(grantee ecdsa.PublicKey) ([]byte, error) {
-	zeroByteArray := []byte{0}
-	// Generate lookup key using Diffie Hellman
-	lookupKey, err := al.diffieHellman.SharedSecret(&grantee, "", zeroByteArray)
-	if err != nil {
-		return []byte{}, err
-	}
-	if len(lookupKey) != 32 {
-		return []byte{}, fmt.Errorf("lookup key length is not 32 (not found)")
-	}
-	return lookupKey, nil
+//
+// act[lookupKey] := valamilyen_cipher.Encrypt(access_key)
 
-}
+// end of pseudo code like code
 
-// Gets the access key decryption key for the publisher
-func (al *DefaultAccessLogic) getAccessKeyDecriptionKey(publisher ecdsa.PublicKey) ([]byte, error) {
+// func (al *DefaultAccessLogic) CreateAccessKey(reference string) {
+// }
+
+func (al *DefaultAccessLogic) getKeys(publicKey ecdsa.PublicKey) ([][]byte, error) {
+	// Generate lookup key and access key decryption
 	oneByteArray := []byte{1}
+	zeroByteArray := []byte{0}
 
-	// Generate access key decryption key using Diffie Hellman
-	accessKeyDecryptionKey, err := al.diffieHellman.SharedSecret(&publisher, "", oneByteArray)
+	keys, err := al.session.Key(&publicKey, [][]byte{zeroByteArray, oneByteArray})
 	if err != nil {
-		return []byte{}, err
+		return [][]byte{}, err
 	}
-
-	return accessKeyDecryptionKey, nil
+	return keys, nil
 }
 
 // Gets the encrypted access key for a given grantee
 func (al *DefaultAccessLogic) getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, error) {
-	byteResult, _ := act.Lookup(lookup_key)
-	if len(byteResult) == 0 {
-		return nil, fmt.Errorf("encrypted access key not found")
+	val, err := act.Lookup(lookup_key)
+	if err != nil {
+		return []byte{}, err
 	}
-	return byteResult, nil
+	return val, nil
 }
 
 // Get will return a decrypted reference, for given encrypted reference and grantee
@@ -158,14 +163,12 @@ func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, grantee e
 		return swarm.EmptyAddress, fmt.Errorf("grantee not provided")
 	}
 
-	lookupKey, err := al.getLookUpKey(grantee)
+	keys, err := al.getKeys(publisher)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
-	accessKeyDecryptionKey, err := al.getAccessKeyDecriptionKey(grantee)
-	if err != nil {
-		return swarm.EmptyAddress, err
-	}
+	lookup_key := keys[0]
+	access_key_decryption_key := keys[1]
 
 	// Lookup encrypted access key from the ACT manifest
 
@@ -191,8 +194,8 @@ func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, grantee e
 	return swarm.NewAddress(ref), nil
 }
 
-func NewAccessLogic(diffieHellman DiffieHellman) AccessLogic {
+func NewAccessLogic(s Session) AccessLogic {
 	return &DefaultAccessLogic{
-		diffieHellman: diffieHellman,
+		session: s,
 	}
 }
