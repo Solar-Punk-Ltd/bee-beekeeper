@@ -1,3 +1,7 @@
+// Copyright 2024 The Swarm Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package mock
 
 import (
@@ -6,33 +10,33 @@ import (
 )
 
 type ActMock struct {
-	AddFunc    func(lookupKey []byte, encryptedAccessKey []byte) dynamicaccess.Act
-	LookupFunc func(lookupKey []byte) []byte
-	LoadFunc   func(lookupKey []byte) manifest.Entry
+	AddFunc    func(key []byte, value []byte) dynamicaccess.Act
+	LookupFunc func(key []byte) []byte
+	LoadFunc   func(key []byte) manifest.Entry
 	StoreFunc  func(me manifest.Entry)
 }
 
 var _ dynamicaccess.Act = (*ActMock)(nil)
 
-func (act *ActMock) Add(lookupKey []byte, encryptedAccessKey []byte) dynamicaccess.Act {
+func (act *ActMock) Add(key []byte, value []byte) dynamicaccess.Act {
 	if act.AddFunc == nil {
 		return act
 	}
-	return act.AddFunc(lookupKey, encryptedAccessKey)
+	return act.AddFunc(key, value)
 }
 
-func (act *ActMock) Lookup(lookupKey []byte) []byte {
+func (act *ActMock) Lookup(key []byte) []byte {
 	if act.LookupFunc == nil {
 		return make([]byte, 0)
 	}
-	return act.LookupFunc(lookupKey)
+	return act.LookupFunc(key)
 }
 
-func (act *ActMock) Load(lookupKey []byte) manifest.Entry {
+func (act *ActMock) Load(key []byte) manifest.Entry {
 	if act.LoadFunc == nil {
 		return nil
 	}
-	return act.LoadFunc(lookupKey)
+	return act.LoadFunc(key)
 }
 
 func (act *ActMock) Store(me manifest.Entry) {
@@ -42,7 +46,7 @@ func (act *ActMock) Store(me manifest.Entry) {
 	act.StoreFunc(me)
 }
 
-func NewActMock(addFunc func(lookupKey []byte, encryptedAccessKey []byte) dynamicaccess.Act, getFunc func(lookupKey []byte) []byte) dynamicaccess.Act {
+func NewActMock(addFunc func(key []byte, value []byte) dynamicaccess.Act, getFunc func(key []byte) []byte) dynamicaccess.Act {
 	return &ActMock{
 		AddFunc:    addFunc,
 		LookupFunc: getFunc,
