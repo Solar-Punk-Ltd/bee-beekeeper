@@ -1,3 +1,7 @@
+// Copyright 2024 The Swarm Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package dynamicaccess
 
 import (
@@ -7,10 +11,18 @@ import (
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
+// Act represents an interface for accessing and manipulating data.
 type Act interface {
-	Add(lookupKey []byte, encryptedAccessKey []byte) Act
-	Lookup(lookupKey []byte) []byte
-	Load(lookupKey []byte) manifest.Entry
+	// Add adds a key-value pair to the data store.
+	Add(key []byte, val []byte) Act
+
+	// Lookup retrieves the value associated with the given key from the data store.
+	Lookup(key []byte) []byte
+
+	// Load retrieves the manifest entry associated with the given key from the data store.
+	Load(key []byte) manifest.Entry
+
+	// Store stores the given manifest entry in the data store.
 	Store(me manifest.Entry)
 }
 
@@ -20,13 +32,13 @@ type defaultAct struct {
 	container map[string]string
 }
 
-func (act *defaultAct) Add(lookupKey []byte, encryptedAccessKey []byte) Act {
-	act.container[hex.EncodeToString(lookupKey)] = hex.EncodeToString(encryptedAccessKey)
+func (act *defaultAct) Add(key []byte, val []byte) Act {
+	act.container[hex.EncodeToString(key)] = hex.EncodeToString(val)
 	return act
 }
 
-func (act *defaultAct) Lookup(lookupKey []byte) []byte {
-	if key, ok := act.container[hex.EncodeToString(lookupKey)]; ok {
+func (act *defaultAct) Lookup(key []byte) []byte {
+	if key, ok := act.container[hex.EncodeToString(key)]; ok {
 		bytes, err := hex.DecodeString(key)
 		if err == nil {
 			return bytes
@@ -36,8 +48,8 @@ func (act *defaultAct) Lookup(lookupKey []byte) []byte {
 }
 
 // to manifestEntry
-func (act *defaultAct) Load(lookupKey []byte) manifest.Entry {
-	return manifest.NewEntry(swarm.NewAddress(lookupKey), act.container)
+func (act *defaultAct) Load(key []byte) manifest.Entry {
+	return manifest.NewEntry(swarm.NewAddress(key), act.container)
 }
 
 // from manifestEntry
