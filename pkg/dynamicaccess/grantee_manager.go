@@ -1,10 +1,12 @@
 package dynamicaccess
 
-import "crypto/ecdsa"
+import (
+	"crypto/ecdsa"
+)
 
 type GranteeManager interface {
 	Get(topic string) []*ecdsa.PublicKey
-	Add(topic string, addList []*ecdsa.PublicKey) error
+	Add(topic string, addList []ecdsa.PublicKey) error
 	Publish(act Act, publisher ecdsa.PublicKey, topic string) Act
 
 	// HandleGrantees(topic string, addList, removeList []*ecdsa.PublicKey) *Act
@@ -28,12 +30,16 @@ func (gm *granteeManager) Get(topic string) []*ecdsa.PublicKey {
 	return gm.granteeList.GetGrantees(topic)
 }
 
-func (gm *granteeManager) Add(topic string, addList []*ecdsa.PublicKey) error {
-	return gm.granteeList.AddGrantees(topic, addList)
+func (gm *granteeManager) Add(topic string, addList []ecdsa.PublicKey) error {
+	_, err := gm.granteeList.AddGrantees(topic, addList)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (gm *granteeManager) Publish(act Act, publisher ecdsa.PublicKey, topic string) Act {
-	gm.accessLogic.AddPublisher(act, publisher, "")
+	gm.accessLogic.AddPublisher(act, publisher)
 	for _, grantee := range gm.granteeList.GetGrantees(topic) {
 		gm.accessLogic.Add_New_Grantee_To_Content(act, publisher, *grantee)
 	}

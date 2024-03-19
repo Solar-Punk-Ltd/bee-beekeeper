@@ -5,43 +5,36 @@ import (
 )
 
 type Grantee interface {
-	AddGrantees(addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error)
-	RemoveGrantees(removeList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error)
-	GetGrantees() []ecdsa.PublicKey
+	AddGrantees(topic string, addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error)
+	RemoveGrantees(topic string, removeList []*ecdsa.PublicKey) error
+	GetGrantees(topic string) []*ecdsa.PublicKey
 }
 
 type defaultGrantee struct {
-	topic    string            //lint:ignore U1000 Ignore unused struct field
-	grantees []ecdsa.PublicKey
+	grantees map[string][]*ecdsa.PublicKey
 }
 
-func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
 
+func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
 	return g.grantees[topic]
 }
 
-// func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
-//     key, ok := g.grantees[topic]
-//     if !ok {
-//         return nil
-//     }
-//     return []*ecdsa.PublicKey{&key}
-// }
-
-func (g *defaultGrantee) AddGrantees(addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error) {
-	g.grantees = append(g.grantees, addList...)
-	return g.grantees, nil
+func (g *defaultGrantee) AddGrantees(topic string, addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error) {
+	for _, add := range addList {
+        g.grantees[topic] = append(g.grantees[topic], &add)
+    }
+    return addList, nil
 }
 
 func (g *defaultGrantee) RemoveGrantees(topic string, removeList []*ecdsa.PublicKey) error {
 	for _, remove := range removeList {
-		for i, grantee := range g.grantees[topic] {
-			if grantee == remove {
-				g.grantees[topic] = append(g.grantees[topic][:i], g.grantees[topic][i+1:]...)
-			}
-		}
-	}
-	return nil
+        for i, grantee := range g.grantees[topic] {
+            if grantee == remove {
+                g.grantees[topic] = append(g.grantees[topic][:i], g.grantees[topic][i+1:]...)
+            }
+        }
+    }
+    return nil
 }
 
 func NewGrantee() Grantee {

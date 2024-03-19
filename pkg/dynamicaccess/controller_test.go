@@ -73,7 +73,7 @@ func TestEncrypt(t *testing.T) {
 	eref, ref := prepareEncryptedChunkReference(ak)
 
 	key1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	gm.Add("topic", []*ecdsa.PublicKey{&key1.PublicKey})
+	gm.Add("topic", []ecdsa.PublicKey{key1.PublicKey})
 
 	addr, _ := c.UploadHandler(ref, &pk.PublicKey, "topic")
 	if !addr.Equal(eref) {
