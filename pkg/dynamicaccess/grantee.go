@@ -20,8 +20,8 @@ func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
 }
 
 func (g *defaultGrantee) AddGrantees(topic string, addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error) {
-	for _, add := range addList {
-        g.grantees[topic] = append(g.grantees[topic], &add)
+	for i, _ := range addList {
+        g.grantees[topic] = append(g.grantees[topic], &addList[i])
     }
     return addList, nil
 }

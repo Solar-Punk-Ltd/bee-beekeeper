@@ -84,8 +84,9 @@ func TestGetGrantees(t *testing.T) {
 	grantee.AddGrantees(exampleTopic, addList)
 
 	grantees := grantee.GetGrantees(exampleTopic)
-
-	if !reflect.DeepEqual(grantees, addList) {
-		t.Errorf("Expected grantees %v, got %v", addList, grantees)
+	for i, grantee := range grantees {
+		if *grantee != addList[i] {
+			t.Errorf("Expected grantee %v, got %v", addList[i], *grantee)
+		}
 	}
 }
