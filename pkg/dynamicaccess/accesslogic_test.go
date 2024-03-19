@@ -12,7 +12,7 @@ import (
 )
 
 // Generates a new test environment with a fix private key
-func setupAccessLogic() dynamicaccess.AccessLogic {
+func setupAccessLogic2() dynamicaccess.AccessLogic {
 	privateKey := generateFixPrivateKey(1000)
 	diffieHellman := dynamicaccess.NewDiffieHellman(&privateKey)
 	al := dynamicaccess.NewAccessLogic(diffieHellman)
@@ -39,7 +39,7 @@ func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
 }
 
 func TestGet_Success(t *testing.T) {
-	al := setupAccessLogic()
+	al := setupAccessLogic2()
 	id0 := generateFixPrivateKey(0)
 
 	act := dynamicaccess.NewDefaultAct()
@@ -48,9 +48,11 @@ func TestGet_Success(t *testing.T) {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
 	}
 
-	expectedRef := "39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559"
+	byteRef, _ := hex.DecodeString("39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559")
 
-	encryptedRef, err := al.EncryptRef(act, id0.PublicKey, swarm.NewAddress([]byte(expectedRef)))
+	expectedRef := swarm.NewAddress(byteRef)
+
+	encryptedRef, err := al.EncryptRef(act, id0.PublicKey, expectedRef)
 	if err != nil {
 		t.Errorf("There was an error while calling EncryptRef: ")
 		t.Error(err)
@@ -62,14 +64,15 @@ func TestGet_Success(t *testing.T) {
 		t.Error(err)
 	}
 
-	if ref != expectedRef {
+	if expectedRef.Compare(ref) != 0  {
+
 		t.Errorf("Get gave back wrong Swarm reference!")
 	}
 }
 
 // This test function tests those cases where different parameters are missing
 func TestGet_Error(t *testing.T) {
-	al := setupAccessLogic()
+	al := setupAccessLogic2()
 	id0 := generateFixPrivateKey(0)
 
 	act := dynamicaccess.NewDefaultAct()
@@ -88,7 +91,7 @@ func TestGet_Error(t *testing.T) {
 	}
 
 	refTwo, _ := al.Get(act, swarm.EmptyAddress, id0.PublicKey)
-	if refTwo != "" {
+	if swarm.EmptyAddress.Compare(refTwo) == 0 {
 		t.Errorf("Get should give back empty string if encrypted ref not provided!")
 	}
 
@@ -100,7 +103,7 @@ func TestGet_Error(t *testing.T) {
 
 // Tests whether the access logic constructor works properly
 func TestNewAccessLogic(t *testing.T) {
-	logic := setupAccessLogic()
+	logic := setupAccessLogic2()
 
 	_, ok := logic.(*dynamicaccess.DefaultAccessLogic)
 	if !ok {
@@ -109,7 +112,7 @@ func TestNewAccessLogic(t *testing.T) {
 }
 
 func TestAddPublisher(t *testing.T) {
-	al := setupAccessLogic()
+	al := setupAccessLogic2()
 	id0 := generateFixPrivateKey(0)
 	savedLookupKey := "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
 	act := dynamicaccess.NewDefaultAct()
@@ -123,7 +126,7 @@ func TestAddPublisher(t *testing.T) {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
 	}
 
-	encryptedAccessKey := act.Get(decodedSavedLookupKey)
+	encryptedAccessKey, _ := act.Lookup(decodedSavedLookupKey)
 	decodedEncryptedAccessKey := hex.EncodeToString(encryptedAccessKey)
 
 	// A random value is returned so it is only possibly to check the length of the returned value
@@ -137,7 +140,7 @@ func TestAddPublisher(t *testing.T) {
 }
 
 func TestAdd_New_Grantee_To_Content(t *testing.T) {
-	al := setupAccessLogic()
+	al := setupAccessLogic2()
 
 	id0 := generateFixPrivateKey(0)
 	id1 := generateFixPrivateKey(1)
@@ -167,7 +170,7 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
-	result := act.Get(lookupKeyAsByte)
+	result, _ := act.Lookup(lookupKeyAsByte)
 	hexEncodedEncryptedAK := hex.EncodeToString(result)
 	if len(hexEncodedEncryptedAK) != 64 {
 		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
@@ -177,7 +180,7 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
-	result = act.Get(lookupKeyAsByte)
+	result, _ = act.Lookup(lookupKeyAsByte)
 	hexEncodedEncryptedAK = hex.EncodeToString(result)
 	if len(hexEncodedEncryptedAK) != 64 {
 		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
@@ -187,7 +190,7 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
-	result = act.Get(lookupKeyAsByte)
+	result, _ = act.Lookup(lookupKeyAsByte)
 	hexEncodedEncryptedAK = hex.EncodeToString(result)
 	if len(hexEncodedEncryptedAK) != 64 {
 		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
@@ -198,7 +201,7 @@ func TestEncryptRef(t *testing.T) {
 	ref := "39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559"
 	savedEncryptedRef := "230cdcfb2e67adddb2822b38f70105213ab3e4f97d03560bfbfbb218f487c5303e9aa9a97e62aa1a8003f162679e7c65e1c8e3aacaec2043fd5d2a4a7d69285e"
 
-	al := setupAccessLogic()
+	al := setupAccessLogic2()
 	id0 := generateFixPrivateKey(0)
 	act := dynamicaccess.NewDefaultAct()
 	decodedLookupKey, err := hex.DecodeString("bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a")

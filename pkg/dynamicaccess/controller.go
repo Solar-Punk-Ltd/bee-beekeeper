@@ -22,7 +22,7 @@ func (c *defaultController) DownloadHandler(timestamp int64, enryptedRef swarm.A
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
-	addr, err := c.accessLogic.Get(act, enryptedRef, *publisher, tag)
+	addr, err := c.accessLogic.Get(act, enryptedRef, *publisher)
 	return addr, err
 }
 

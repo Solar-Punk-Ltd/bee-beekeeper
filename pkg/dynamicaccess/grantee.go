@@ -11,13 +11,22 @@ type Grantee interface {
 }
 
 type defaultGrantee struct {
-	// topic    string            //lint:ignore U1000 Ignore unused struct field
+	topic    string            //lint:ignore U1000 Ignore unused struct field
 	grantees []ecdsa.PublicKey
 }
 
 func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
+
 	return g.grantees[topic]
 }
+
+// func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
+//     key, ok := g.grantees[topic]
+//     if !ok {
+//         return nil
+//     }
+//     return []*ecdsa.PublicKey{&key}
+// }
 
 func (g *defaultGrantee) AddGrantees(addList []ecdsa.PublicKey) ([]ecdsa.PublicKey, error) {
 	g.grantees = append(g.grantees, addList...)
