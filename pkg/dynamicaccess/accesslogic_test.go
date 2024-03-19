@@ -43,7 +43,7 @@ func TestGet_Success(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 
 	act := dynamicaccess.NewDefaultAct()
-	act, err := al.AddPublisher(act, id0.PublicKey, "")
+	act, err := al.AddPublisher(act, id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
 	}
@@ -55,10 +55,8 @@ func TestGet_Success(t *testing.T) {
 		t.Errorf("There was an error while calling EncryptRef: ")
 		t.Error(err)
 	}
-	
-	tag := "exampleTag"
 
-	ref, err := al.Get(act, encryptedRef, id0.PublicKey, tag)
+	ref, err := al.Get(act, encryptedRef, id0.PublicKey)
 	if err != nil {
 		t.Errorf("There was an error while calling Get: ")
 		t.Error(err)
@@ -75,7 +73,7 @@ func TestGet_Error(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 
 	act := dynamicaccess.NewDefaultAct()
-	act, err := al.AddPublisher(act, id0.PublicKey, "")
+	act, err := al.AddPublisher(act, id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
 	}
@@ -83,19 +81,18 @@ func TestGet_Error(t *testing.T) {
 	expectedRef := "39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559"
 
 	encryptedRef, _ := al.EncryptRef(act, id0.PublicKey, swarm.NewAddress([]byte(expectedRef)))
-	tag := "exampleTag"
 
-	_, err = al.Get(dynamicaccess.NewDefaultAct(), encryptedRef, id0.PublicKey, tag)
+	_, err = al.Get(dynamicaccess.NewDefaultAct(), encryptedRef, id0.PublicKey)
 	if err == nil {
 		t.Errorf("Get should give back encrypted access key not found error!")
 	}
 
-	refTwo, _ := al.Get(act, swarm.EmptyAddress, id0.PublicKey, tag)
+	refTwo, _ := al.Get(act, swarm.EmptyAddress, id0.PublicKey)
 	if refTwo != "" {
 		t.Errorf("Get should give back empty string if encrypted ref not provided!")
 	}
 
-	_, err = al.Get(act, encryptedRef, ecdsa.PublicKey{}, tag)
+	_, err = al.Get(act, encryptedRef, ecdsa.PublicKey{})
 	if err == nil {
 		t.Errorf("Get should give back error if grantee not provided!")
 	}
@@ -116,7 +113,7 @@ func TestAddPublisher(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 	savedLookupKey := "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
 	act := dynamicaccess.NewDefaultAct()
-	act, err := al.AddPublisher(act, id0.PublicKey, "")
+	act, err := al.AddPublisher(act, id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
 	}
@@ -151,7 +148,7 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	secondAddedGranteeLookupKey := "8fe8dff7cd15a6a0095c1b25071a5691e7c901fd0b95857a96c0e4659b48716a"
 
 	act := dynamicaccess.NewDefaultAct()
-	act, err := al.AddPublisher(act, id0.PublicKey, "")
+	act, err := al.AddPublisher(act, id0.PublicKey)
 	 if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
