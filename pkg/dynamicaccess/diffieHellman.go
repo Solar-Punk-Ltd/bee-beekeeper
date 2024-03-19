@@ -3,6 +3,7 @@ package dynamicaccess
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 
 	"github.com/ethersphere/bee/pkg/crypto"
 )
@@ -18,7 +19,14 @@ type defaultDiffieHellman struct {
 }
 
 func (dh *defaultDiffieHellman) SharedSecret(publicKey *ecdsa.PublicKey, tag string, salt []byte) ([]byte, error) {
+	fmt.Println("PUBLIC KEY INSIDE SharedSecret: ", publicKey)
+	fmt.Println("x: ", publicKey.X)
+	fmt.Println("y: ", publicKey.Y)
+	fmt.Println("dh.key.D: ", dh.key.D)
+	fmt.Println("Salt: ", salt)
 	x, _ := publicKey.Curve.ScalarMult(publicKey.X, publicKey.Y, dh.key.D.Bytes())
+	fmt.Println("x: ", x)
+	fmt.Println(crypto.LegacyKeccak256(append(x.Bytes(), salt...)))
 	if x == nil {
 		return nil, errors.New("shared secret is point at infinity")
 	}

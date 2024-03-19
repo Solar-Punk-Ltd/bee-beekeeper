@@ -4,23 +4,22 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"testing"
 
-	"github.com/ethersphere/bee/pkg/crypto"
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 func setupAccessLogic() dynamicaccess.AccessLogic {
-	privateKey, err := crypto.GenerateSecp256k1Key()
-	if err != nil {
-		errors.New("error creating private key")
-		fmt.Println(err)
-	}
-	diffieHellman := dynamicaccess.NewDiffieHellman(privateKey)
+	//privateKey, err := crypto.GenerateSecp256k1Key()
+	privateKey := generateFixPrivateKey(1000)
+	// if err != nil {
+	// 	errors.New("error creating private key")
+	// 	fmt.Println(err)
+	// }
+	diffieHellman := dynamicaccess.NewDiffieHellman(&privateKey)
 	al := dynamicaccess.NewAccessLogic(diffieHellman)
 
 	return al
@@ -148,9 +147,11 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	lookupKeyAsByte, _ := hex.DecodeString(publisherLookupKey)
 	actFirstResult := act.Get(lookupKeyAsByte)
 	fmt.Println("encrypted access key for publisher: ", actFirstResult)
+
 	lookupKeyAsByte, _ = hex.DecodeString(firstAddedGranteeLookupKey)
 	actSecondResult := act.Get(lookupKeyAsByte)
 	fmt.Println("encrypted access key for publisher: ", actSecondResult)
+
 	lookupKeyAsByte, _ = hex.DecodeString(secondAddedGranteeLookupKey)
 	actThirdResult := act.Get(lookupKeyAsByte)
 	fmt.Println("encrypted access key for publisher: ", actThirdResult)
