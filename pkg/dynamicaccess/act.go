@@ -14,16 +14,16 @@ import (
 // Act represents an interface for accessing and manipulating data.
 type Act interface {
 	// Add adds a key-value pair to the data store.
-	Add(key []byte, val []byte) Act
+	Add(key []byte, val []byte) error
 
 	// Lookup retrieves the value associated with the given key from the data store.
-	Lookup(key []byte) []byte
+	Lookup(key []byte) ([]byte, error)
 
 	// Load retrieves the manifest entry associated with the given key from the data store.
-	Load(key []byte) manifest.Entry
+	Load(key []byte) (manifest.Entry, error)
 
 	// Store stores the given manifest entry in the data store.
-	Store(me manifest.Entry)
+	Store(me manifest.Entry) error
 }
 
 var _ Act = (*defaultAct)(nil)
@@ -32,32 +32,34 @@ type defaultAct struct {
 	container map[string]string
 }
 
-func (act *defaultAct) Add(key []byte, val []byte) Act {
+func (act *defaultAct) Add(key []byte, val []byte) error {
 	act.container[hex.EncodeToString(key)] = hex.EncodeToString(val)
-	return act
+	return nil
 }
 
-func (act *defaultAct) Lookup(key []byte) []byte {
+func (act *defaultAct) Lookup(key []byte) ([]byte, error) {
 	if key, ok := act.container[hex.EncodeToString(key)]; ok {
 		bytes, err := hex.DecodeString(key)
-		if err == nil {
-			return bytes
+		if err != nil {
+			return nil, err
 		}
+		return bytes, nil
 	}
-	return make([]byte, 0)
+	return make([]byte, 0), nil
 }
 
 // to manifestEntry
-func (act *defaultAct) Load(key []byte) manifest.Entry {
-	return manifest.NewEntry(swarm.NewAddress(key), act.container)
+func (act *defaultAct) Load(key []byte) (manifest.Entry, error) {
+	return manifest.NewEntry(swarm.NewAddress(key), act.container), nil
 }
 
 // from manifestEntry
-func (act *defaultAct) Store(me manifest.Entry) {
+func (act *defaultAct) Store(me manifest.Entry) error {
 	if act.container == nil {
 		act.container = make(map[string]string)
 	}
 	act.container = me.Metadata()
+	return nil
 }
 
 func NewDefaultAct() Act {
