@@ -23,14 +23,14 @@ type Logic interface {
 	EncryptRef(act Act, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
 }
 
-type defaultLogic struct {
+type actLogic struct {
 	session Session
 }
 
-var _ Logic = (*defaultLogic)(nil)
+var _ Logic = (*actLogic)(nil)
 
 // Adds a new publisher to an empty act
-func (al *defaultLogic) AddPublisher(act Act, publisher *ecdsa.PublicKey) (Act, error) {
+func (al *actLogic) AddPublisher(act Act, publisher *ecdsa.PublicKey) (Act, error) {
 	accessKey := encryption.GenerateRandomKey(encryption.KeyLength)
 
 	keys, err := al.getKeys(publisher)
@@ -46,13 +46,13 @@ func (al *defaultLogic) AddPublisher(act Act, publisher *ecdsa.PublicKey) (Act, 
 		return nil, err
 	}
 
-	act.Add([]byte(lookupKey), encryptedAccessKey)
+	act.Add(lookupKey, encryptedAccessKey)
 
 	return act, nil
 }
 
 // Encrypts a SWARM reference for a publisher
-func (al *defaultLogic) EncryptRef(act Act, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
+func (al *actLogic) EncryptRef(act Act, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
 	accessKey := al.getAccessKey(act, publisherPubKey)
 	refCipher := encryption.New(accessKey, 0, uint32(0), hashFunc)
 	encryptedRef, _ := refCipher.Encrypt(ref.Bytes())
@@ -61,7 +61,7 @@ func (al *defaultLogic) EncryptRef(act Act, publisherPubKey *ecdsa.PublicKey, re
 }
 
 // Adds a new grantee to the ACT
-func (al *defaultLogic) AddNewGranteeToContent(act Act, publisherPubKey, granteePubKey *ecdsa.PublicKey) (Act, error) {
+func (al *actLogic) AddNewGranteeToContent(act Act, publisherPubKey, granteePubKey *ecdsa.PublicKey) (Act, error) {
 	// Get previously generated access key
 	accessKey := al.getAccessKey(act, publisherPubKey)
 
@@ -81,14 +81,14 @@ func (al *defaultLogic) AddNewGranteeToContent(act Act, publisherPubKey, grantee
 	}
 
 	// Add the new encrypted access key for the Act
-	act.Add([]byte(lookupKey), granteeEncryptedAccessKey)
+	act.Add(lookupKey, granteeEncryptedAccessKey)
 
 	return act, nil
 
 }
 
 // Will return the access key for a publisher (public key)
-func (al *defaultLogic) getAccessKey(act Act, publisherPubKey *ecdsa.PublicKey) []byte {
+func (al *actLogic) getAccessKey(act Act, publisherPubKey *ecdsa.PublicKey) []byte {
 	keys, err := al.getKeys(publisherPubKey)
 	if err != nil {
 		return nil
@@ -110,7 +110,7 @@ func (al *defaultLogic) getAccessKey(act Act, publisherPubKey *ecdsa.PublicKey) 
 	return accessKey
 }
 
-func (al *defaultLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
+func (al *actLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
 	// Generate lookup key and access key decryption
 	oneByteArray := []byte{1}
 	zeroByteArray := []byte{0}
@@ -123,7 +123,7 @@ func (al *defaultLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
 }
 
 // Gets the encrypted access key for a given grantee
-func (al *defaultLogic) getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, error) {
+func (al *actLogic) getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, error) {
 	val, err := act.Lookup(lookup_key)
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (al *defaultLogic) getEncryptedAccessKey(act Act, lookup_key []byte) ([]byt
 }
 
 // Get will return a decrypted reference, for given encrypted reference and grantee
-func (al *defaultLogic) Get(act Act, encryped_ref swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error) {
+func (al *actLogic) Get(act Act, encryped_ref swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error) {
 	if encryped_ref.Compare(swarm.EmptyAddress) == 0 {
 		return swarm.EmptyAddress, fmt.Errorf("encrypted ref not provided")
 	}
@@ -171,7 +171,13 @@ func (al *defaultLogic) Get(act Act, encryped_ref swarm.Address, grantee *ecdsa.
 }
 
 func NewLogic(s Session) Logic {
-	return &defaultLogic{
+	return &actLogic{
 		session: s,
 	}
 }
+
+// TODO
+// interface -nél nem ACT típusokat kell használni hanem swarm assreess-t, és csak encrypt és decryptáló metódusok legyen
+// OK defaultLogic helyett ACTLogic nevezékú
+// OK lookup- key-ek byte-tá castolásást ellenőrizni
+//  sof link grantee.go 46 sorához kicserélni

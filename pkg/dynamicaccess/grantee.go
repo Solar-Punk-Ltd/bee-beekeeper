@@ -2,7 +2,6 @@ package dynamicaccess
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 )
 
 type Grantee interface {
@@ -31,11 +30,12 @@ func (g *defaultGrantee) RemoveGrantees(topic string, removeList []*ecdsa.Public
 	for _, remove := range removeList {
 		for i, grantee := range g.grantees[topic] {
 			if *grantee == *remove {
-				fmt.Println("REMOVE")
 				g.grantees[topic] = append(g.grantees[topic][:i], g.grantees[topic][i+1:]...)
 			}
 		}
 	}
+
+	
 	return nil
 }
 
