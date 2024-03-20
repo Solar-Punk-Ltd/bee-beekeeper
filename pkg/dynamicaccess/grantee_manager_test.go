@@ -36,6 +36,6 @@ func TestAdd(t *testing.T) {
 	if err != nil {
 		t.Errorf("Add() returned an error")
 	}
-	m.Publish(act, pub.PublicKey, "topic")
+	m.Publish(act, &pub.PublicKey, "topic")
 	fmt.Println("")
 }

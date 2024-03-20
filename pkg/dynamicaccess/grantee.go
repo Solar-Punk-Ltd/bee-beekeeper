@@ -2,49 +2,40 @@ package dynamicaccess
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 )
 
 type Grantee interface {
-	//? ÁTBESZÉLNI
-	// Revoke(topic string) error
-	// Publish(topic string) error
-
-	// RevokeList(topic string, removeList []string, addList []string) (string, error)
-	// RevokeGrantees(topic string, removeList []string) (string, error)
-	AddGrantees(topic string, addList []*ecdsa.PublicKey) error
+	AddGrantees(topic string, addList []*ecdsa.PublicKey) (error)
 	RemoveGrantees(topic string, removeList []*ecdsa.PublicKey) error
 	GetGrantees(topic string) []*ecdsa.PublicKey
 }
 
 type defaultGrantee struct {
-	grantees map[string][]*ecdsa.PublicKey // Modified field name to start with an uppercase letter
+	grantees map[string][]*ecdsa.PublicKey
 }
 
 func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
-	return g.grantees[topic]
+	grantees := g.grantees[topic]
+	keys := make([]*ecdsa.PublicKey, len(grantees))
+	for i, key := range grantees {
+		keys[i] = key
+	}
+	return keys
 }
 
-// func (g *defaultGrantee) Revoke(topic string) error {
-// 	return nil
-// }
-
-// func (g *defaultGrantee) RevokeList(topic string, removeList []string, addList []string) (string, error) {
-// 	return "", nil
-// }
-
-// func (g *defaultGrantee) Publish(topic string) error {
-// 	return nil
-// }
-
-func (g *defaultGrantee) AddGrantees(topic string, addList []*ecdsa.PublicKey) error {
-	g.grantees[topic] = append(g.grantees[topic], addList...)
+func (g *defaultGrantee) AddGrantees(topic string, addList []*ecdsa.PublicKey) (error) {
+	for i, _ := range addList {
+		g.grantees[topic] = append(g.grantees[topic], addList[i])
+	}
 	return nil
 }
 
 func (g *defaultGrantee) RemoveGrantees(topic string, removeList []*ecdsa.PublicKey) error {
 	for _, remove := range removeList {
 		for i, grantee := range g.grantees[topic] {
-			if grantee == remove {
+			if *grantee == *remove {
+				fmt.Println("REMOVE")
 				g.grantees[topic] = append(g.grantees[topic][:i], g.grantees[topic][i+1:]...)
 			}
 		}

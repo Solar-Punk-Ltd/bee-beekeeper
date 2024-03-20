@@ -22,7 +22,7 @@ func (c *defaultController) DownloadHandler(timestamp int64, enryptedRef swarm.A
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
-	addr, err := c.accessLogic.Get(act, enryptedRef, *publisher, tag)
+	addr, err := c.accessLogic.Get(act, enryptedRef, publisher)
 	return addr, err
 }
 
@@ -31,10 +31,10 @@ func (c *defaultController) UploadHandler(ref swarm.Address, publisher *ecdsa.Pu
 	if act == nil {
 		// new feed
 		act = NewInMemoryAct()
-		act = c.granteeManager.Publish(act, *publisher, topic)
+		act = c.granteeManager.Publish(act, publisher, topic)
 	}
 	//FIXME: check if ACT is consistent with the grantee list
-	return c.accessLogic.EncryptRef(act, *publisher, ref)
+	return c.accessLogic.EncryptRef(act, publisher, ref)
 }
 
 func NewController(history History, granteeManager GranteeManager, accessLogic AccessLogic) Controller {
