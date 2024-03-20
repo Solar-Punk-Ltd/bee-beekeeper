@@ -11,7 +11,7 @@ import (
 
 var hashFunc = sha3.NewLegacyKeccak256
 
-// Logic is the interface for the access logic
+// Logic has the responsibility to return a ref for a given grantee and create new encrypted reference for a grantee
 type Logic interface {
 	// Adds a new publisher to an empty act
 	AddPublisher(act Act, publisher *ecdsa.PublicKey) (Act, error) 
