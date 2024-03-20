@@ -51,8 +51,10 @@ func TestGet_Success(t *testing.T) {
 	byteRef, _ := hex.DecodeString("39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559")
 
 	expectedRef := swarm.NewAddress(byteRef)
+	t.Logf("encryptedRef: %s", expectedRef.String())
 
 	encryptedRef, err := al.EncryptRef(act, id0.PublicKey, expectedRef)
+	t.Logf("encryptedRef: %s", encryptedRef.String())
 	if err != nil {
 		t.Errorf("There was an error while calling EncryptRef: ")
 		t.Error(err)
@@ -91,7 +93,7 @@ func TestGet_Error(t *testing.T) {
 	}
 
 	refTwo, _ := al.Get(act, swarm.EmptyAddress, id0.PublicKey)
-	if swarm.EmptyAddress.Compare(refTwo) == 0 {
+	if swarm.EmptyAddress.Compare(refTwo) != 0 {
 		t.Errorf("Get should give back empty string if encrypted ref not provided!")
 	}
 

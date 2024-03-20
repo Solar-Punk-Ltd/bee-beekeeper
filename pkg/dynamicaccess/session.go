@@ -27,12 +27,12 @@ func (s *session) Key(publicKey *ecdsa.PublicKey, nonces [][]byte) ([][]byte, er
 	}
 
 	keys := make([][]byte, len(nonces))
-	for _, nonce := range nonces {
+	for i, nonce := range nonces {
 		key, err := crypto.LegacyKeccak256(append(x.Bytes(), nonce...))
 		if err != nil {
 			return nil, err
 		}
-		keys = append(keys, key)
+		keys[i] = key
 	}
 
 	return keys, nil
