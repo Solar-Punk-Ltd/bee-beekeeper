@@ -10,13 +10,13 @@ import (
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 )
 
-func setupAccessLogic(privateKey *ecdsa.PrivateKey) dynamicaccess.AccessLogic {
+func setupAccessLogic(privateKey *ecdsa.PrivateKey) dynamicaccess.Logic {
 	// privateKey, err := crypto.GenerateSecp256k1Key()
 	// if err != nil {
 	// 	errors.New("error creating private key")
 	// }
 	si := dynamicaccess.NewDefaultSession(privateKey)
-	al := dynamicaccess.NewAccessLogic(si)
+	al := dynamicaccess.NewLogic(si)
 
 	return al
 }

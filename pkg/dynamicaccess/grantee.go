@@ -6,7 +6,7 @@ import (
 )
 
 type Grantee interface {
-	AddGrantees(topic string, addList []*ecdsa.PublicKey) (error)
+	AddGrantees(topic string, addList []*ecdsa.PublicKey) error
 	RemoveGrantees(topic string, removeList []*ecdsa.PublicKey) error
 	GetGrantees(topic string) []*ecdsa.PublicKey
 }
@@ -18,16 +18,12 @@ type defaultGrantee struct {
 func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
 	grantees := g.grantees[topic]
 	keys := make([]*ecdsa.PublicKey, len(grantees))
-	for i, key := range grantees {
-		keys[i] = key
-	}
+	copy(keys, grantees)
 	return keys
 }
 
-func (g *defaultGrantee) AddGrantees(topic string, addList []*ecdsa.PublicKey) (error) {
-	for i, _ := range addList {
-		g.grantees[topic] = append(g.grantees[topic], addList[i])
-	}
+func (g *defaultGrantee) AddGrantees(topic string, addList []*ecdsa.PublicKey) error {
+	g.grantees[topic] = append(g.grantees[topic], addList...)
 	return nil
 }
 

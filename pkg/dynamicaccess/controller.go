@@ -14,7 +14,7 @@ type Controller interface {
 type defaultController struct {
 	history        History
 	granteeManager GranteeManager
-	accessLogic    AccessLogic
+	accessLogic    Logic
 }
 
 func (c *defaultController) DownloadHandler(timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, tag string) (swarm.Address, error) {
@@ -37,7 +37,7 @@ func (c *defaultController) UploadHandler(ref swarm.Address, publisher *ecdsa.Pu
 	return c.accessLogic.EncryptRef(act, publisher, ref)
 }
 
-func NewController(history History, granteeManager GranteeManager, accessLogic AccessLogic) Controller {
+func NewController(history History, granteeManager GranteeManager, accessLogic Logic) Controller {
 	return &defaultController{
 		history:        history,
 		granteeManager: granteeManager,

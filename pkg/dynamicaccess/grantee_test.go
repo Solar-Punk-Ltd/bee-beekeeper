@@ -53,6 +53,9 @@ func TestRemoveGrantees(t *testing.T) {
 	addList := []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}
 	exampleTopic := "topic"
 	err = grantee.AddGrantees(exampleTopic, addList)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
 
 	removeList := []*ecdsa.PublicKey{&key1.PublicKey}
 	err = grantee.RemoveGrantees(exampleTopic, removeList)
@@ -86,6 +89,9 @@ func TestGetGrantees(t *testing.T) {
 	addList := []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}
 	exampleTopic := "topic"
 	err = grantee.AddGrantees(exampleTopic, addList)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
 
 	grantees := grantee.GetGrantees(exampleTopic)
 	for i, grantee := range grantees {

@@ -12,10 +12,10 @@ import (
 )
 
 // Generates a new test environment with a fix private key
-func setupAccessLogic2() dynamicaccess.AccessLogic {
+func setupAccessLogic2() dynamicaccess.Logic {
 	privateKey := generateFixPrivateKey(1000)
 	diffieHellman := dynamicaccess.NewDefaultSession(&privateKey)
-	al := dynamicaccess.NewAccessLogic(diffieHellman)
+	al := dynamicaccess.NewLogic(diffieHellman)
 
 	return al
 }
@@ -103,16 +103,6 @@ func TestGet_Error(t *testing.T) {
 	}
 }
 
-// Tests whether the access logic constructor works properly
-func TestNewAccessLogic(t *testing.T) {
-	logic := setupAccessLogic2()
-
-	_, ok := logic.(*dynamicaccess.DefaultAccessLogic)
-	if !ok {
-		t.Errorf("NewAccessLogic: expected type *DefaultAccessLogic, got %T", logic)
-	}
-}
-
 func TestAddPublisher(t *testing.T) {
 	al := setupAccessLogic2()
 	id0 := generateFixPrivateKey(0)
@@ -158,12 +148,12 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
 
-	act, err = al.Add_New_Grantee_To_Content(act, &id0.PublicKey, &id1.PublicKey)
+	act, err = al.AddNewGranteeToContent(act, &id0.PublicKey, &id1.PublicKey)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
 
-	act, err = al.Add_New_Grantee_To_Content(act, &id0.PublicKey, &id2.PublicKey)
+	act, err = al.AddNewGranteeToContent(act, &id0.PublicKey, &id2.PublicKey)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
