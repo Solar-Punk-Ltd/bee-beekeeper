@@ -34,6 +34,58 @@ func TestControllerUploadHandler(t *testing.T) {
 	pk := getPrivateKey()
 	ak := encryption.Key([]byte("cica"))
 
+	// si := dynamicaccess.NewDefaultSession(pk)
+	// aek, _ := si.Key(&pk.PublicKey, [][]byte{{1}})
+	// e2 := encryption.New(aek[0], 0, uint32(0), hashFunc)
+	// _, err := e2.Encrypt(ak)
+
+	h := mock.NewHistory()
+	al := setupAccessLogic(pk)
+	gm := dynamicaccess.NewGranteeManager(al)
+	c := mock.NewControllerMock(h, gm, al)
+	eref, ref := prepareEncryptedChunkReference(ak)
+
+	key1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	err := gm.Add("topic", []*ecdsa.PublicKey{&key1.PublicKey})
+	if err != nil {
+		t.Fatalf("gm.Add() returned an error: %v", err)
+	}
+
+	addr, _ := c.UploadHandler(ref, &pk.PublicKey, "topic")
+	if !addr.Equal(eref) {
+		t.Fatalf("Encrypted chunk address: %s is not the expected: %s", addr, eref)
+	}
+	act, err := h.Lookup(0)
+	if err != nil {
+		t.Fatalf("h.Lookup() returned an error: %v", err)
+	}
+	manifRef, err := c.Store(act)
+	t.Logf("manifRef: %s", manifRef)
+	if err != nil {
+		t.Fatalf("Store() returned an error: %v", err)
+	}
+
+	//FIXME
+	// storer := mockstorer.New()
+	// ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, 0))
+	// m, err := manifest.NewDefaultManifestReference(manifRef, ls)
+	// if err != nil {
+	// 	t.Fatalf("NewDefaultManifestReference() returned an error: %v", err)
+	// }
+	// me, err := m.Lookup(context.Background(), hex.EncodeToString(aek))
+	// if err != nil {
+	// 	t.Fatalf("m.Lookup() returned an error: %v", err)
+	// }
+	// if me.Reference().String() != addr.String() {
+	// 	t.Fatalf("me.Reference(): %s is not the expected: %s", me.Reference(), addr)
+
+	// }
+}
+
+func TestControllerDecrypt(t *testing.T) {
+	pk := getPrivateKey()
+	ak := encryption.Key([]byte("cica"))
+
 	si := dynamicaccess.NewDefaultSession(pk)
 	aek, _ := si.Key(&pk.PublicKey, [][]byte{{0}, {1}})
 	e2 := encryption.New(aek[1], 0, uint32(0), hashFunc)
@@ -60,13 +112,13 @@ func TestControllerGranteeDecrypt(t *testing.T) {
 	pk := getPrivateKey()
 	ak := encryption.Key([]byte("cica"))
 
-	dh := dynamicaccess.NewDiffieHellman(pk)
-	aek, _ := dh.SharedSecret(&pk.PublicKey, "tag", []byte{1})
-	e2 := encryption.New(aek, 0, uint32(0), hashFunc)
+	si := dynamicaccess.NewDefaultSession(pk)
+	aek, _ := si.Key(&pk.PublicKey, [][]byte{{0}, {1}})
+	e2 := encryption.New(aek[1], 0, uint32(0), hashFunc)
 	peak, _ := e2.Encrypt(ak)
 
 	h := mockTestHistory(nil, peak)
-	al := setupAccessLogicWithPk(pk)
+	al := setupAccessLogic(pk)
 	gm := dynamicaccess.NewGranteeManager(al)
 	c := dynamicaccess.NewController(h, gm, al)
 	eref, ref := prepareEncryptedChunkReference(ak)

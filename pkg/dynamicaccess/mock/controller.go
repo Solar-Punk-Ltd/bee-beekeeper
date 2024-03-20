@@ -47,7 +47,7 @@ func (c *controllerMock) UploadHandler(ref swarm.Address, publisher *ecdsa.Publi
 	act, _ := c.history.Lookup(0)
 	if act == nil {
 		// new feed
-		act = dynamicaccess.NewDefaultAct()
+		act = dynamicaccess.NewInMemoryAct()
 		act = c.granteeManager.Publish(act, *publisher, topic)
 		err := c.history.Add(time.Now().Unix(), act)
 		if err != nil {
@@ -68,8 +68,9 @@ func (c *controllerMock) Store(act dynamicaccess.Act) (swarm.Address, error) {
 		return swarm.ZeroAddress, err
 	}
 
-	actManifEntry := act.Load()
-	err = rootManifest.Add(ctx, manifest.RootPath, actManifEntry)
+	//FIXME
+	//actManifEntry := act.Load(swarm.EmptyAddress)
+	err = rootManifest.Add(ctx, manifest.RootPath, manifest.NewEntry(swarm.EmptyAddress, map[string]string{}))
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
