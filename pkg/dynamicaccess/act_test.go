@@ -10,24 +10,52 @@ import (
 	"testing"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
+	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 func TestActAddLookup(t *testing.T) {
-	act := dynamicaccess.NewInMemoryAct()
+	mockStorer := mockstorer.New()
+	act := dynamicaccess.NewManifestAct(mockStorer)
 	lookupKey := swarm.RandAddress(t).Bytes()
 	encryptedAccesskey := swarm.RandAddress(t).Bytes()
-	err := act.Add(lookupKey, encryptedAccesskey)
+	ref, err := act.Add(swarm.EmptyAddress, lookupKey, encryptedAccesskey)
 	if err != nil {
-		t.Error("Add() should not return an error")
+		t.Errorf("Add() should not return an error: %v", err)
 	}
 
-	key, _ := act.Lookup(lookupKey)
+	key, err := act.Lookup(ref, lookupKey)
+	if err != nil {
+		t.Errorf("Lookup() should not return an error: %v", err)
+	}
 	if !bytes.Equal(key, encryptedAccesskey) {
 		t.Errorf("Get() value is not the expected %s != %s", key, encryptedAccesskey)
 	}
 }
 
+func TestActAddLookupWithNew(t *testing.T) {
+	mockStorer := mockstorer.New()
+
+	act1 := dynamicaccess.NewManifestAct(mockStorer)
+	lookupKey := swarm.RandAddress(t).Bytes()
+	encryptedAccesskey := swarm.RandAddress(t).Bytes()
+	ref, err := act1.Add(swarm.EmptyAddress, lookupKey, encryptedAccesskey)
+	if err != nil {
+		t.Fatalf("Lookup() should not return an error: %v", err)
+	}
+	t.Logf("ref: %s", ref.String())
+
+	act2 := dynamicaccess.NewManifestAct(mockStorer)
+	key, err := act2.Lookup(ref, lookupKey)
+	if err != nil {
+		t.Fatalf("Lookup() should not return an error: %v", err)
+	}
+	if !bytes.Equal(key, encryptedAccesskey) {
+		t.Errorf("Get() value is not the expected %s != %s", hex.EncodeToString(key), hex.EncodeToString(encryptedAccesskey))
+	}
+}
+
+/*
 func TestActStoreLoad(t *testing.T) {
 
 	act := dynamicaccess.NewInMemoryAct()
@@ -50,3 +78,4 @@ func TestActStoreLoad(t *testing.T) {
 		t.Errorf("actualAct.Load() value is not the expected %s != %s", hex.EncodeToString(actualEak), hex.EncodeToString(encryptedAccesskey))
 	}
 }
+*/
