@@ -16,11 +16,11 @@ type GranteeManager interface {
 var _ GranteeManager = (*granteeManager)(nil)
 
 type granteeManager struct {
-	accessLogic Logic
+	accessLogic ActLogic
 	granteeList Grantee
 }
 
-func NewGranteeManager(al Logic) *granteeManager {
+func NewGranteeManager(al ActLogic) *granteeManager {
 	return &granteeManager{accessLogic: al, granteeList: NewGrantee()}
 }
 

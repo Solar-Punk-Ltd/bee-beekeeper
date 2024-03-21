@@ -13,24 +13,20 @@ var hashFunc = sha3.NewLegacyKeccak256
 
 // Logic has the responsibility to return a ref for a given grantee and create new encrypted reference for a grantee
 type Logic interface {
-	// Adds a new publisher to an empty act
-	AddPublisher(act Act, publisher *ecdsa.PublicKey) (Act, error) 
 	// Adds a new grantee to the ACT
 	AddNewGranteeToContent(act Act, publisherPubKey, granteePubKey *ecdsa.PublicKey) (Act, error)
-	// Will return the access key for a publisher (public key)
+	// Get will return a decrypted reference, for given encrypted reference and grantee !!!!!!!!!!!!!!!!!!!!!
 	Get(act Act, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
-	// Encrypts the provided SWARM reference
-	EncryptRef(act Act, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
 }
 
-type actLogic struct {
+type ActLogic struct {
 	session Session
 }
 
-var _ Logic = (*actLogic)(nil)
+var _ Logic = (*ActLogic)(nil)
 
 // Adds a new publisher to an empty act
-func (al *actLogic) AddPublisher(act Act, publisher *ecdsa.PublicKey) (Act, error) {
+func (al ActLogic) AddPublisher(act Act, publisher *ecdsa.PublicKey) (Act, error) {
 	accessKey := encryption.GenerateRandomKey(encryption.KeyLength)
 
 	keys, err := al.getKeys(publisher)
@@ -52,7 +48,7 @@ func (al *actLogic) AddPublisher(act Act, publisher *ecdsa.PublicKey) (Act, erro
 }
 
 // Encrypts a SWARM reference for a publisher
-func (al *actLogic) EncryptRef(act Act, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
+func (al ActLogic) EncryptRef(act Act, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
 	accessKey := al.getAccessKey(act, publisherPubKey)
 	refCipher := encryption.New(accessKey, 0, uint32(0), hashFunc)
 	encryptedRef, _ := refCipher.Encrypt(ref.Bytes())
@@ -61,7 +57,7 @@ func (al *actLogic) EncryptRef(act Act, publisherPubKey *ecdsa.PublicKey, ref sw
 }
 
 // Adds a new grantee to the ACT
-func (al *actLogic) AddNewGranteeToContent(act Act, publisherPubKey, granteePubKey *ecdsa.PublicKey) (Act, error) {
+func (al ActLogic) AddNewGranteeToContent(act Act, publisherPubKey, granteePubKey *ecdsa.PublicKey) (Act, error) {
 	// Get previously generated access key
 	accessKey := al.getAccessKey(act, publisherPubKey)
 
@@ -88,7 +84,7 @@ func (al *actLogic) AddNewGranteeToContent(act Act, publisherPubKey, granteePubK
 }
 
 // Will return the access key for a publisher (public key)
-func (al *actLogic) getAccessKey(act Act, publisherPubKey *ecdsa.PublicKey) []byte {
+func (al *ActLogic) getAccessKey(act Act, publisherPubKey *ecdsa.PublicKey) []byte {
 	keys, err := al.getKeys(publisherPubKey)
 	if err != nil {
 		return nil
@@ -110,7 +106,7 @@ func (al *actLogic) getAccessKey(act Act, publisherPubKey *ecdsa.PublicKey) []by
 	return accessKey
 }
 
-func (al *actLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
+func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
 	// Generate lookup key and access key decryption
 	oneByteArray := []byte{1}
 	zeroByteArray := []byte{0}
@@ -123,7 +119,7 @@ func (al *actLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
 }
 
 // Gets the encrypted access key for a given grantee
-func (al *actLogic) getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, error) {
+func (al *ActLogic) getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, error) {
 	val, err := act.Lookup(lookup_key)
 	if err != nil {
 		return nil, err
@@ -132,7 +128,7 @@ func (al *actLogic) getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, e
 }
 
 // Get will return a decrypted reference, for given encrypted reference and grantee
-func (al *actLogic) Get(act Act, encryped_ref swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error) {
+func (al ActLogic) Get(act Act, encryped_ref swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error) {
 	if encryped_ref.Compare(swarm.EmptyAddress) == 0 {
 		return swarm.EmptyAddress, fmt.Errorf("encrypted ref not provided")
 	}
@@ -170,14 +166,8 @@ func (al *actLogic) Get(act Act, encryped_ref swarm.Address, grantee *ecdsa.Publ
 	return swarm.NewAddress(ref), nil
 }
 
-func NewLogic(s Session) Logic {
-	return &actLogic{
+func NewLogic(s Session) ActLogic {
+	return ActLogic{
 		session: s,
 	}
 }
-
-// TODO
-// interface -nél nem ACT típusokat kell használni hanem swarm assreess-t, és csak encrypt és decryptáló metódusok legyen
-// OK defaultLogic helyett ACTLogic nevezékú
-// OK lookup- key-ek byte-tá castolásást ellenőrizni
-//  sof link grantee.go 46 sorához kicserélni

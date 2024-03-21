@@ -12,7 +12,7 @@ import (
 )
 
 // Generates a new test environment with a fix private key
-func setupAccessLogic2() dynamicaccess.Logic {
+func setupAccessLogic2() dynamicaccess.ActLogic {
 	privateKey := generateFixPrivateKey(1000)
 	diffieHellman := dynamicaccess.NewDefaultSession(&privateKey)
 	al := dynamicaccess.NewLogic(diffieHellman)

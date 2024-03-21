@@ -30,7 +30,8 @@ func (g *defaultGrantee) RemoveGrantees(topic string, removeList []*ecdsa.Public
 	for _, remove := range removeList {
 		for i, grantee := range g.grantees[topic] {
 			if *grantee == *remove {
-				g.grantees[topic] = append(g.grantees[topic][:i], g.grantees[topic][i+1:]...)
+				g.grantees[topic][i] = g.grantees[topic][len(g.grantees[topic])-1]
+				g.grantees[topic] = g.grantees[topic][:len(g.grantees[topic])-1]
 			}
 		}
 	}
