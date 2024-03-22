@@ -10,37 +10,6 @@ import (
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
-/*
-var lock = &sync.Mutex{}
-
-type single struct {
-	memoryMock map[string]manifest.Entry
-}
-
-var singleInMemorySwarm *single
-
-func getInMemorySwarm() *single {
-	if singleInMemorySwarm == nil {
-		lock.Lock()
-		defer lock.Unlock()
-		if singleInMemorySwarm == nil {
-			singleInMemorySwarm = &single{
-				memoryMock: make(map[string]manifest.Entry)}
-		}
-	}
-	return singleInMemorySwarm
-}
-
-func getMemory() map[string]manifest.Entry {
-	ch := make(chan *single)
-	go func() {
-		ch <- getInMemorySwarm()
-	}()
-	mem := <-ch
-	return mem.memoryMock
-}
-*/
-
 // Act represents an interface for accessing and manipulating data.
 type Act interface {
 	// Add adds a key-value pair to the data store.
@@ -56,29 +25,31 @@ type Act interface {
 	//Store() (swarm.Address, error)
 }
 
-var _ Act = (*inMemoryAct)(nil)
-
-// inMemoryAct is a simple implementation of the Act interface, with in memory storage.
-type inMemoryAct struct {
+// inKvsAct is an implementation of the Act interface that uses kvs storage.
+type inKvsAct struct {
 	storage kvs.KeyValueStore
 }
 
-func (act *inMemoryAct) Add(rootHash swarm.Address, key []byte, val []byte) (swarm.Address, error) {
+// Add adds a key-value pair to the in-memory data store.
+func (act *inKvsAct) Add(rootHash swarm.Address, key []byte, val []byte) (swarm.Address, error) {
 	return act.storage.Put(rootHash, key, val)
 }
 
-func (act *inMemoryAct) Lookup(rootHash swarm.Address, key []byte) ([]byte, error) {
+// Lookup retrieves the value associated with the given key from the in-memory data store.
+func (act *inKvsAct) Lookup(rootHash swarm.Address, key []byte) ([]byte, error) {
 	return act.storage.Get(rootHash, key)
 }
 
+// NewInMemoryAct creates a new instance of the Act interface with in-memory storage.
 func NewInMemoryAct() Act {
-	return &inMemoryAct{
+	return &inKvsAct{
 		storage: kvs.NewmemoryKeyValueStore(swarm.EmptyAddress),
 	}
 }
 
-func NewManifestAct(storer api.Storer) Act {
-	return &inMemoryAct{
+// NewInManifestAct creates a new instance of the Act interface with manifest storage.
+func NewInManifestAct(storer api.Storer) Act {
+	return &inKvsAct{
 		storage: kvs.NewManifestKeyValueStore(storer),
 	}
 }
