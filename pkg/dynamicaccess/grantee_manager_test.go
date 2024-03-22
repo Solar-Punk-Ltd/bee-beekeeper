@@ -12,18 +12,9 @@ import (
 )
 
 func setupAccessLogic(privateKey *ecdsa.PrivateKey) dynamicaccess.ActLogic {
-<<<<<<< HEAD
 	act := dynamicaccess.NewInMemoryAct()
 	si := dynamicaccess.NewDefaultSession(privateKey)
 	al := dynamicaccess.NewLogic(si, act)
-=======
-	// privateKey, err := crypto.GenerateSecp256k1Key()
-	// if err != nil {
-	// 	errors.New("error creating private key")
-	// }
-	si := dynamicaccess.NewDefaultSession(privateKey)
-	al := dynamicaccess.NewLogic(si)
->>>>>>> origin/act
 
 	return al
 }
@@ -42,10 +33,6 @@ func TestAdd(t *testing.T) {
 	if err != nil {
 		t.Errorf("Add() returned an error")
 	}
-<<<<<<< HEAD
 	m.Publish(swarm.EmptyAddress, &pub.PublicKey, "topic")
-=======
-	m.Publish(act, &pub.PublicKey, "topic")
->>>>>>> origin/act
 	fmt.Println("")
 }
