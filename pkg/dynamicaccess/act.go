@@ -43,7 +43,7 @@ func (act *inKvsAct) Lookup(rootHash swarm.Address, key []byte) ([]byte, error) 
 // NewInMemoryAct creates a new instance of the Act interface with in-memory storage.
 func NewInMemoryAct() Act {
 	return &inKvsAct{
-		storage: kvs.NewmemoryKeyValueStore(swarm.EmptyAddress),
+		storage: kvs.NewMemoryKeyValueStore(swarm.EmptyAddress),
 	}
 }
 

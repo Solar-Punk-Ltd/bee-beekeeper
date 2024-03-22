@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
+	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -40,8 +41,8 @@ func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
 
 func TestGet_Success(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
-
-	act := dynamicaccess.NewInMemoryAct()
+	var mockStorer = mockstorer.New()
+	act := dynamicaccess.NewInManifestAct(mockStorer)
 	al := setupAccessLogic2(act)
 	ref, err := al.AddPublisher(swarm.EmptyAddress, &id0.PublicKey)
 	if err != nil {
