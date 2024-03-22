@@ -10,6 +10,8 @@ type Grantee interface {
 	GetGrantees(topic string) []*ecdsa.PublicKey
 }
 
+var _ Grantee = (*defaultGrantee)(nil)
+
 type defaultGrantee struct {
 	grantees map[string][]*ecdsa.PublicKey
 }
