@@ -9,7 +9,11 @@ import (
 type GranteeManager interface {
 	Get(topic string) []*ecdsa.PublicKey
 	Add(topic string, addList []*ecdsa.PublicKey) error
+<<<<<<< HEAD
 	Publish(rootHash swarm.Address, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error)
+=======
+	Publish(act Act, publisher *ecdsa.PublicKey, topic string) Act
+>>>>>>> origin/act
 
 	// HandleGrantees(topic string, addList, removeList []*ecdsa.PublicKey) *Act
 
@@ -36,10 +40,17 @@ func (gm *granteeManager) Add(topic string, addList []*ecdsa.PublicKey) error {
 	return gm.granteeList.AddGrantees(topic, addList)
 }
 
+<<<<<<< HEAD
 func (gm *granteeManager) Publish(rootHash swarm.Address, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error) {
 	ref, err := gm.accessLogic.AddPublisher(rootHash, publisher)
 	for _, grantee := range gm.granteeList.GetGrantees(topic) {
 		ref, err = gm.accessLogic.AddNewGranteeToContent(ref, publisher, grantee)
+=======
+func (gm *granteeManager) Publish(act Act, publisher *ecdsa.PublicKey, topic string) Act {
+	gm.accessLogic.AddPublisher(act, publisher)
+	for _, grantee := range gm.granteeList.GetGrantees(topic) {
+		gm.accessLogic.AddNewGranteeToContent(act, publisher, grantee)
+>>>>>>> origin/act
 	}
 	return ref, err
 }
