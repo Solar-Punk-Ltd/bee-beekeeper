@@ -14,13 +14,23 @@ import (
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
-type ManifestKeyValueStore struct {
-	Storer api.Storer
+const (
+	// KvsTypeManifest represents
+	KvsTypeManifest = "Manifest"
+)
+
+type ManifestKeyValueStore interface {
+	Get(rootHash swarm.Address, key []byte) ([]byte, error)
+	Put(rootHash swarm.Address, key, value []byte) (swarm.Address, error)
+}
+
+type manifestKeyValueStore struct {
+	storer api.Storer
 }
 
 // TODO: pass context as dep.
-func (m *ManifestKeyValueStore) Get(rootHash swarm.Address, key []byte) ([]byte, error) {
-	ls := loadsave.NewReadonly(m.Storer.ChunkStore())
+func (m *manifestKeyValueStore) Get(rootHash swarm.Address, key []byte) ([]byte, error) {
+	ls := loadsave.NewReadonly(m.storer.ChunkStore())
 	// existing manif
 	manif, err := manifest.NewSimpleManifestReference(rootHash, ls)
 	if err != nil {
@@ -34,9 +44,9 @@ func (m *ManifestKeyValueStore) Get(rootHash swarm.Address, key []byte) ([]byte,
 	return ref.Bytes(), nil
 }
 
-func (m *ManifestKeyValueStore) Put(rootHash swarm.Address, key []byte, value []byte) (swarm.Address, error) {
-	factory := requestPipelineFactory(context.Background(), m.Storer.Cache(), false, redundancy.NONE)
-	ls := loadsave.New(m.Storer.ChunkStore(), m.Storer.Cache(), factory)
+func (m *manifestKeyValueStore) Put(rootHash swarm.Address, key []byte, value []byte) (swarm.Address, error) {
+	factory := requestPipelineFactory(context.Background(), m.storer.Cache(), false, redundancy.NONE)
+	ls := loadsave.New(m.storer.ChunkStore(), m.storer.Cache(), factory)
 	// existing manif
 	manif, err := manifest.NewSimpleManifestReference(rootHash, ls)
 	if err != nil {
@@ -55,12 +65,18 @@ func (m *ManifestKeyValueStore) Put(rootHash swarm.Address, key []byte, value []
 		return swarm.EmptyAddress, err
 	}
 
-	session := m.Storer.DirectUpload()
-	err = session.Done(manifRef)
+	putter := m.storer.DirectUpload()
+	err = putter.Done(manifRef)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
 	return manifRef, nil
+}
+
+func NewManifestKeyValueStore(storer api.Storer) (ManifestKeyValueStore, error) {
+	return &manifestKeyValueStore{
+		storer: storer,
+	}, nil
 }
 
 func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {

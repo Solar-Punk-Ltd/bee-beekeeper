@@ -34,7 +34,6 @@ func (c *defaultController) UploadHandler(ref swarm.Address, publisher *ecdsa.Pu
 	var actRef swarm.Address
 	if act == nil {
 		// new feed
-		// act = NewInMemoryAct()
 		actRef, err = c.granteeManager.Publish(swarm.EmptyAddress, publisher, topic)
 		if err != nil {
 			return swarm.EmptyAddress, err

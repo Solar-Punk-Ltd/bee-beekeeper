@@ -7,6 +7,8 @@ package dynamicaccess
 import (
 	"github.com/ethersphere/bee/pkg/api"
 	"github.com/ethersphere/bee/pkg/kvs"
+	kvsmanifest "github.com/ethersphere/bee/pkg/kvs/manifest"
+	kvsmemory "github.com/ethersphere/bee/pkg/kvs/memory"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -42,14 +44,22 @@ func (act *inKvsAct) Lookup(rootHash swarm.Address, key []byte) ([]byte, error) 
 
 // NewInMemoryAct creates a new instance of the Act interface with in-memory storage.
 func NewInMemoryAct() Act {
+	s, err := kvs.NewKeyValueStore(nil, kvsmemory.KvsTypeMemory)
+	if err != nil {
+		return nil
+	}
 	return &inKvsAct{
-		storage: kvs.NewMemoryKeyValueStore(swarm.EmptyAddress),
+		storage: s,
 	}
 }
 
 // NewInManifestAct creates a new instance of the Act interface with manifest storage.
 func NewInManifestAct(storer api.Storer) Act {
+	s, err := kvs.NewKeyValueStore(storer, kvsmanifest.KvsTypeManifest)
+	if err != nil {
+		return nil
+	}
 	return &inKvsAct{
-		storage: kvs.NewManifestKeyValueStore(storer),
+		storage: s,
 	}
 }

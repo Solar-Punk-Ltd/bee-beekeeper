@@ -15,7 +15,7 @@ var hashFunc = sha3.NewLegacyKeccak256
 type Logic interface {
 	// Adds a new grantee to the ACT
 	AddNewGranteeToContent(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey) (swarm.Address, error)
-	// Get will return a decrypted reference, for given encrypted reference and grantee !!!!!!!!!!!!!!!!!!!!!
+	// Get will return a decrypted reference, for given encrypted reference and grantee
 	Get(rootHash swarm.Address, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
 }
 
@@ -44,8 +44,6 @@ func (al ActLogic) AddPublisher(rootHash swarm.Address, publisher *ecdsa.PublicK
 	}
 
 	return al.act.Add(rootHash, lookupKey, encryptedAccessKey)
-
-	// return al.act, nil
 }
 
 // Encrypts a SWARM reference for a publisher
@@ -79,8 +77,6 @@ func (al ActLogic) AddNewGranteeToContent(rootHash swarm.Address, publisherPubKe
 
 	// Add the new encrypted access key for the Act
 	return al.act.Add(rootHash, lookupKey, granteeEncryptedAccessKey)
-
-	// return al.act, nil
 
 }
 
