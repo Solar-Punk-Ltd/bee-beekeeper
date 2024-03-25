@@ -4,31 +4,31 @@ import (
 	"crypto/ecdsa"
 )
 
-type Grantee interface {
+type GranteeList interface {
 	Add(topic string, addList []*ecdsa.PublicKey) error
 	Remove(topic string, removeList []*ecdsa.PublicKey) error
 	Get(topic string) []*ecdsa.PublicKey
 }
 
-var _ Grantee = (*defaultGrantee)(nil)
+var _ GranteeList = (*granteeList)(nil)
 
-type defaultGrantee struct {
+type granteeList struct {
 	grantees map[string][]*ecdsa.PublicKey
 }
 
-func (g *defaultGrantee) Get(topic string) []*ecdsa.PublicKey {
+func (g *granteeList) Get(topic string) []*ecdsa.PublicKey {
 	grantees := g.grantees[topic]
 	keys := make([]*ecdsa.PublicKey, len(grantees))
 	copy(keys, grantees)
 	return keys
 }
 
-func (g *defaultGrantee) Add(topic string, addList []*ecdsa.PublicKey) error {
+func (g *granteeList) Add(topic string, addList []*ecdsa.PublicKey) error {
 	g.grantees[topic] = append(g.grantees[topic], addList...)
 	return nil
 }
 
-func (g *defaultGrantee) Remove(topic string, removeList []*ecdsa.PublicKey) error {
+func (g *granteeList) Remove(topic string, removeList []*ecdsa.PublicKey) error {
 	for _, remove := range removeList {
 		for i, grantee := range g.grantees[topic] {
 			if *grantee == *remove {
@@ -41,6 +41,6 @@ func (g *defaultGrantee) Remove(topic string, removeList []*ecdsa.PublicKey) err
 	return nil
 }
 
-func NewGrantee() Grantee {
-	return &defaultGrantee{grantees: make(map[string][]*ecdsa.PublicKey)}
+func NewGrantee() GranteeList {
+	return &granteeList{grantees: make(map[string][]*ecdsa.PublicKey)}
 }

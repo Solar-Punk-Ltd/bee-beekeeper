@@ -21,7 +21,7 @@ var _ GranteeManager = (*granteeManager)(nil)
 
 type granteeManager struct {
 	accessLogic ActLogic
-	granteeList Grantee
+	granteeList GranteeList
 }
 
 func NewGranteeManager(al ActLogic) *granteeManager {
