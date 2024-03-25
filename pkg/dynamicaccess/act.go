@@ -10,26 +10,22 @@ import (
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
-// Act represents an interface for accessing and manipulating data.
 type Act interface {
-	// Add adds a key-value pair to the data store.
 	Add(rootHash swarm.Address, key []byte, val []byte) (swarm.Address, error)
 
-	// Lookup retrieves the value associated with the given key from the data store.
 	Lookup(rootHash swarm.Address, key []byte) ([]byte, error)
 }
 
-// act is an implementation of the Act interface that uses kvs storage.
+var _ Act = (*act)(nil)
+
 type act struct {
 	storage kvs.KeyValueStore
 }
 
-// Add adds a key-value pair to the in-memory data store.
 func (a *act) Add(rootHash swarm.Address, key []byte, val []byte) (swarm.Address, error) {
 	return a.storage.Put(rootHash, key, val)
 }
 
-// Lookup retrieves the value associated with the given key from the in-memory data store.
 func (a *act) Lookup(rootHash swarm.Address, key []byte) ([]byte, error) {
 	return a.storage.Get(rootHash, key)
 }

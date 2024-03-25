@@ -18,6 +18,8 @@ type keyValueStore struct {
 	ls file.LoadSaver
 }
 
+var _ KeyValueStore = (*keyValueStore)(nil)
+
 // TODO: pass context as dep.
 func (s *keyValueStore) Get(rootHash swarm.Address, key []byte) ([]byte, error) {
 	// existing manif

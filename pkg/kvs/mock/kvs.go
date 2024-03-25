@@ -41,6 +41,8 @@ func getMemory() map[string][]byte {
 type mockKeyValueStore struct {
 }
 
+var _ kvs.KeyValueStore = (*mockKeyValueStore)(nil)
+
 func (m *mockKeyValueStore) Get(rootHash swarm.Address, key []byte) ([]byte, error) {
 	mem := getMemory()
 	val := mem[hex.EncodeToString(key)]
