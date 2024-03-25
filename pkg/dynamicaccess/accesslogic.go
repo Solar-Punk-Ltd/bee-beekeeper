@@ -10,37 +10,21 @@ import (
 
 var hashFunc = sha3.NewLegacyKeccak256
 
-// There should be a read-only extension
-// and that should have a writeable extension
-
-//	type WriteInt extends Decryptor {
-//		AddNew..
-//	}
-//
-// Decryptor has the responsibility to return a ref for a given grantee and create new encrypted reference for a grantee
-// This should be named 'Decryptor'
+// Read-only interface for the ACT
 type Decryptor interface {
-	// Adds a new grantee to the ACT
 	// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
 	DecryptRef(rootHash swarm.Address, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
-	// ! Get is not truely 'Get', it's a 'Decryptor'
-	// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
-	// There should be a Session interface that should be used to get the keys
 	Session
 }
 
-// There should be an AccessControlDecryptor interface that should have a Decrypt method
-
-// AccessControl control object
+// Control interface for the ACT (does write operations)
 type Control interface {
 	Decryptor
+	// Adds a new grantee to the ACT
 	AddGrantee(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKey *encryption.Key) (swarm.Address, error)
-	//AddGrantee(rootHash swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error)
+	// Encrypts a Swarm reference for a given grantee
 	EncryptRef(rootHash swarm.Address, grantee *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
 }
-
-// AddGrantee
-// EncryptRef
 
 type ActLogic struct {
 	Session
