@@ -5,10 +5,8 @@
 package dynamicaccess
 
 import (
-	"github.com/ethersphere/bee/pkg/api"
+	"github.com/ethersphere/bee/pkg/file"
 	"github.com/ethersphere/bee/pkg/kvs"
-	kvsmanifest "github.com/ethersphere/bee/pkg/kvs/manifest"
-	kvsmemory "github.com/ethersphere/bee/pkg/kvs/memory"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -19,47 +17,25 @@ type Act interface {
 
 	// Lookup retrieves the value associated with the given key from the data store.
 	Lookup(rootHash swarm.Address, key []byte) ([]byte, error)
-
-	// Load loads the data store from the given address.
-	//Load(addr swarm.Address) error
-
-	// Store stores the current state of the data store and returns the address of the ACT.
-	//Store() (swarm.Address, error)
 }
 
-// inKvsAct is an implementation of the Act interface that uses kvs storage.
-type inKvsAct struct {
+// act is an implementation of the Act interface that uses kvs storage.
+type act struct {
 	storage kvs.KeyValueStore
 }
 
 // Add adds a key-value pair to the in-memory data store.
-func (act *inKvsAct) Add(rootHash swarm.Address, key []byte, val []byte) (swarm.Address, error) {
-	return act.storage.Put(rootHash, key, val)
+func (a *act) Add(rootHash swarm.Address, key []byte, val []byte) (swarm.Address, error) {
+	return a.storage.Put(rootHash, key, val)
 }
 
 // Lookup retrieves the value associated with the given key from the in-memory data store.
-func (act *inKvsAct) Lookup(rootHash swarm.Address, key []byte) ([]byte, error) {
-	return act.storage.Get(rootHash, key)
+func (a *act) Lookup(rootHash swarm.Address, key []byte) ([]byte, error) {
+	return a.storage.Get(rootHash, key)
 }
 
-// NewInMemoryAct creates a new instance of the Act interface with in-memory storage.
-func NewInMemoryAct() Act {
-	s, err := kvs.NewKeyValueStore(nil, kvsmemory.KvsTypeMemory)
-	if err != nil {
-		return nil
-	}
-	return &inKvsAct{
-		storage: s,
-	}
-}
-
-// NewInManifestAct creates a new instance of the Act interface with manifest storage.
-func NewInManifestAct(storer api.Storer) Act {
-	s, err := kvs.NewKeyValueStore(storer, kvsmanifest.KvsTypeManifest)
-	if err != nil {
-		return nil
-	}
-	return &inKvsAct{
-		storage: s,
+func NewAct(ls file.LoadSaver) Act {
+	return &act{
+		storage: kvs.New(ls),
 	}
 }

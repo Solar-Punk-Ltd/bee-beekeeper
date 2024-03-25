@@ -8,11 +8,12 @@ import (
 	"testing"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
+	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 func setupAccessLogic(privateKey *ecdsa.PrivateKey) dynamicaccess.ActLogic {
-	act := dynamicaccess.NewInMemoryAct()
+	act := mock.NewActMock()
 	si := dynamicaccess.NewDefaultSession(privateKey)
 	al := dynamicaccess.NewLogic(si, act)
 
