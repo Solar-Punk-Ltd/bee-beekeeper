@@ -35,7 +35,10 @@ func (al ActLogic) AddPublisher(rootHash swarm.Address, publisher *ecdsa.PublicK
 
 // Encrypts a SWARM reference for a publisher
 func (al ActLogic) EncryptRef(rootHash swarm.Address, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
-	accessKey := al.getAccessKey(rootHash, publisherPubKey)
+	accessKey, err := al.getAccessKey(rootHash, publisherPubKey)
+	if err != nil {
+		return swarm.EmptyAddress, err
+	}
 	refCipher := encryption.New(accessKey, 0, uint32(0), hashFunc)
 	encryptedRef, _ := refCipher.Encrypt(ref.Bytes())
 
@@ -45,9 +48,14 @@ func (al ActLogic) EncryptRef(rootHash swarm.Address, publisherPubKey *ecdsa.Pub
 // Adds a new grantee to the ACT
 func (al ActLogic) AddNewGranteeToContent(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKeyPointer *encryption.Key) (swarm.Address, error) {
 	var accessKey encryption.Key
+	var err error // Declare the "err" variable
+
 	if accessKeyPointer == nil {
 		// Get previously generated access key
-		accessKey = al.getAccessKey(rootHash, publisherPubKey)
+		accessKey, err = al.getAccessKey(rootHash, publisherPubKey)
+		if err != nil {
+			return swarm.EmptyAddress, err
+		}
 	} else {
 		// This is a newly created access key, because grantee is publisher (they are the same)
 		accessKey = *accessKeyPointer
@@ -73,38 +81,30 @@ func (al ActLogic) AddNewGranteeToContent(rootHash swarm.Address, publisherPubKe
 }
 
 // Will return the access key for a publisher (public key)
-func (al *ActLogic) getAccessKey(rootHash swarm.Address, publisherPubKey *ecdsa.PublicKey) []byte {
+func (al *ActLogic) getAccessKey(rootHash swarm.Address, publisherPubKey *ecdsa.PublicKey) ([]byte, error) {
 	keys, err := al.getKeys(publisherPubKey)
-	if err != nil {
-		return nil
-	}
-	publisherLookupKey := keys[0]
-	publisherAKDecryptionKey := keys[1]
-
-	accessKeyDecryptionCipher := encryption.New(encryption.Key(publisherAKDecryptionKey), 0, uint32(0), hashFunc)
-	encryptedAK, err := al.getEncryptedAccessKey(rootHash, publisherLookupKey)
-	if err != nil {
-		return nil
-	}
-
-	accessKey, err := accessKeyDecryptionCipher.Decrypt(encryptedAK)
-	if err != nil {
-		return nil
-	}
-
-	return accessKey
-}
-
-func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
-	// Generate lookup key and access key decryption
-	oneByteArray := []byte{1}
-	zeroByteArray := []byte{0}
-
-	keys, err := al.session.Key(publicKey, [][]byte{zeroByteArray, oneByteArray})
 	if err != nil {
 		return nil, err
 	}
-	return keys, nil
+	publisherLookupKey := keys[0]
+	publisherAKDecryptionKey := keys[1]
+	// no need to constructor call if value not found in act
+	accessKeyDecryptionCipher := encryption.New(encryption.Key(publisherAKDecryptionKey), 0, uint32(0), hashFunc)
+	encryptedAK, err := al.getEncryptedAccessKey(rootHash, publisherLookupKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return accessKeyDecryptionCipher.Decrypt(encryptedAK)
+	
+}
+
+var oneByteArray = []byte{1}
+var zeroByteArray = []byte{0}
+
+// Generate lookup key and access key decryption key for a given public key
+func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
+	return al.session.Key(publicKey, [][]byte{zeroByteArray, oneByteArray})
 }
 
 // Gets the encrypted access key for a given grantee
