@@ -49,14 +49,25 @@ func New(ls file.LoadSaver, rootHash swarm.Address) KeyValueStore {
 		manif manifest.Interface
 		err   error
 	)
-	if swarm.ZeroAddress.Equal(rootHash) || swarm.EmptyAddress.Equal(rootHash) {
-		manif, err = manifest.NewSimpleManifest(ls)
-	} else {
-		manif, err = manifest.NewSimpleManifestReference(rootHash, ls)
-	}
+
+	manif, err = manifest.NewSimpleManifestReference(rootHash, ls)
 	if err != nil {
-		return nil
+		// new manif
+		manif, err = manifest.NewSimpleManifest(ls)
+		if err != nil {
+			return nil
+		}
 	}
+	/*
+			if swarm.ZeroAddress.Equal(rootHash) || swarm.EmptyAddress.Equal(rootHash) {
+				manif, err = manifest.NewSimpleManifest(ls)
+			} else {
+				manif, err = manifest.NewSimpleManifestReference(rootHash, ls)
+			}
+		if err != nil {
+			return nil
+		}
+	*/
 	return &keyValueStore{
 		m: manif,
 	}

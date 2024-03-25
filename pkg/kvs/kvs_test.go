@@ -59,7 +59,8 @@ func TestActAddLookup(t *testing.T) {
 
 func TestActAddLookupWithNew(t *testing.T) {
 	ls := createLs()
-	s1 := kvs.New(ls, swarm.ZeroAddress)
+	addr := swarm.RandAddress(t)
+	s1 := kvs.New(ls, addr)
 	lookupKey := swarm.RandAddress(t).Bytes()
 	encryptedAccesskey := swarm.RandAddress(t).Bytes()
 
@@ -67,8 +68,11 @@ func TestActAddLookupWithNew(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Add() should not return an error: %v", err)
 	}
-
-	s2 := kvs.New(ls, swarm.ZeroAddress)
+	ref, err := s1.Save()
+	if err != nil {
+		t.Fatalf("Save() should not return an error: %v", err)
+	}
+	s2 := kvs.New(ls, ref)
 	key, err := s2.Get(lookupKey)
 	if err != nil {
 		t.Fatalf("Lookup() should not return an error: %v", err)
