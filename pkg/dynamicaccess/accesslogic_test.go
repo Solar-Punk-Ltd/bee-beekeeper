@@ -61,7 +61,7 @@ func TestGet_Success(t *testing.T) {
 		t.Error(err)
 	}
 
-	acutalRef, err := al.Get(ref, encryptedRef, &id0.PublicKey)
+	acutalRef, err := al.DecryptRef(ref, encryptedRef, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("There was an error while calling Get: ")
 		t.Error(err)
@@ -88,18 +88,18 @@ func TestGet_Error(t *testing.T) {
 
 	encryptedRef, _ := al.EncryptRef(ref, &id0.PublicKey, swarm.NewAddress([]byte(expectedRef)))
 
-	r, err := al.Get(swarm.RandAddress(t), encryptedRef, &id0.PublicKey)
+	r, err := al.DecryptRef(swarm.RandAddress(t), encryptedRef, &id0.PublicKey)
 	if err == nil {
 		t.Logf("r: %s", r.String())
 		t.Errorf("Get should give back encrypted access key not found error!")
 	}
 
-	refTwo, _ := al.Get(swarm.RandAddress(t), swarm.EmptyAddress, &id0.PublicKey)
+	refTwo, _ := al.DecryptRef(swarm.RandAddress(t), swarm.EmptyAddress, &id0.PublicKey)
 	if swarm.EmptyAddress.Compare(refTwo) != 0 {
 		t.Errorf("Get should give back empty string if encrypted ref not provided!")
 	}
 
-	_, err = al.Get(swarm.RandAddress(t), encryptedRef, nil)
+	_, err = al.DecryptRef(swarm.RandAddress(t), encryptedRef, nil)
 	if err == nil {
 		t.Errorf("Get should give back error if grantee not provided!")
 	}
@@ -136,7 +136,7 @@ func TestAddPublisher(t *testing.T) {
 	}
 }
 
-func TestAdd_New_Grantee_To_Content(t *testing.T) {
+func TestAddNewGranteeToContent(t *testing.T) {
 
 	id0 := generateFixPrivateKey(0)
 	id1 := generateFixPrivateKey(1)
@@ -153,12 +153,12 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
 
-	ref, err = al.AddNewGranteeToContent(ref, &id0.PublicKey, &id1.PublicKey, nil)
+	ref, err = al.AddGrantee(ref, &id0.PublicKey, &id1.PublicKey, nil)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
 
-	ref, err = al.AddNewGranteeToContent(ref, &id0.PublicKey, &id2.PublicKey, nil)
+	ref, err = al.AddGrantee(ref, &id0.PublicKey, &id2.PublicKey, nil)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}

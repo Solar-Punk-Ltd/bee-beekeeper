@@ -10,26 +10,50 @@ import (
 
 var hashFunc = sha3.NewLegacyKeccak256
 
-// Logic has the responsibility to return a ref for a given grantee and create new encrypted reference for a grantee
-type Logic interface {
+// There should be a read-only extension
+// and that should have a writeable extension
+
+//	type WriteInt extends Decryptor {
+//		AddNew..
+//	}
+//
+// Decryptor has the responsibility to return a ref for a given grantee and create new encrypted reference for a grantee
+// This should be named 'Decryptor'
+type Decryptor interface {
 	// Adds a new grantee to the ACT
-	AddNewGranteeToContent(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKey *encryption.Key) (swarm.Address, error)
-	// Get will return a decrypted reference, for given encrypted reference and grantee
-	Get(rootHash swarm.Address, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
+	// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
+	DecryptRef(rootHash swarm.Address, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
+	// ! Get is not truely 'Get', it's a 'Decryptor'
+	// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
+	// There should be a Session interface that should be used to get the keys
+	Session
 }
+
+// There should be an AccessControlDecryptor interface that should have a Decrypt method
+
+// AccessControl control object
+type Control interface {
+	Decryptor
+	AddGrantee(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKey *encryption.Key) (swarm.Address, error)
+	//AddGrantee(rootHash swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error)
+	EncryptRef(rootHash swarm.Address, grantee *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
+}
+
+// AddGrantee
+// EncryptRef
 
 type ActLogic struct {
-	session Session
-	act     Act
+	Session
+	act Act
 }
 
-var _ Logic = (*ActLogic)(nil)
+var _ Decryptor = (*ActLogic)(nil)
 
 // Adds a new publisher to an empty act
 func (al ActLogic) AddPublisher(rootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error) {
 	accessKey := encryption.GenerateRandomKey(encryption.KeyLength)
 
-	return al.AddNewGranteeToContent(rootHash, publisher, publisher, &accessKey)
+	return al.AddGrantee(rootHash, publisher, publisher, &accessKey)
 }
 
 // Encrypts a SWARM reference for a publisher
@@ -45,7 +69,7 @@ func (al ActLogic) EncryptRef(rootHash swarm.Address, publisherPubKey *ecdsa.Pub
 }
 
 // Adds a new grantee to the ACT
-func (al ActLogic) AddNewGranteeToContent(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKeyPointer *encryption.Key) (swarm.Address, error) {
+func (al ActLogic) AddGrantee(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKeyPointer *encryption.Key) (swarm.Address, error) {
 	var accessKey encryption.Key
 	var err error // Declare the "err" variable
 
@@ -103,11 +127,11 @@ var zeroByteArray = []byte{0}
 
 // Generate lookup key and access key decryption key for a given public key
 func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
-	return al.session.Key(publicKey, [][]byte{zeroByteArray, oneByteArray})
+	return al.Session.Key(publicKey, [][]byte{zeroByteArray, oneByteArray})
 }
 
-// Get will return a decrypted reference, for given encrypted reference and grantee
-func (al ActLogic) Get(rootHash swarm.Address, encryped_ref swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error) {
+// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
+func (al ActLogic) DecryptRef(rootHash swarm.Address, encryped_ref swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error) {
 	keys, err := al.getKeys(grantee)
 	if err != nil {
 		return swarm.EmptyAddress, err
@@ -138,9 +162,9 @@ func (al ActLogic) Get(rootHash swarm.Address, encryped_ref swarm.Address, grant
 	return swarm.NewAddress(ref), nil
 }
 
-func NewLogic(s Session, act Act) ActLogic {
+func NewLogic(S Session, act Act) ActLogic {
 	return ActLogic{
-		session: s,
+		Session: S,
 		act:     act,
 	}
 }
