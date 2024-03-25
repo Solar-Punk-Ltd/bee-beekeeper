@@ -153,12 +153,12 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
 
-	ref, err = al.AddNewGranteeToContent(ref, &id0.PublicKey, &id1.PublicKey)
+	ref, err = al.AddNewGranteeToContent(ref, &id0.PublicKey, &id1.PublicKey, nil)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
 
-	ref, err = al.AddNewGranteeToContent(ref, &id0.PublicKey, &id2.PublicKey)
+	ref, err = al.AddNewGranteeToContent(ref, &id0.PublicKey, &id2.PublicKey, nil)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}

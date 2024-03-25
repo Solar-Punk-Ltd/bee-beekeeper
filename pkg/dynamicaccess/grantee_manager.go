@@ -39,7 +39,7 @@ func (gm *granteeManager) Add(topic string, addList []*ecdsa.PublicKey) error {
 func (gm *granteeManager) Publish(rootHash swarm.Address, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error) {
 	ref, err := gm.accessLogic.AddPublisher(rootHash, publisher)
 	for _, grantee := range gm.granteeList.GetGrantees(topic) {
-		ref, err = gm.accessLogic.AddNewGranteeToContent(ref, publisher, grantee)
+		ref, err = gm.accessLogic.AddNewGranteeToContent(ref, publisher, grantee, nil)
 	}
 	return ref, err
 }

@@ -14,7 +14,7 @@ var hashFunc = sha3.NewLegacyKeccak256
 // Logic has the responsibility to return a ref for a given grantee and create new encrypted reference for a grantee
 type Logic interface {
 	// Adds a new grantee to the ACT
-	AddNewGranteeToContent(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey) (swarm.Address, error)
+	AddNewGranteeToContent(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKey *encryption.Key) (swarm.Address, error)
 	// Get will return a decrypted reference, for given encrypted reference and grantee
 	Get(rootHash swarm.Address, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
 }
@@ -30,20 +30,7 @@ var _ Logic = (*ActLogic)(nil)
 func (al ActLogic) AddPublisher(rootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error) {
 	accessKey := encryption.GenerateRandomKey(encryption.KeyLength)
 
-	keys, err := al.getKeys(publisher)
-	if err != nil {
-		return swarm.EmptyAddress, err
-	}
-	lookupKey := keys[0]
-	accessKeyEncryptionKey := keys[1]
-
-	accessKeyCipher := encryption.New(encryption.Key(accessKeyEncryptionKey), 0, uint32(0), hashFunc)
-	encryptedAccessKey, err := accessKeyCipher.Encrypt([]byte(accessKey))
-	if err != nil {
-		return swarm.EmptyAddress, err
-	}
-
-	return al.act.Add(rootHash, lookupKey, encryptedAccessKey)
+	return al.AddNewGranteeToContent(rootHash, publisher, publisher, &accessKey)
 }
 
 // Encrypts a SWARM reference for a publisher
@@ -56,9 +43,15 @@ func (al ActLogic) EncryptRef(rootHash swarm.Address, publisherPubKey *ecdsa.Pub
 }
 
 // Adds a new grantee to the ACT
-func (al ActLogic) AddNewGranteeToContent(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey) (swarm.Address, error) {
-	// Get previously generated access key
-	accessKey := al.getAccessKey(rootHash, publisherPubKey)
+func (al ActLogic) AddNewGranteeToContent(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKeyPointer *encryption.Key) (swarm.Address, error) {
+	var accessKey encryption.Key
+	if accessKeyPointer == nil {
+		// Get previously generated access key
+		accessKey = al.getAccessKey(rootHash, publisherPubKey)
+	} else {
+		// This is a newly created access key, because grantee is publisher (they are the same)
+		accessKey = *accessKeyPointer
+	}
 
 	// Encrypt the access key for the new Grantee
 	keys, err := al.getKeys(granteePubKey)
@@ -77,7 +70,6 @@ func (al ActLogic) AddNewGranteeToContent(rootHash swarm.Address, publisherPubKe
 
 	// Add the new encrypted access key for the Act
 	return al.act.Add(rootHash, lookupKey, granteeEncryptedAccessKey)
-
 }
 
 // Will return the access key for a publisher (public key)
