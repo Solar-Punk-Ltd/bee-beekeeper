@@ -90,13 +90,13 @@ func (al *ActLogic) getAccessKey(rootHash swarm.Address, publisherPubKey *ecdsa.
 	publisherAKDecryptionKey := keys[1]
 	// no need to constructor call if value not found in act
 	accessKeyDecryptionCipher := encryption.New(encryption.Key(publisherAKDecryptionKey), 0, uint32(0), hashFunc)
-	encryptedAK, err := al.getEncryptedAccessKey(rootHash, publisherLookupKey)
+	encryptedAK, err := al.act.Lookup(rootHash, publisherLookupKey)
 	if err != nil {
 		return nil, err
 	}
 
 	return accessKeyDecryptionCipher.Decrypt(encryptedAK)
-	
+
 }
 
 var oneByteArray = []byte{1}
@@ -105,15 +105,6 @@ var zeroByteArray = []byte{0}
 // Generate lookup key and access key decryption key for a given public key
 func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
 	return al.session.Key(publicKey, [][]byte{zeroByteArray, oneByteArray})
-}
-
-// Gets the encrypted access key for a given grantee
-func (al *ActLogic) getEncryptedAccessKey(rootHash swarm.Address, lookup_key []byte) ([]byte, error) {
-	val, err := al.act.Lookup(rootHash, lookup_key)
-	if err != nil {
-		return nil, err
-	}
-	return val, nil
 }
 
 // Get will return a decrypted reference, for given encrypted reference and grantee
@@ -133,7 +124,7 @@ func (al ActLogic) Get(rootHash swarm.Address, encryped_ref swarm.Address, grant
 	accessKeyDecryptionKey := keys[1]
 
 	// Lookup encrypted access key from the ACT manifest
-	encryptedAccessKey, err := al.getEncryptedAccessKey(rootHash, lookupKey)
+	encryptedAccessKey, err := al.act.Lookup(rootHash, lookupKey)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
