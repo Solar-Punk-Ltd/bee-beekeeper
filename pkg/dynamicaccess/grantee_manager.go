@@ -29,16 +29,16 @@ func NewGranteeManager(al ActLogic) *granteeManager {
 }
 
 func (gm *granteeManager) Get(topic string) []*ecdsa.PublicKey {
-	return gm.granteeList.GetGrantees(topic)
+	return gm.granteeList.Get(topic)
 }
 
 func (gm *granteeManager) Add(topic string, addList []*ecdsa.PublicKey) error {
-	return gm.granteeList.AddGrantees(topic, addList)
+	return gm.granteeList.Add(topic, addList)
 }
 
 func (gm *granteeManager) Publish(rootHash swarm.Address, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error) {
 	ref, err := gm.accessLogic.AddPublisher(rootHash, publisher)
-	for _, grantee := range gm.granteeList.GetGrantees(topic) {
+	for _, grantee := range gm.granteeList.Get(topic) {
 		ref, err = gm.accessLogic.AddNewGranteeToContent(ref, publisher, grantee, nil)
 	}
 	return ref, err
