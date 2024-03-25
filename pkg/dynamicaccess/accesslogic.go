@@ -14,11 +14,13 @@ var hashFunc = sha3.NewLegacyKeccak256
 type Decryptor interface {
 	// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
 	DecryptRef(rootHash swarm.Address, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
+	// Embedding the Session interface
 	Session
 }
 
 // Control interface for the ACT (does write operations)
 type Control interface {
+	// Embedding the Decryptor interface
 	Decryptor
 	// Adds a new grantee to the ACT
 	AddGrantee(rootHash swarm.Address, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKey *encryption.Key) (swarm.Address, error)
