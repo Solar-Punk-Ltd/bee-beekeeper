@@ -48,6 +48,7 @@ func NewDefaultSession(key *ecdsa.PrivateKey) Session {
 	}
 }
 
+// Currently implemented only in mock/session.go
 func NewFromKeystore(ks keystore.Service, tag, password string) Session {
 	return nil
 }
