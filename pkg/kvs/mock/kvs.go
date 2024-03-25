@@ -1,10 +1,13 @@
 package mock
 
 import (
+	"context"
 	"encoding/hex"
 	"sync"
 
+	"github.com/ethersphere/bee/pkg/file"
 	"github.com/ethersphere/bee/pkg/kvs"
+	"github.com/ethersphere/bee/pkg/manifest"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -39,22 +42,41 @@ func getMemory() map[string][]byte {
 }
 
 type mockKeyValueStore struct {
+	ls file.LoadSaver
 }
 
 var _ kvs.KeyValueStore = (*mockKeyValueStore)(nil)
 
-func (m *mockKeyValueStore) Get(rootHash swarm.Address, key []byte) ([]byte, error) {
+func (m *mockKeyValueStore) Get(key []byte) ([]byte, error) {
 	mem := getMemory()
 	val := mem[hex.EncodeToString(key)]
 	return val, nil
 }
 
-func (m *mockKeyValueStore) Put(rootHash swarm.Address, key []byte, value []byte) (swarm.Address, error) {
+func (m *mockKeyValueStore) Put(key []byte, value []byte) error {
 	mem := getMemory()
 	mem[hex.EncodeToString(key)] = value
-	return swarm.EmptyAddress, nil
+	return nil
 }
 
-func New() kvs.KeyValueStore {
-	return &mockKeyValueStore{}
+func (s *mockKeyValueStore) Load() manifest.Interface {
+	m, err := manifest.NewSimpleManifest(s.ls)
+	if err != nil {
+		return nil
+	}
+	return m
+}
+
+func (s *mockKeyValueStore) Save() (swarm.Address, error) {
+	m, err := manifest.NewSimpleManifest(s.ls)
+	if err != nil {
+		return swarm.EmptyAddress, err
+	}
+	return m.Store(context.Background())
+}
+
+func New(ls file.LoadSaver, rootHash swarm.Address) kvs.KeyValueStore {
+	return &mockKeyValueStore{
+		ls: ls,
+	}
 }

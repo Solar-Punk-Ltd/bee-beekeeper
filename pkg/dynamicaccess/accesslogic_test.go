@@ -9,14 +9,16 @@ import (
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
+	"github.com/ethersphere/bee/pkg/kvs"
+	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 // Generates a new test environment with a fix private key
-func setupAccessLogic2(act dynamicaccess.Act) dynamicaccess.ActLogic {
+func setupAccessLogic2(s kvs.KeyValueStore) dynamicaccess.ActLogic {
 	privateKey := generateFixPrivateKey(1000)
 	diffieHellman := dynamicaccess.NewDefaultSession(&privateKey)
-	al := dynamicaccess.NewLogic(diffieHellman, act)
+	al := dynamicaccess.NewLogic(diffieHellman)
 
 	return al
 }
@@ -41,9 +43,9 @@ func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
 
 func TestGet_Success(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
-	act := mock.NewActMock()
-	al := setupAccessLogic2(act)
-	ref, err := al.AddPublisher(swarm.EmptyAddress, &id0.PublicKey)
+	s := kvsmock.New(ls, swarm.ZeroAddress)
+	al := setupAccessLogic2(s)
+	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
 	}
@@ -53,14 +55,14 @@ func TestGet_Success(t *testing.T) {
 	expectedRef := swarm.NewAddress(byteRef)
 	t.Logf("encryptedRef: %s", expectedRef.String())
 
-	encryptedRef, err := al.EncryptRef(ref, &id0.PublicKey, expectedRef)
+	encryptedRef, err := al.EncryptRef(s, &id0.PublicKey, expectedRef)
 	t.Logf("encryptedRef: %s", encryptedRef.String())
 	if err != nil {
 		t.Errorf("There was an error while calling EncryptRef: ")
 		t.Error(err)
 	}
 
-	acutalRef, err := al.Get(ref, encryptedRef, &id0.PublicKey)
+	acutalRef, err := al.Get(s, encryptedRef, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("There was an error while calling Get: ")
 		t.Error(err)

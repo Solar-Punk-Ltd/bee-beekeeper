@@ -10,24 +10,21 @@ import (
 )
 
 type KeyValueStore interface {
-	Get(rootHash swarm.Address, key []byte) ([]byte, error)
-	Put(rootHash swarm.Address, key, value []byte) (swarm.Address, error)
+	Get(key []byte) ([]byte, error)
+	Put(key, value []byte) error
+	Load() manifest.Interface
+	Save() (swarm.Address, error)
 }
 
 type keyValueStore struct {
-	ls file.LoadSaver
+	m manifest.Interface
 }
 
 var _ KeyValueStore = (*keyValueStore)(nil)
 
 // TODO: pass context as dep.
-func (s *keyValueStore) Get(rootHash swarm.Address, key []byte) ([]byte, error) {
-	// existing manif
-	manif, err := manifest.NewSimpleManifestReference(rootHash, s.ls)
-	if err != nil {
-		return nil, err
-	}
-	entry, err := manif.Lookup(context.Background(), hex.EncodeToString(key))
+func (s *keyValueStore) Get(key []byte) ([]byte, error) {
+	entry, err := s.m.Lookup(context.Background(), hex.EncodeToString(key))
 	if err != nil {
 		return nil, err
 	}
@@ -35,29 +32,32 @@ func (s *keyValueStore) Get(rootHash swarm.Address, key []byte) ([]byte, error) 
 	return ref.Bytes(), nil
 }
 
-func (s *keyValueStore) Put(rootHash swarm.Address, key []byte, value []byte) (swarm.Address, error) {
-	// existing manif
-	manif, err := manifest.NewSimpleManifestReference(rootHash, s.ls)
-	if err != nil {
-		// new manif
-		manif, err = manifest.NewSimpleManifest(s.ls)
-		if err != nil {
-			return swarm.EmptyAddress, err
-		}
-	}
-	err = manif.Add(context.Background(), hex.EncodeToString(key), manifest.NewEntry(swarm.NewAddress(value), map[string]string{}))
-	if err != nil {
-		return swarm.EmptyAddress, err
-	}
-	manifRef, err := manif.Store(context.Background())
-	if err != nil {
-		return swarm.EmptyAddress, err
-	}
-	return manifRef, nil
+func (s *keyValueStore) Put(key []byte, value []byte) error {
+	return s.m.Add(context.Background(), hex.EncodeToString(key), manifest.NewEntry(swarm.NewAddress(value), map[string]string{}))
 }
 
-func New(ls file.LoadSaver) KeyValueStore {
+func (s *keyValueStore) Load() manifest.Interface {
+	return s.m
+}
+
+func (s *keyValueStore) Save() (swarm.Address, error) {
+	return s.m.Store(context.Background())
+}
+
+func New(ls file.LoadSaver, rootHash swarm.Address) KeyValueStore {
+	var (
+		manif manifest.Interface
+		err   error
+	)
+	if swarm.ZeroAddress.Equal(rootHash) || swarm.EmptyAddress.Equal(rootHash) {
+		manif, err = manifest.NewSimpleManifest(ls)
+	} else {
+		manif, err = manifest.NewSimpleManifestReference(rootHash, ls)
+	}
+	if err != nil {
+		return nil
+	}
 	return &keyValueStore{
-		ls: ls,
+		m: manif,
 	}
 }

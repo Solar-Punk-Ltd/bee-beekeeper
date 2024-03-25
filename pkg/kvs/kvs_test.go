@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dynamicaccess_test
+package kvs_test
 
 import (
 	"bytes"
@@ -10,12 +10,12 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/file"
 	"github.com/ethersphere/bee/pkg/file/loadsave"
 	"github.com/ethersphere/bee/pkg/file/pipeline"
 	"github.com/ethersphere/bee/pkg/file/pipeline/builder"
 	"github.com/ethersphere/bee/pkg/file/redundancy"
+	"github.com/ethersphere/bee/pkg/kvs"
 	"github.com/ethersphere/bee/pkg/storage"
 	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
@@ -36,17 +36,17 @@ func createLs() file.LoadSaver {
 func TestActAddLookup(t *testing.T) {
 	ls := createLs()
 
-	act := dynamicaccess.NewAct(ls)
+	s := kvs.New(ls, swarm.ZeroAddress)
 
 	lookupKey := swarm.RandAddress(t).Bytes()
 	encryptedAccesskey := swarm.RandAddress(t).Bytes()
 
-	ref, err := act.Add(swarm.EmptyAddress, lookupKey, encryptedAccesskey)
+	err := s.Put(lookupKey, encryptedAccesskey)
 	if err != nil {
 		t.Errorf("Add() should not return an error: %v", err)
 	}
 
-	key, err := act.Lookup(ref, lookupKey)
+	key, err := s.Get(lookupKey)
 	if err != nil {
 		t.Errorf("Lookup() should not return an error: %v", err)
 	}
@@ -59,17 +59,17 @@ func TestActAddLookup(t *testing.T) {
 
 func TestActAddLookupWithNew(t *testing.T) {
 	ls := createLs()
-	act1 := dynamicaccess.NewAct(ls)
+	s1 := kvs.New(ls, swarm.ZeroAddress)
 	lookupKey := swarm.RandAddress(t).Bytes()
 	encryptedAccesskey := swarm.RandAddress(t).Bytes()
 
-	ref, err := act1.Add(swarm.EmptyAddress, lookupKey, encryptedAccesskey)
+	err := s1.Put(lookupKey, encryptedAccesskey)
 	if err != nil {
 		t.Fatalf("Add() should not return an error: %v", err)
 	}
 
-	act2 := dynamicaccess.NewAct(ls)
-	key, err := act2.Lookup(ref, lookupKey)
+	s2 := kvs.New(ls, swarm.ZeroAddress)
+	key, err := s2.Get(lookupKey)
 	if err != nil {
 		t.Fatalf("Lookup() should not return an error: %v", err)
 	}
