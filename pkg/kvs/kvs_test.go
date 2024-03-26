@@ -59,8 +59,7 @@ func TestActAddLookup(t *testing.T) {
 
 func TestActAddLookupWithNew(t *testing.T) {
 	ls := createLs()
-	addr := swarm.RandAddress(t)
-	s1 := kvs.New(ls, addr)
+	s1 := kvs.New(ls, swarm.ZeroAddress)
 	lookupKey := swarm.RandAddress(t).Bytes()
 	encryptedAccesskey := swarm.RandAddress(t).Bytes()
 
@@ -68,7 +67,8 @@ func TestActAddLookupWithNew(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Add() should not return an error: %v", err)
 	}
-	ref, err := s1.Save()
+	putter := mockStorer.DirectUpload()
+	ref, err := s1.Save(putter)
 	if err != nil {
 		t.Fatalf("Save() should not return an error: %v", err)
 	}
@@ -83,28 +83,3 @@ func TestActAddLookupWithNew(t *testing.T) {
 	}
 
 }
-
-/*
-func TestActStoreLoad(t *testing.T) {
-
-	act := dynamicaccess.NewInMemoryAct()
-	lookupKey := swarm.RandAddress(t).Bytes()
-	encryptedAccesskey := swarm.RandAddress(t).Bytes()
-	err := act.Add(lookupKey, encryptedAccesskey)
-	if err != nil {
-		t.Error("Add() should not return an error")
-	}
-
-	swarm_ref, err := act.Store()
-	if err != nil {
-		t.Error("Store() should not return an error")
-	}
-
-	actualAct := dynamicaccess.NewInMemoryAct()
-	actualAct.Load(swarm_ref)
-	actualEak, _ := actualAct.Lookup(lookupKey)
-	if !bytes.Equal(actualEak, encryptedAccesskey) {
-		t.Errorf("actualAct.Load() value is not the expected %s != %s", hex.EncodeToString(actualEak), hex.EncodeToString(encryptedAccesskey))
-	}
-}
-*/

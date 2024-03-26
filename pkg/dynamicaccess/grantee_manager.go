@@ -3,13 +3,14 @@ package dynamicaccess
 import (
 	"crypto/ecdsa"
 
+	"github.com/ethersphere/bee/pkg/kvs"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 type GranteeManager interface {
 	Get(topic string) []*ecdsa.PublicKey
 	Add(topic string, addList []*ecdsa.PublicKey) error
-	Publish(rootHash swarm.Address, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error)
+	Publish(kvs kvs.KeyValueStore, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error)
 
 	// HandleGrantees(topic string, addList, removeList []*ecdsa.PublicKey) *Act
 
@@ -36,10 +37,10 @@ func (gm *granteeManager) Add(topic string, addList []*ecdsa.PublicKey) error {
 	return gm.granteeList.AddGrantees(topic, addList)
 }
 
-func (gm *granteeManager) Publish(rootHash swarm.Address, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error) {
-	ref, err := gm.accessLogic.AddPublisher(rootHash, publisher)
+func (gm *granteeManager) Publish(kvs kvs.KeyValueStore, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error) {
+	err := gm.accessLogic.AddPublisher(kvs, publisher)
 	for _, grantee := range gm.granteeList.GetGrantees(topic) {
-		ref, err = gm.accessLogic.AddNewGranteeToContent(ref, publisher, grantee)
+		err = gm.accessLogic.AddNewGranteeToContent(kvs, publisher, grantee)
 	}
-	return ref, err
+	return swarm.EmptyAddress, err
 }

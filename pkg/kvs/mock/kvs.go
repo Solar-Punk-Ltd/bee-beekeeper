@@ -8,6 +8,7 @@ import (
 	"github.com/ethersphere/bee/pkg/file"
 	"github.com/ethersphere/bee/pkg/kvs"
 	"github.com/ethersphere/bee/pkg/manifest"
+	"github.com/ethersphere/bee/pkg/storer"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -67,12 +68,20 @@ func (s *mockKeyValueStore) Load() manifest.Interface {
 	return m
 }
 
-func (s *mockKeyValueStore) Save() (swarm.Address, error) {
+func (s *mockKeyValueStore) Save(putter storer.PutterSession) (swarm.Address, error) {
 	m, err := manifest.NewSimpleManifest(s.ls)
 	if err != nil {
-		return swarm.EmptyAddress, err
+		return swarm.ZeroAddress, err
 	}
-	return m.Store(context.Background())
+	ref, err := m.Store(context.Background())
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+	err = putter.Done(ref)
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+	return ref, nil
 }
 
 func New(ls file.LoadSaver, rootHash swarm.Address) kvs.KeyValueStore {

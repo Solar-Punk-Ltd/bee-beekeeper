@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethersphere/bee/pkg/file"
 	"github.com/ethersphere/bee/pkg/manifest"
+	"github.com/ethersphere/bee/pkg/storer"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -13,7 +14,7 @@ type KeyValueStore interface {
 	Get(key []byte) ([]byte, error)
 	Put(key, value []byte) error
 	Load() manifest.Interface
-	Save() (swarm.Address, error)
+	Save(putter storer.PutterSession) (swarm.Address, error)
 }
 
 type keyValueStore struct {
@@ -40,8 +41,16 @@ func (s *keyValueStore) Load() manifest.Interface {
 	return s.m
 }
 
-func (s *keyValueStore) Save() (swarm.Address, error) {
-	return s.m.Store(context.Background())
+func (s *keyValueStore) Save(putter storer.PutterSession) (swarm.Address, error) {
+	ref, err := s.m.Store(context.Background())
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+	err = putter.Done(ref)
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+	return ref, nil
 }
 
 func New(ls file.LoadSaver, rootHash swarm.Address) KeyValueStore {
@@ -49,25 +58,15 @@ func New(ls file.LoadSaver, rootHash swarm.Address) KeyValueStore {
 		manif manifest.Interface
 		err   error
 	)
-
-	manif, err = manifest.NewSimpleManifestReference(rootHash, ls)
-	if err != nil {
-		// new manif
+	if swarm.ZeroAddress.Equal(rootHash) || swarm.EmptyAddress.Equal(rootHash) {
 		manif, err = manifest.NewSimpleManifest(ls)
-		if err != nil {
-			return nil
-		}
+	} else {
+		manif, err = manifest.NewSimpleManifestReference(rootHash, ls)
 	}
-	/*
-			if swarm.ZeroAddress.Equal(rootHash) || swarm.EmptyAddress.Equal(rootHash) {
-				manif, err = manifest.NewSimpleManifest(ls)
-			} else {
-				manif, err = manifest.NewSimpleManifestReference(rootHash, ls)
-			}
-		if err != nil {
-			return nil
-		}
-	*/
+	if err != nil {
+		return nil
+	}
+
 	return &keyValueStore{
 		m: manif,
 	}

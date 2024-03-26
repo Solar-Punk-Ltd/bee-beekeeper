@@ -3,6 +3,7 @@ package dynamicaccess
 import (
 	"crypto/ecdsa"
 
+	"github.com/ethersphere/bee/pkg/kvs"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -18,11 +19,11 @@ type defaultController struct {
 }
 
 func (c *defaultController) DownloadHandler(timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, tag string) (swarm.Address, error) {
-	_, err := c.history.Lookup(timestamp)
+	kvs, err := c.history.Lookup(timestamp)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
-	addr, err := c.accessLogic.Get(swarm.EmptyAddress, enryptedRef, publisher)
+	addr, err := c.accessLogic.Get(kvs, enryptedRef, publisher)
 	return addr, err
 }
 
@@ -31,16 +32,17 @@ func (c *defaultController) UploadHandler(ref swarm.Address, publisher *ecdsa.Pu
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
-	var actRef swarm.Address
+	var s kvs.KeyValueStore
 	if act == nil {
 		// new feed
-		actRef, err = c.granteeManager.Publish(swarm.EmptyAddress, publisher, topic)
+		s = kvs.New(nil, swarm.ZeroAddress)
+		_, err = c.granteeManager.Publish(s, publisher, topic)
 		if err != nil {
 			return swarm.EmptyAddress, err
 		}
 	}
 	//FIXME: check if ACT is consistent with the grantee list
-	return c.accessLogic.EncryptRef(actRef, publisher, ref)
+	return c.accessLogic.EncryptRef(s, publisher, ref)
 }
 
 func NewController(history History, granteeManager GranteeManager, accessLogic ActLogic) Controller {
