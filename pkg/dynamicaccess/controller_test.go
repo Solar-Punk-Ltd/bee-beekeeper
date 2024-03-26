@@ -12,7 +12,6 @@ import (
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
 	"github.com/ethersphere/bee/pkg/encryption"
-	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
 	"golang.org/x/crypto/sha3"
 )
@@ -23,10 +22,10 @@ func mockTestHistory(key, val []byte) dynamicaccess.History {
 	var (
 		h   = mock.NewHistory()
 		now = time.Now()
-		s   = kvsmock.New()
+		act = dynamicaccess.NewInMemoryAct()
 	)
-	_ = s.Put(key, val)
-	h.Insert(now.AddDate(-3, 0, 0).Unix(), s)
+	act.Add(swarm.EmptyAddress, key, val)
+	h.Insert(now.AddDate(-3, 0, 0).Unix(), act)
 	return h
 }
 
