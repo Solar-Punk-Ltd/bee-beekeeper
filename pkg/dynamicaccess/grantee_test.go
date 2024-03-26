@@ -10,6 +10,8 @@ import (
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 )
 
+var _ dynamicaccess.GranteeList = (*dynamicaccess.GranteeListStruct)(nil)
+
 func TestGranteeAddGrantees(t *testing.T) {
 	grantee := dynamicaccess.NewGrantee()
 
