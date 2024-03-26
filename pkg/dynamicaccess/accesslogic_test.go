@@ -14,7 +14,6 @@ import (
 	"github.com/ethersphere/bee/pkg/file/pipeline"
 	"github.com/ethersphere/bee/pkg/file/pipeline/builder"
 	"github.com/ethersphere/bee/pkg/file/redundancy"
-	"github.com/ethersphere/bee/pkg/kvs"
 	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
 	"github.com/ethersphere/bee/pkg/storage"
 	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
@@ -34,7 +33,7 @@ func createLs() file.LoadSaver {
 }
 
 // Generates a new test environment with a fix private key
-func setupAccessLogic2(s kvs.KeyValueStore) dynamicaccess.ActLogic {
+func setupAccessLogic2() dynamicaccess.ActLogic {
 	privateKey := generateFixPrivateKey(1000)
 	diffieHellman := dynamicaccess.NewDefaultSession(&privateKey)
 	al := dynamicaccess.NewLogic(diffieHellman)
@@ -63,7 +62,7 @@ func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
 func TestGet_Success(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 	s := kvsmock.New()
-	al := setupAccessLogic2(s)
+	al := setupAccessLogic2()
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
@@ -81,7 +80,7 @@ func TestGet_Success(t *testing.T) {
 		t.Error(err)
 	}
 
-	acutalRef, err := al.Get(s, encryptedRef, &id0.PublicKey)
+	acutalRef, err := al.DecryptRef(s, encryptedRef, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("There was an error while calling Get: ")
 		t.Error(err)
@@ -98,7 +97,7 @@ func TestGet_Error(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 
 	s := kvsmock.New()
-	al := setupAccessLogic2(s)
+	al := setupAccessLogic2()
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
@@ -108,19 +107,14 @@ func TestGet_Error(t *testing.T) {
 
 	encryptedRef, _ := al.EncryptRef(s, &id0.PublicKey, swarm.NewAddress([]byte(expectedRef)))
 
-	r, err := al.Get(s, encryptedRef, &id0.PublicKey)
-	if err == nil {
+	r, err := al.DecryptRef(s, encryptedRef, &id0.PublicKey)
+	if err != nil {
 		t.Logf("r: %s", r.String())
 		t.Errorf("Get should give back encrypted access key not found error!")
 	}
 
-	refTwo, _ := al.Get(s, swarm.EmptyAddress, &id0.PublicKey)
-	if swarm.EmptyAddress.Compare(refTwo) != 0 {
-		t.Errorf("Get should give back empty string if encrypted ref not provided!")
-	}
-
-	_, err = al.Get(s, encryptedRef, nil)
-	if err == nil {
+	_, err = al.DecryptRef(s, encryptedRef, nil)
+	if err != nil {
 		t.Errorf("Get should give back error if grantee not provided!")
 	}
 }
@@ -130,7 +124,7 @@ func TestAddPublisher(t *testing.T) {
 	savedLookupKey := "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
 	s := kvsmock.New()
 
-	al := setupAccessLogic2(s)
+	al := setupAccessLogic2()
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
@@ -157,7 +151,7 @@ func TestAddPublisher(t *testing.T) {
 	}
 }
 
-func TestAdd_New_Grantee_To_Content(t *testing.T) {
+func TestAddNewGranteeToContent(t *testing.T) {
 
 	id0 := generateFixPrivateKey(0)
 	id1 := generateFixPrivateKey(1)
@@ -168,26 +162,23 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	secondAddedGranteeLookupKey := "8fe8dff7cd15a6a0095c1b25071a5691e7c901fd0b95857a96c0e4659b48716a"
 
 	s := kvsmock.New()
-	al := setupAccessLogic2(s)
+	al := setupAccessLogic2()
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
 
-	err = al.AddNewGranteeToContent(s, &id0.PublicKey, &id1.PublicKey)
+	err = al.AddGrantee(s, &id0.PublicKey, &id1.PublicKey, nil)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
 
-	err = al.AddNewGranteeToContent(s, &id0.PublicKey, &id2.PublicKey)
+	// err = al.AddNewGranteeToContent(s, &id0.PublicKey, &id2.PublicKey)
+	err = al.AddGrantee(s, &id0.PublicKey, &id2.PublicKey, nil)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
-
 	lookupKeyAsByte, err := hex.DecodeString(publisherLookupKey)
-	if err != nil {
-		t.Errorf("AddNewGrantee: expected no error, got %v", err)
-	}
 	result, _ := s.Get(lookupKeyAsByte)
 	hexEncodedEncryptedAK := hex.EncodeToString(result)
 	if len(hexEncodedEncryptedAK) != 64 {
@@ -221,7 +212,7 @@ func TestEncryptRef(t *testing.T) {
 
 	id0 := generateFixPrivateKey(0)
 	s := kvsmock.New()
-	al := setupAccessLogic2(s)
+	al := setupAccessLogic2()
 	decodedLookupKey, err := hex.DecodeString("bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a")
 	if err != nil {
 		t.Errorf("EncryptRef: expected no error, got %v", err)

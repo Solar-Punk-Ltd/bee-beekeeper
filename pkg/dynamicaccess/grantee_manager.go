@@ -22,7 +22,7 @@ var _ GranteeManager = (*granteeManager)(nil)
 
 type granteeManager struct {
 	accessLogic ActLogic
-	granteeList Grantee
+	granteeList GranteeList
 }
 
 func NewGranteeManager(al ActLogic) *granteeManager {
@@ -30,17 +30,17 @@ func NewGranteeManager(al ActLogic) *granteeManager {
 }
 
 func (gm *granteeManager) Get(topic string) []*ecdsa.PublicKey {
-	return gm.granteeList.GetGrantees(topic)
+	return gm.granteeList.Get(topic)
 }
 
 func (gm *granteeManager) Add(topic string, addList []*ecdsa.PublicKey) error {
-	return gm.granteeList.AddGrantees(topic, addList)
+	return gm.granteeList.Add(topic, addList)
 }
 
 func (gm *granteeManager) Publish(kvs kvs.KeyValueStore, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error) {
 	err := gm.accessLogic.AddPublisher(kvs, publisher)
-	for _, grantee := range gm.granteeList.GetGrantees(topic) {
-		err = gm.accessLogic.AddNewGranteeToContent(kvs, publisher, grantee)
+	for _, grantee := range gm.granteeList.Get(topic) {
+		err = gm.accessLogic.AddGrantee(kvs, publisher, grantee, nil)
 	}
 	return swarm.EmptyAddress, err
 }
