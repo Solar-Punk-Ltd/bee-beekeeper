@@ -13,19 +13,19 @@ import (
 type KeyValueStore interface {
 	Get(key []byte) ([]byte, error)
 	Put(key, value []byte) error
-	Load() manifest.Interface
-	Save(putter storer.PutterSession) (swarm.Address, error)
+	Save() (swarm.Address, error)
 }
 
 type keyValueStore struct {
-	m manifest.Interface
+	manifest manifest.Interface
+	putter   storer.PutterSession
 }
 
 var _ KeyValueStore = (*keyValueStore)(nil)
 
 // TODO: pass context as dep.
 func (s *keyValueStore) Get(key []byte) ([]byte, error) {
-	entry, err := s.m.Lookup(context.Background(), hex.EncodeToString(key))
+	entry, err := s.manifest.Lookup(context.Background(), hex.EncodeToString(key))
 	if err != nil {
 		return nil, err
 	}
@@ -34,26 +34,22 @@ func (s *keyValueStore) Get(key []byte) ([]byte, error) {
 }
 
 func (s *keyValueStore) Put(key []byte, value []byte) error {
-	return s.m.Add(context.Background(), hex.EncodeToString(key), manifest.NewEntry(swarm.NewAddress(value), map[string]string{}))
+	return s.manifest.Add(context.Background(), hex.EncodeToString(key), manifest.NewEntry(swarm.NewAddress(value), map[string]string{}))
 }
 
-func (s *keyValueStore) Load() manifest.Interface {
-	return s.m
-}
-
-func (s *keyValueStore) Save(putter storer.PutterSession) (swarm.Address, error) {
-	ref, err := s.m.Store(context.Background())
+func (s *keyValueStore) Save() (swarm.Address, error) {
+	ref, err := s.manifest.Store(context.Background())
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
-	err = putter.Done(ref)
+	err = s.putter.Done(ref)
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
 	return ref, nil
 }
 
-func New(ls file.LoadSaver, rootHash swarm.Address) KeyValueStore {
+func New(ls file.LoadSaver, putter storer.PutterSession, rootHash swarm.Address) KeyValueStore {
 	var (
 		manif manifest.Interface
 		err   error
@@ -68,6 +64,7 @@ func New(ls file.LoadSaver, rootHash swarm.Address) KeyValueStore {
 	}
 
 	return &keyValueStore{
-		m: manif,
+		manifest: manif,
+		putter:   putter,
 	}
 }

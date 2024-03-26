@@ -62,7 +62,7 @@ func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
 
 func TestGet_Success(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
-	s := kvsmock.New(createLs(), swarm.ZeroAddress)
+	s := kvsmock.New()
 	al := setupAccessLogic2(s)
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
@@ -97,7 +97,7 @@ func TestGet_Success(t *testing.T) {
 func TestGet_Error(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 
-	s := kvsmock.New(createLs(), swarm.EmptyAddress)
+	s := kvsmock.New()
 	al := setupAccessLogic2(s)
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestGet_Error(t *testing.T) {
 func TestAddPublisher(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 	savedLookupKey := "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
-	s := kvsmock.New(createLs(), swarm.EmptyAddress)
+	s := kvsmock.New()
 
 	al := setupAccessLogic2(s)
 	err := al.AddPublisher(s, &id0.PublicKey)
@@ -167,7 +167,7 @@ func TestAdd_New_Grantee_To_Content(t *testing.T) {
 	firstAddedGranteeLookupKey := "e221a2abf64357260e8f2c937ee938aed98dce097e537c1a3fd4caf73510dbe4"
 	secondAddedGranteeLookupKey := "8fe8dff7cd15a6a0095c1b25071a5691e7c901fd0b95857a96c0e4659b48716a"
 
-	s := kvsmock.New(createLs(), swarm.EmptyAddress)
+	s := kvsmock.New()
 	al := setupAccessLogic2(s)
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
@@ -220,7 +220,7 @@ func TestEncryptRef(t *testing.T) {
 	savedEncryptedRef := "230cdcfb2e67adddb2822b38f70105213ab3e4f97d03560bfbfbb218f487c5303e9aa9a97e62aa1a8003f162679e7c65e1c8e3aacaec2043fd5d2a4a7d69285e"
 
 	id0 := generateFixPrivateKey(0)
-	s := kvsmock.New(createLs(), swarm.EmptyAddress)
+	s := kvsmock.New()
 	al := setupAccessLogic2(s)
 	decodedLookupKey, err := hex.DecodeString("bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a")
 	if err != nil {

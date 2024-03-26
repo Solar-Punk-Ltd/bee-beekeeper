@@ -3,7 +3,7 @@ package dynamicaccess
 import (
 	"crypto/ecdsa"
 
-	"github.com/ethersphere/bee/pkg/kvs"
+	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -28,21 +28,21 @@ func (c *defaultController) DownloadHandler(timestamp int64, enryptedRef swarm.A
 }
 
 func (c *defaultController) UploadHandler(ref swarm.Address, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error) {
-	act, err := c.history.Lookup(0)
+	kvs, err := c.history.Lookup(0)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
-	var s kvs.KeyValueStore
-	if act == nil {
+	if kvs == nil {
 		// new feed
-		s = kvs.New(nil, swarm.ZeroAddress)
-		_, err = c.granteeManager.Publish(s, publisher, topic)
+		// TODO: putter session to create kvs
+		kvs = kvsmock.New()
+		_, err = c.granteeManager.Publish(kvs, publisher, topic)
 		if err != nil {
 			return swarm.EmptyAddress, err
 		}
 	}
-	//FIXME: check if ACT is consistent with the grantee list
-	return c.accessLogic.EncryptRef(s, publisher, ref)
+	//FIXME: check if kvs is consistent with the grantee list
+	return c.accessLogic.EncryptRef(kvs, publisher, ref)
 }
 
 func NewController(history History, granteeManager GranteeManager, accessLogic ActLogic) Controller {

@@ -33,10 +33,11 @@ func createLs() file.LoadSaver {
 	return loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
 }
 
-func TestActAddLookup(t *testing.T) {
+func TestKvsAddLookup(t *testing.T) {
 	ls := createLs()
 
-	s := kvs.New(ls, swarm.ZeroAddress)
+	putter := mockStorer.DirectUpload()
+	s := kvs.New(ls, putter, swarm.ZeroAddress)
 
 	lookupKey := swarm.RandAddress(t).Bytes()
 	encryptedAccesskey := swarm.RandAddress(t).Bytes()
@@ -57,9 +58,10 @@ func TestActAddLookup(t *testing.T) {
 
 }
 
-func TestActAddLookupWithNew(t *testing.T) {
+func TestKvsAddLookupWithSave(t *testing.T) {
 	ls := createLs()
-	s1 := kvs.New(ls, swarm.ZeroAddress)
+	putter := mockStorer.DirectUpload()
+	s1 := kvs.New(ls, putter, swarm.ZeroAddress)
 	lookupKey := swarm.RandAddress(t).Bytes()
 	encryptedAccesskey := swarm.RandAddress(t).Bytes()
 
@@ -67,12 +69,11 @@ func TestActAddLookupWithNew(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Add() should not return an error: %v", err)
 	}
-	putter := mockStorer.DirectUpload()
-	ref, err := s1.Save(putter)
+	ref, err := s1.Save()
 	if err != nil {
 		t.Fatalf("Save() should not return an error: %v", err)
 	}
-	s2 := kvs.New(ls, ref)
+	s2 := kvs.New(ls, putter, ref)
 	key, err := s2.Get(lookupKey)
 	if err != nil {
 		t.Fatalf("Lookup() should not return an error: %v", err)

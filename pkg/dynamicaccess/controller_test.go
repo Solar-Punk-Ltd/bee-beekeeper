@@ -23,7 +23,7 @@ func mockTestHistory(key, val []byte) dynamicaccess.History {
 	var (
 		h   = mock.NewHistory()
 		now = time.Now()
-		s   = kvsmock.New(createLs(), swarm.ZeroAddress)
+		s   = kvsmock.New()
 	)
 	_ = s.Put(key, val)
 	h.Insert(now.AddDate(-3, 0, 0).Unix(), s)

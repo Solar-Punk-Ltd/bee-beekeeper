@@ -8,7 +8,6 @@ import (
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
 	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
-	"github.com/ethersphere/bee/pkg/swarm"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,9 +43,9 @@ func prepareTestHistory() dynamicaccess.History {
 	var (
 		h   = mock.NewHistory()
 		now = time.Now()
-		s1  = kvsmock.New(createLs(), swarm.ZeroAddress)
-		s2  = kvsmock.New(createLs(), swarm.ZeroAddress)
-		s3  = kvsmock.New(createLs(), swarm.ZeroAddress)
+		s1  = kvsmock.New()
+		s2  = kvsmock.New()
+		s3  = kvsmock.New()
 	)
 	s1.Put([]byte("key1"), []byte("value1"))
 	s2.Put([]byte("key1"), []byte("value2"))
