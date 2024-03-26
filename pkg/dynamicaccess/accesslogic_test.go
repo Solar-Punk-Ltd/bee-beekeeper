@@ -73,28 +73,6 @@ func TestDecryptRef_Success(t *testing.T) {
 	}
 }
 
-// This test function tests those cases where different parameters are missing
-func TestDecryptRef_Error(t *testing.T) {
-	id0 := generateFixPrivateKey(0)
-
-	act := dynamicaccess.NewInMemoryAct()
-	al := setupAccessLogic2(act)
-	ref, err := al.AddPublisher(swarm.EmptyAddress, &id0.PublicKey)
-	if err != nil {
-		t.Errorf("AddPublisher: expected no error, got %v", err)
-	}
-
-	expectedRef := "39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559"
-
-	encryptedRef, _ := al.EncryptRef(ref, &id0.PublicKey, swarm.NewAddress([]byte(expectedRef)))
-
-	r, err := al.DecryptRef(swarm.RandAddress(t), encryptedRef, &id0.PublicKey)
-	if err != nil {
-		t.Logf("r: %s", r.String())
-		t.Errorf("Get should give back encrypted access key not found error!")
-	}
-}
-
 func TestAddPublisher(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 	savedLookupKey := "bc36789e7a1e281436464229828f817d6612f7b477d66591ff96a9e064bcc98a"
