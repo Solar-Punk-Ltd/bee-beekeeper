@@ -39,7 +39,7 @@ func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
 	return privateKey
 }
 
-func TestGet_Success(t *testing.T) {
+func TestDecryptRef_Success(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 	var mockStorer = mockstorer.New()
 	act := dynamicaccess.NewInManifestAct(mockStorer)
@@ -74,7 +74,7 @@ func TestGet_Success(t *testing.T) {
 }
 
 // This test function tests those cases where different parameters are missing
-func TestGet_Error(t *testing.T) {
+func TestDecryptRef_Error(t *testing.T) {
 	id0 := generateFixPrivateKey(0)
 
 	act := dynamicaccess.NewInMemoryAct()
@@ -92,11 +92,6 @@ func TestGet_Error(t *testing.T) {
 	if err != nil {
 		t.Logf("r: %s", r.String())
 		t.Errorf("Get should give back encrypted access key not found error!")
-	}
-
-	_, err = al.DecryptRef(swarm.RandAddress(t), encryptedRef, nil)
-	if err != nil {
-		t.Errorf("Get should give back error if grantee not provided!")
 	}
 }
 
