@@ -2,7 +2,6 @@ package dynamicaccess
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 
 	encryption "github.com/ethersphere/bee/pkg/encryption"
 	"github.com/ethersphere/bee/pkg/kvs"
@@ -17,7 +16,7 @@ type Decryptor interface {
 	// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
 	DecryptRef(storage kvs.KeyValueStore, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
 	// Embedding the Session interface
-	// Session
+	Session
 }
 
 // Control interface for the ACT (does write operations)
@@ -25,13 +24,13 @@ type Control interface {
 	// Embedding the Decryptor interface
 	Decryptor
 	// Adds a new grantee to the ACT
-	AddNewGranteeToContent(storage kvs.KeyValueStore, publisherPubKey, granteePubKey *ecdsa.PublicKey) error
-	// Get will return a decrypted reference, for given encrypted reference and grantee
-	Get(storage kvs.KeyValueStore, encryped_ref swarm.Address, publisher *ecdsa.PublicKey) error
+	AddGrantee(storage kvs.KeyValueStore, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKey *encryption.Key) error
+	// Encrypts a Swarm reference for a given grantee
+	EncryptRef(storage kvs.KeyValueStore, grantee *ecdsa.PublicKey, ref swarm.Address) error
 }
 
 type ActLogic struct {
-	Session Session
+	Session
 }
 
 var _ Decryptor = (*ActLogic)(nil)
@@ -120,7 +119,6 @@ func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
 // DecryptRef will return a decrypted reference, for given encrypted reference and grantee
 func (al ActLogic) DecryptRef(storage kvs.KeyValueStore, encryped_ref swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error) {
 	keys, err := al.getKeys(grantee)
-	fmt.Println("encrypted_ref: ", encryped_ref)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
