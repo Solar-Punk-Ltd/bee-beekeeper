@@ -2,6 +2,7 @@ package dynamicaccess
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 
 	encryption "github.com/ethersphere/bee/pkg/encryption"
 	"github.com/ethersphere/bee/pkg/swarm"
@@ -119,6 +120,7 @@ func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
 // DecryptRef will return a decrypted reference, for given encrypted reference and grantee
 func (al ActLogic) DecryptRef(rootHash swarm.Address, encryped_ref swarm.Address, grantee *ecdsa.PublicKey) (swarm.Address, error) {
 	keys, err := al.getKeys(grantee)
+	fmt.Println("encrypted_ref: ", encryped_ref)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}

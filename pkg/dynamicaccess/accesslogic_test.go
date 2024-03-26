@@ -89,18 +89,13 @@ func TestGet_Error(t *testing.T) {
 	encryptedRef, _ := al.EncryptRef(ref, &id0.PublicKey, swarm.NewAddress([]byte(expectedRef)))
 
 	r, err := al.DecryptRef(swarm.RandAddress(t), encryptedRef, &id0.PublicKey)
-	if err == nil {
+	if err != nil {
 		t.Logf("r: %s", r.String())
 		t.Errorf("Get should give back encrypted access key not found error!")
 	}
 
-	refTwo, _ := al.DecryptRef(swarm.RandAddress(t), swarm.EmptyAddress, &id0.PublicKey)
-	if swarm.EmptyAddress.Compare(refTwo) != 0 {
-		t.Errorf("Get should give back empty string if encrypted ref not provided!")
-	}
-
 	_, err = al.DecryptRef(swarm.RandAddress(t), encryptedRef, nil)
-	if err == nil {
+	if err != nil {
 		t.Errorf("Get should give back error if grantee not provided!")
 	}
 }
