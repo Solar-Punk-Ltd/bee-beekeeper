@@ -29,7 +29,7 @@ LDFLAGS ?= -s -w \
 -X github.com/ethersphere/bee/pkg/postage/listener.batchFactorOverridePublic="$(BATCHFACTOR_OVERRIDE_PUBLIC)"
 
 .PHONY: all
-all: build lint test-race binary
+all: build binary
 
 .PHONY: binary
 binary: export CGO_ENABLED=0
