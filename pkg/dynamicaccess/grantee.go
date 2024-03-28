@@ -2,6 +2,8 @@ package dynamicaccess
 
 import (
 	"crypto/ecdsa"
+
+	"github.com/ethersphere/bee/pkg/swarm"
 )
 
 type GranteeList interface {
@@ -41,4 +43,8 @@ func (g *GranteeListStruct) Remove(topic string, removeList []*ecdsa.PublicKey) 
 
 func NewGrantee() *GranteeListStruct {
 	return &GranteeListStruct{grantees: make(map[string][]*ecdsa.PublicKey)}
+}
+
+func (g *GranteeListStruct) Store() (swarm.Address, error) {
+	return swarm.EmptyAddress, nil
 }
