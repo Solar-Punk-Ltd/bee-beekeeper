@@ -1,105 +1,139 @@
 package dynamicaccess
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"fmt"
 
+	"github.com/ethersphere/bee/pkg/file"
+	"github.com/ethersphere/bee/pkg/storer"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
+const (
+	publicKeyLen = 65
+)
+
+// TODO: maybe rename to "List", simply
 type GranteeList interface {
-	Add(topic string, addList []*ecdsa.PublicKey) error
-	Remove(topic string, removeList []*ecdsa.PublicKey) error
-	Get(topic string) []*ecdsa.PublicKey
+	Add(publicKeys []*ecdsa.PublicKey) error
+	Remove(removeList []*ecdsa.PublicKey) error
+	Get() []*ecdsa.PublicKey
 	Save() (swarm.Address, error)
 }
 
 type GranteeListStruct struct {
-	grantees map[string][]*ecdsa.PublicKey
+	grantees []byte
+	loadSave file.LoadSaver
+	putter   storer.PutterSession
 }
 
-func (g *GranteeListStruct) Get(topic string) []*ecdsa.PublicKey {
-	grantees := g.grantees[topic]
-	keys := make([]*ecdsa.PublicKey, len(grantees))
-	copy(keys, grantees)
-	return keys
+var _ GranteeList = (*GranteeListStruct)(nil)
+
+func (g *GranteeListStruct) Get() []*ecdsa.PublicKey {
+	return g.Deserialize(g.grantees)
 }
 
-func (g *GranteeListStruct) Serialize(addList []*ecdsa.PublicKey) []byte {
-	b := make([]byte, 0, len(addList))
-	// d := byte(',')
-	for _, key := range addList {
+func (g *GranteeListStruct) Serialize(publicKeys []*ecdsa.PublicKey) []byte {
+	b := make([]byte, 0, len(publicKeys))
+	for _, key := range publicKeys {
 		b = append(b, g.SerializePublicKey(key)...)
 	}
-	// grantees = b
 	return b
-}
-
-func (g *GranteeListStruct) DeSerialize(data []byte) []*ecdsa.PublicKey {
-	p := make([]*ecdsa.PublicKey, 0, len(data)/65)
-	// d := byte(',')
-	for i := 0; i < len(data); i += 65 {
-		p = append(p, g.DeSerializeBytes(data[i:i+65]))
-	}
-	// grantees = b
-	return p
 }
 
 func (g *GranteeListStruct) SerializePublicKey(pub *ecdsa.PublicKey) []byte {
 	return elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 }
 
-func (g *GranteeListStruct) DeSerializeBytes(data []byte) *ecdsa.PublicKey {
+func (g *GranteeListStruct) Deserialize(data []byte) []*ecdsa.PublicKey {
+	if len(data) == 0 {
+		return nil
+	}
+
+	p := make([]*ecdsa.PublicKey, 0, len(data)/publicKeyLen)
+	for i := 0; i < len(data); i += publicKeyLen {
+		pubKey := g.DeserializeBytes(data[i : i+publicKeyLen])
+		if pubKey == nil {
+			return nil
+		}
+		p = append(p, pubKey)
+	}
+	return p
+}
+
+func (g *GranteeListStruct) DeserializeBytes(data []byte) *ecdsa.PublicKey {
 	curve := elliptic.P256()
-	// TODO: use not depreceted ecdh stuff
+	// TODO: use not deprecated ecdsa, ecdh instead
 	// pub, err := ecdh.P256().NewPublicKey(data)
 	// if err != nil {
 	// 	return nil
 	// }
+	// return pub
 	x, y := elliptic.Unmarshal(curve, data)
 	return &ecdsa.PublicKey{Curve: curve, X: x, Y: y}
-	// return pub
+}
+
+func (g *GranteeListStruct) Add(publicKeys []*ecdsa.PublicKey) error {
+	if len(publicKeys) == 0 {
+		return fmt.Errorf("no public key provided")
+	}
+
+	data := g.Serialize(publicKeys)
+	g.grantees = append(g.grantees, data...)
+	return nil
 }
 
 func (g *GranteeListStruct) Save() (swarm.Address, error) {
-	return swarm.EmptyAddress, nil
+	refBytes, err := g.loadSave.Save(context.Background(), g.grantees)
+	if err != nil {
+		return swarm.ZeroAddress, fmt.Errorf("grantee save error: %w", err)
+	}
+	address := swarm.NewAddress(refBytes)
+	err = g.putter.Done(address)
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+	return address, nil
 }
 
-// == 0x11132454/..soc...soc...
-// file upload -> address -> key/ lookupkey
-//
-//	roothash      / pubkey(lookupkey) /   accesskey / mtdt (empty map) (application/json)
-//
-// manifest: swarmAddress, path :(hash/address) / address/metadata (map[string]string)
-// manifes.RootPath == / -> soc hash
-func (g *GranteeListStruct) Add(topic string, addList []*ecdsa.PublicKey) error {
-	// addList -> serialize to []byte -> string -> manifestkey
-	// b, err := hex.DecodeString(topic)
-	// if err != nil {
-	// 	return err
-	// }
-	// g.grantees.Put(context.Background(), b, addList)
-	g.grantees[topic] = append(g.grantees[topic], addList...)
-	return nil
-}
+func (g *GranteeListStruct) Remove(keysToRemove []*ecdsa.PublicKey) error {
+	grantees := g.Deserialize(g.grantees)
+	if grantees == nil {
+		return fmt.Errorf("no grantee found")
+	}
 
-func (g *GranteeListStruct) Remove(topic string, removeList []*ecdsa.PublicKey) error {
-	for _, remove := range removeList {
-		for i, grantee := range g.grantees[topic] {
-			if *grantee == *remove {
-				g.grantees[topic][i] = g.grantees[topic][len(g.grantees[topic])-1]
-				g.grantees[topic] = g.grantees[topic][:len(g.grantees[topic])-1]
+	for _, remove := range keysToRemove {
+		for i, grantee := range grantees {
+			if grantee.Equal(remove) {
+				grantees[i] = grantees[len(grantees)-1]
+				grantees = grantees[:len(grantees)-1]
 			}
 		}
 	}
-
+	g.grantees = g.Serialize(grantees)
 	return nil
 }
 
-func NewGrantee() *GranteeListStruct {
-	return &GranteeListStruct{grantees: make(map[string][]*ecdsa.PublicKey)}
-}
+// TODO: retrun GrantList IF instead of GranteeListStructMock
+func NewGranteeList(ls file.LoadSaver, putter storer.PutterSession, reference swarm.Address) GranteeList {
+	var (
+		data []byte
+		err  error
+	)
+	if swarm.ZeroAddress.Equal(reference) || swarm.EmptyAddress.Equal(reference) {
+		data = []byte{}
+	} else {
+		data, err = ls.Load(context.Background(), reference.Bytes())
+	}
+	if err != nil {
+		return nil
+	}
 
-func (g *GranteeListStruct) Store() (swarm.Address, error) {
-	return swarm.EmptyAddress, nil
+	return &GranteeListStruct{
+		grantees: data,
+		loadSave: ls,
+		putter:   putter,
+	}
 }

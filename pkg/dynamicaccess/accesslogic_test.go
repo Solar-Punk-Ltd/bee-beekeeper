@@ -40,7 +40,7 @@ func generateFixPrivateKey(input int64) ecdsa.PrivateKey {
 }
 
 func TestDecryptRef_Success(t *testing.T) {
-	id0 := generateFixPrivateKey(0)
+	id0 := generateFixPrivateKey(1)
 	s := kvsmock.New()
 	al := setupAccessLogic2()
 	err := al.AddPublisher(s, &id0.PublicKey)
@@ -49,26 +49,17 @@ func TestDecryptRef_Success(t *testing.T) {
 	}
 
 	byteRef, _ := hex.DecodeString("39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559")
-
-	grantee := dynamicaccess.NewGrantee()
-	serializedPubs := grantee.Serialize([]*ecdsa.PublicKey{&id0.PublicKey})
-	// if err != nil {
-	// 	t.Errorf("Expected no error, got %v", err)
-	// }
-
-	deSerializedPubs := grantee.DeSerialize(serializedPubs)
-
 	expectedRef := swarm.NewAddress(byteRef)
 	t.Logf("encryptedRef: %s", expectedRef.String())
 
-	encryptedRef, err := al.EncryptRef(s, deSerializedPubs[0], expectedRef)
+	encryptedRef, err := al.EncryptRef(s, &id0.PublicKey, expectedRef)
 	t.Logf("encryptedRef: %s", encryptedRef.String())
 	if err != nil {
 		t.Errorf("There was an error while calling EncryptRef: ")
 		t.Error(err)
 	}
 
-	acutalRef, err := al.DecryptRef(s, encryptedRef, deSerializedPubs[0])
+	acutalRef, err := al.DecryptRef(s, encryptedRef, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("There was an error while calling Get: ")
 		t.Error(err)

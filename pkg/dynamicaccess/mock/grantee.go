@@ -7,34 +7,34 @@ import (
 )
 
 type GranteeListMock interface {
-	Add(topic string, addList []*ecdsa.PublicKey) error
-	Remove(topic string, removeList []*ecdsa.PublicKey) error
-	Get(topic string) []*ecdsa.PublicKey
+	Add(publicKeys []*ecdsa.PublicKey) error
+	Remove(removeList []*ecdsa.PublicKey) error
+	Get() []*ecdsa.PublicKey
 	Save() (swarm.Address, error)
 }
 
 type GranteeListStructMock struct {
-	grantees map[string][]*ecdsa.PublicKey
+	grantees []*ecdsa.PublicKey
 }
 
-func (g *GranteeListStructMock) Get(topic string) []*ecdsa.PublicKey {
-	grantees := g.grantees[topic]
+func (g *GranteeListStructMock) Get() []*ecdsa.PublicKey {
+	grantees := g.grantees
 	keys := make([]*ecdsa.PublicKey, len(grantees))
 	copy(keys, grantees)
 	return keys
 }
 
-func (g *GranteeListStructMock) Add(topic string, addList []*ecdsa.PublicKey) error {
-	g.grantees[topic] = append(g.grantees[topic], addList...)
+func (g *GranteeListStructMock) Add(addList []*ecdsa.PublicKey) error {
+	g.grantees = append(g.grantees, addList...)
 	return nil
 }
 
-func (g *GranteeListStructMock) Remove(topic string, removeList []*ecdsa.PublicKey) error {
+func (g *GranteeListStructMock) Remove(removeList []*ecdsa.PublicKey) error {
 	for _, remove := range removeList {
-		for i, grantee := range g.grantees[topic] {
+		for i, grantee := range g.grantees {
 			if *grantee == *remove {
-				g.grantees[topic][i] = g.grantees[topic][len(g.grantees[topic])-1]
-				g.grantees[topic] = g.grantees[topic][:len(g.grantees[topic])-1]
+				g.grantees[i] = g.grantees[len(g.grantees)-1]
+				g.grantees = g.grantees[:len(g.grantees)-1]
 			}
 		}
 	}
@@ -46,6 +46,6 @@ func (g *GranteeListStructMock) Save() (swarm.Address, error) {
 	return swarm.EmptyAddress, nil
 }
 
-func NewGrantee() *GranteeListStructMock {
-	return &GranteeListStructMock{grantees: make(map[string][]*ecdsa.PublicKey)}
+func NewGranteeList() *GranteeListStructMock {
+	return &GranteeListStructMock{grantees: []*ecdsa.PublicKey{}}
 }

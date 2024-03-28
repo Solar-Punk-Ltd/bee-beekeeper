@@ -3,6 +3,7 @@ package dynamicaccess
 import (
 	"crypto/ecdsa"
 
+	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
 	"github.com/ethersphere/bee/pkg/kvs"
 	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
@@ -40,7 +41,7 @@ type Controller interface {
 type controller struct {
 	history     History
 	accessLogic ActLogic
-	granteeList *GranteeListStruct
+	granteeList *mock.GranteeListStructMock
 	//[ ]: do we need to protect this with a mutex?
 	revokeFlag []swarm.Address
 }
@@ -67,21 +68,21 @@ func (c *controller) UploadHandler(ref swarm.Address, publisher *ecdsa.PublicKey
 
 func NewController(history History, accessLogic ActLogic) Controller {
 	return &controller{
-		granteeList: NewGrantee(),
+		granteeList: mock.NewGranteeList(),
 		history:     history,
 		accessLogic: accessLogic,
 	}
 }
 
 func (c *controller) Grant(granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error {
-	return c.granteeList.Add(topic, []*ecdsa.PublicKey{grantee})
+	return c.granteeList.Add([]*ecdsa.PublicKey{grantee})
 }
 
 func (c *controller) Revoke(granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error {
 	if !c.isRevokeFlagged(granteesAddress) {
 		c.setRevokeFlag(granteesAddress, true)
 	}
-	return c.granteeList.Remove(topic, []*ecdsa.PublicKey{grantee})
+	return c.granteeList.Remove([]*ecdsa.PublicKey{grantee})
 }
 
 func (c *controller) Commit(granteesAddress swarm.Address, actRootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
@@ -94,13 +95,13 @@ func (c *controller) Commit(granteesAddress swarm.Address, actRootHash swarm.Add
 		act = kvsmock.NewReference(actRootHash)
 	}
 
-	grantees := c.granteeList.Get(topic)
+	grantees := c.granteeList.Get()
 	for _, grantee := range grantees {
 		c.accessLogic.AddGrantee(act, publisher, grantee, nil)
 	}
 
 	//HACK: Store not implemented
-	granteeref, err := c.granteeList.Store()
+	granteeref, err := c.granteeList.Save()
 	if err != nil {
 		return swarm.EmptyAddress, swarm.EmptyAddress, err
 	}
@@ -128,7 +129,7 @@ func (c *controller) HandleGrantees(granteesAddress swarm.Address, publisher *ec
 func (c *controller) GetGrantees(granteeRootHash swarm.Address) ([]*ecdsa.PublicKey, error) {
 	//[ ]: grantee list address deterministic or stored?
 	// grateeListAddress, _ := hash(append([]byte(topic), []byte("grantee")...))
-	return c.granteeList.Get(topic), nil
+	return c.granteeList.Get(), nil
 }
 
 func (c *controller) isRevokeFlagged(granteeRootHash swarm.Address) bool {
