@@ -15,11 +15,12 @@ import (
 )
 
 type History interface {
-	Add(ctx context.Context, actRef swarm.Address) error
-	Lookup(timestamp string) (swarm.Address, error)
+	Add(ctx context.Context, actRef swarm.Address, timestamp *int64) error
+	Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver) (swarm.Address, error)
+	Store(ctx context.Context) (swarm.Address, error)
 }
 
-// var _ History = (*history)(nil)
+var _ History = (*history)(nil)
 
 type history struct {
 	manifest *manifest.MantarayManifest
@@ -33,69 +34,92 @@ func NewHistory(ls file.LoadSaver) (*history, error) {
 
 	mm, ok := m.(*manifest.MantarayManifest)
 	if !ok {
-		return nil, fmt.Errorf("Expected MantarayManifest, got %T", m)
+		return nil, fmt.Errorf("expected MantarayManifest, got %T", m)
 	}
 
 	return &history{manifest: mm}, nil
 }
 
-func (h *history) Add(ctx context.Context, actRef swarm.Address) error {
+func (h *history) Manifest() *manifest.MantarayManifest {
+	return h.manifest
+}
+
+func (h *history) Add(ctx context.Context, actRef swarm.Address, timestamp *int64) error {
 	// Do we need any extra meta/act?
 	meta := map[string]string{}
 	// add timestamps transformed so that the latests timestamp becomes the smallest key
-	unixTime := time.Now().Unix()
+	var unixTime int64
+	if timestamp != nil {
+		unixTime = *timestamp
+	} else {
+		unixTime = time.Now().Unix()
+	}
 	key := strconv.FormatInt(math.MaxInt64-unixTime, 10)
 	return h.manifest.Add(ctx, key, manifest.NewEntry(actRef, meta))
 }
 
 // Lookup finds the entry for a path or returns error if not found
-func (h *history) Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver) swarm.Address {
-	node := h.LookupNode(ctx, timestamp, ls)
-	if node != nil {
-		return swarm.NewAddress(node.Entry())
+func (h *history) Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver) (swarm.Address, error) {
+	reversedTimestamp := math.MaxInt64 - timestamp
+	node, err := h.LookupNode(ctx, reversedTimestamp, ls)
+	if err != nil {
+		return swarm.Address{}, err
 	}
-	return swarm.Address{}
+
+	if node != nil {
+		return swarm.NewAddress(node.Entry()), nil
+	}
+
+	return swarm.Address{}, nil
 }
 
-func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64, ls file.LoadSaver) *mantaray.Node {
+func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64, ls file.LoadSaver) (*mantaray.Node, error) {
 	var node *mantaray.Node
 
-	walker := func(pathTimestamp []byte, walkedNode *mantaray.Node, err error) error {
+	walker := func(pathTimestamp []byte, currNode *mantaray.Node, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if walkedNode != nil {
+		if currNode.IsValueType() && len(currNode.Entry()) > 0 {
 			match, err := isMatch(pathTimestamp, searchedTimestamp)
 			if match {
-				node = walkedNode
+				node = currNode
 				// return error to stop the walk, this is how WalkNode works...
-				return errors.New("End iteration!")
+				return errors.New("end iteration")
 			}
+
 			return err
 		}
+
 		return nil
 	}
 
 	rootNode := h.manifest.Root()
-	node, err := rootNode.WalkNode(ctx, []byte{}, ls, walker)
-	if err != nil {
-		fmt.Errorf("History lookup node error: %w", err)
-		return nil
+	err := rootNode.WalkNode(ctx, []byte{}, ls, walker)
+
+	if node == nil && err != nil {
+		return nil, fmt.Errorf("history lookup node error: %w", err)
 	}
 
-	return node
+	return node, nil
 }
 
-func int64ToBytes(num int64) []byte {
-	return []byte(strconv.FormatInt(num, 10))
+func (h *history) Store(ctx context.Context) (swarm.Address, error) {
+	return h.manifest.Store(ctx)
 }
 
 func bytesToInt64(b []byte) (int64, error) {
+	if len(b) == 0 {
+		return math.MaxInt, nil
+
+	}
+
 	num, err := strconv.ParseInt(string(b), 10, 64)
 	if err != nil {
 		return -1, err
 	}
+
 	return num, nil
 }
 
@@ -104,5 +128,5 @@ func isMatch(pathTimestamp []byte, searchedTimestamp int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return searchedTimestamp >= targetTimestamp, nil
+	return searchedTimestamp <= targetTimestamp, nil
 }

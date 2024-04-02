@@ -1,58 +1,82 @@
 package dynamicaccess_test
 
 import (
-	"encoding/hex"
+	"context"
 	"testing"
 	"time"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
-	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
+	"github.com/ethersphere/bee/pkg/file/loadsave"
+	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
+	"github.com/ethersphere/bee/pkg/swarm"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHistoryLookup(t *testing.T) {
-	h := prepareTestHistory()
-	now := time.Now()
+func TestHistoryAdd(t *testing.T) {
+	h, err := dynamicaccess.NewHistory(nil)
+	assert.NoError(t, err)
 
-	tests := []struct {
-		input    int64
-		expected string
-	}{
-		{input: 0, expected: "value3"},
-		{input: now.Unix(), expected: "value3"},
-		{input: now.AddDate(0, -5, 0).Unix(), expected: "value3"},
-		{input: now.AddDate(0, -6, 0).Unix(), expected: "value3"},
-		{input: now.AddDate(-1, 0, 0).Unix(), expected: "value3"},
-		{input: now.AddDate(-1, -6, 0).Unix(), expected: "value2"},
-		{input: now.AddDate(-2, -0, 0).Unix(), expected: "value2"},
-		{input: now.AddDate(-2, -6, 0).Unix(), expected: "value1"},
-		{input: now.AddDate(-3, -0, 0).Unix(), expected: "value1"},
-	}
+	addr := swarm.NewAddress([]byte("addr"))
 
-	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
-			actAt, _ := h.Lookup(tt.input)
-			output := actAt.Get([]byte("key1"))
-			assert.Equal(t, output, hex.EncodeToString([]byte(tt.expected)))
-		})
-	}
+	ctx := context.Background()
+
+	err = h.Add(ctx, addr, nil)
+	assert.NoError(t, err)
 }
 
-func prepareTestHistory() dynamicaccess.History {
-	var (
-		h    = mock.NewHistory()
-		now  = time.Now()
-		act1 = dynamicaccess.NewDefaultAct()
-		act2 = dynamicaccess.NewDefaultAct()
-		act3 = dynamicaccess.NewDefaultAct()
-	)
-	act1.Add([]byte("key1"), []byte("value1"))
-	act2.Add([]byte("key1"), []byte("value2"))
-	act3.Add([]byte("key1"), []byte("value3"))
+func TestSingleNodeHistoryLookup(t *testing.T) {
+	storer := mockstorer.New()
+	ctx := context.Background()
+	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, 0))
 
-	h.Insert(now.AddDate(-3, 0, 0).Unix(), act1)
-	h.Insert(now.AddDate(-2, 0, 0).Unix(), act2)
-	h.Insert(now.AddDate(-1, 0, 0).Unix(), act3)
+	h, err := dynamicaccess.NewHistory(ls)
+	assert.NoError(t, err)
 
-	return h
+	testActRef := swarm.RandAddress(t)
+	err = h.Add(ctx, testActRef, nil)
+	assert.NoError(t, err)
+
+	_, err = h.Store(ctx)
+	assert.NoError(t, err)
+
+	searchedTime := time.Now().Unix()
+	actRef, err := h.Lookup(ctx, searchedTime, ls)
+	assert.NoError(t, err)
+	assert.True(t, actRef.Equal(testActRef))
+}
+
+func TestMultiNodeHistoryLookup(t *testing.T) {
+	storer := mockstorer.New()
+	ctx := context.Background()
+	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, 0))
+
+	h, _ := dynamicaccess.NewHistory(ls)
+
+	testActRef1 := swarm.RandAddress(t)
+	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
+	h.Add(ctx, testActRef1, &firstTime)
+
+	testActRef2 := swarm.RandAddress(t)
+	secondTime := time.Date(2000, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
+	h.Add(ctx, testActRef2, &secondTime)
+
+	testActRef3 := swarm.RandAddress(t)
+	thirdTime := time.Date(2015, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
+	h.Add(ctx, testActRef3, &thirdTime)
+
+	testActRef4 := swarm.RandAddress(t)
+	fourthTime := time.Date(2020, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
+	h.Add(ctx, testActRef4, &fourthTime)
+
+	testActRef5 := swarm.RandAddress(t)
+	fifthTime := time.Date(2030, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
+	h.Add(ctx, testActRef5, &fifthTime)
+
+	_, err := h.Store(ctx)
+	assert.NoError(t, err)
+
+	searchedTime := time.Date(2016, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
+	actRef, err := h.Lookup(ctx, searchedTime, ls)
+	assert.NoError(t, err)
+	assert.True(t, actRef.Equal(testActRef3))
 }
