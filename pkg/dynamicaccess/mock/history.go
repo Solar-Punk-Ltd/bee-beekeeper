@@ -5,10 +5,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ethersphere/bee/pkg/crypto"
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/feeds"
-	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
 )
 
@@ -67,24 +65,4 @@ type updater struct {
 
 func (f *finder) At(ctx context.Context, at int64, after uint64) (chunk swarm.Chunk, currentIndex, nextIndex feeds.Index, err error) {
 	return nil, nil, nil, nil
-}
-
-func HistoryFinder(getter storage.Getter, feed *feeds.Feed) feeds.Lookup {
-	return &finder{feeds.NewGetter(getter, feed)}
-}
-
-func (u *updater) Update(ctx context.Context, at int64, payload []byte) error {
-	return nil
-}
-
-func (u *updater) Feed() *feeds.Feed {
-	return nil
-}
-
-func HistoryUpdater(putter storage.Putter, signer crypto.Signer, topic []byte) (feeds.Updater, error) {
-	p, err := feeds.NewPutter(putter, signer, topic)
-	if err != nil {
-		return nil, err
-	}
-	return &updater{Putter: p}, nil
 }
