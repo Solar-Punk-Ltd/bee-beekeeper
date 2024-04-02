@@ -12,6 +12,7 @@ import (
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/dynamicaccess/mock"
 	"github.com/ethersphere/bee/pkg/encryption"
+	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
 	"golang.org/x/crypto/sha3"
 )
@@ -22,12 +23,10 @@ func mockTestHistory(key, val []byte) dynamicaccess.History {
 	var (
 		h   = mock.NewHistory()
 		now = time.Now()
-		act = mock.NewActMock(nil, func(lookupKey []byte) []byte {
-			return val
-		})
+		s   = kvsmock.New()
 	)
-	// act.Add(key, val)
-	h.Insert(now.AddDate(-3, 0, 0).Unix(), act)
+	_ = s.Put(key, val)
+	h.Insert(now.AddDate(-3, 0, 0).Unix(), s)
 	return h
 }
 
@@ -35,12 +34,12 @@ func TestDecrypt(t *testing.T) {
 	pk := getPrivateKey()
 	ak := encryption.Key([]byte("cica"))
 
-	dh := dynamicaccess.NewDiffieHellman(pk)
-	aek, _ := dh.SharedSecret(&pk.PublicKey, "", []byte{1})
-	e2 := encryption.New(aek, 0, uint32(0), hashFunc)
+	si := dynamicaccess.NewDefaultSession(pk)
+	aek, _ := si.Key(&pk.PublicKey, [][]byte{{0}, {1}})
+	e2 := encryption.New(aek[1], 0, uint32(0), hashFunc)
 	peak, _ := e2.Encrypt(ak)
 
-	h := mockTestHistory(nil, peak)
+	h := mockTestHistory(aek[0], peak)
 	al := setupAccessLogic(pk)
 	gm := dynamicaccess.NewGranteeManager(al)
 	c := dynamicaccess.NewController(h, gm, al)
@@ -61,12 +60,12 @@ func TestEncrypt(t *testing.T) {
 	pk := getPrivateKey()
 	ak := encryption.Key([]byte("cica"))
 
-	dh := dynamicaccess.NewDiffieHellman(pk)
-	aek, _ := dh.SharedSecret(&pk.PublicKey, "", []byte{1})
-	e2 := encryption.New(aek, 0, uint32(0), hashFunc)
+	si := dynamicaccess.NewDefaultSession(pk)
+	aek, _ := si.Key(&pk.PublicKey, [][]byte{{0}, {1}})
+	e2 := encryption.New(aek[1], 0, uint32(0), hashFunc)
 	peak, _ := e2.Encrypt(ak)
 
-	h := mockTestHistory(nil, peak)
+	h := mockTestHistory(aek[0], peak)
 	al := setupAccessLogic(pk)
 	gm := dynamicaccess.NewGranteeManager(al)
 	c := dynamicaccess.NewController(h, gm, al)

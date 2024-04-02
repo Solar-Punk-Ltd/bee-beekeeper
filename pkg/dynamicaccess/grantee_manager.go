@@ -1,11 +1,16 @@
 package dynamicaccess
 
-import "crypto/ecdsa"
+import (
+	"crypto/ecdsa"
+
+	"github.com/ethersphere/bee/pkg/kvs"
+	"github.com/ethersphere/bee/pkg/swarm"
+)
 
 type GranteeManager interface {
 	Get(topic string) []*ecdsa.PublicKey
 	Add(topic string, addList []*ecdsa.PublicKey) error
-	Publish(act Act, publisher ecdsa.PublicKey, topic string) Act
+	Publish(kvs kvs.KeyValueStore, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error)
 
 	// HandleGrantees(topic string, addList, removeList []*ecdsa.PublicKey) *Act
 
@@ -16,26 +21,26 @@ type GranteeManager interface {
 var _ GranteeManager = (*granteeManager)(nil)
 
 type granteeManager struct {
-	accessLogic AccessLogic
-	granteeList Grantee
+	accessLogic ActLogic
+	granteeList GranteeList
 }
 
-func NewGranteeManager(al AccessLogic) *granteeManager {
+func NewGranteeManager(al ActLogic) *granteeManager {
 	return &granteeManager{accessLogic: al, granteeList: NewGrantee()}
 }
 
 func (gm *granteeManager) Get(topic string) []*ecdsa.PublicKey {
-	return gm.granteeList.GetGrantees(topic)
+	return gm.granteeList.Get(topic)
 }
 
 func (gm *granteeManager) Add(topic string, addList []*ecdsa.PublicKey) error {
-	return gm.granteeList.AddGrantees(topic, addList)
+	return gm.granteeList.Add(topic, addList)
 }
 
-func (gm *granteeManager) Publish(act Act, publisher ecdsa.PublicKey, topic string) Act {
-	gm.accessLogic.AddPublisher(act, publisher, "")
-	for _, grantee := range gm.granteeList.GetGrantees(topic) {
-		gm.accessLogic.Add_New_Grantee_To_Content(act, publisher, *grantee)
+func (gm *granteeManager) Publish(kvs kvs.KeyValueStore, publisher *ecdsa.PublicKey, topic string) (swarm.Address, error) {
+	err := gm.accessLogic.AddPublisher(kvs, publisher)
+	for _, grantee := range gm.granteeList.Get(topic) {
+		err = gm.accessLogic.AddGrantee(kvs, publisher, grantee, nil)
 	}
-	return act
+	return swarm.EmptyAddress, err
 }

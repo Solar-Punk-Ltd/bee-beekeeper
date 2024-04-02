@@ -4,148 +4,143 @@ import (
 	"crypto/ecdsa"
 
 	encryption "github.com/ethersphere/bee/pkg/encryption"
+	"github.com/ethersphere/bee/pkg/kvs"
 	"github.com/ethersphere/bee/pkg/swarm"
 	"golang.org/x/crypto/sha3"
 )
 
 var hashFunc = sha3.NewLegacyKeccak256
 
-type AccessLogic interface {
-	Get(act Act, encryped_ref swarm.Address, publisher ecdsa.PublicKey, tag string) (swarm.Address, error)
-	EncryptRef(act Act, publisherPubKey ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
-	//Add(act *Act, ref string, publisher ecdsa.PublicKey, tag string) (string, error)
-	getLookUpKey(publisher ecdsa.PublicKey, tag string) ([]byte, error)
-	getAccessKeyDecriptionKey(publisher ecdsa.PublicKey, tag string) ([]byte, error)
-	getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, error)
-	//createEncryptedAccessKey(ref string)
-	Add_New_Grantee_To_Content(act Act, publisherPubKey, granteePubKey ecdsa.PublicKey) (Act, error)
-	AddPublisher(act Act, publisher ecdsa.PublicKey, tag string) (Act, error)
-	// CreateAccessKey()
+// Read-only interface for the ACT
+type Decryptor interface {
+	// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
+	DecryptRef(storage kvs.KeyValueStore, encryptedRef swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
+	// Embedding the Session interface
+	Session
 }
 
-type DefaultAccessLogic struct {
-	diffieHellman DiffieHellman
-	//encryption    encryption.Interface
+// Control interface for the ACT (does write operations)
+type Control interface {
+	// Embedding the Decryptor interface
+	Decryptor
+	// Adds a new grantee to the ACT
+	AddGrantee(storage kvs.KeyValueStore, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKey *encryption.Key) error
+	// Encrypts a Swarm reference for a given grantee
+	EncryptRef(storage kvs.KeyValueStore, grantee *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
 }
 
-// Will create a new Act list with only one element (the creator), and will also create encrypted_ref
-func (al *DefaultAccessLogic) AddPublisher(act Act, publisher ecdsa.PublicKey, tag string) (Act, error) {
-	access_key := encryption.GenerateRandomKey(encryption.KeyLength)
-
-	lookup_key, _ := al.getLookUpKey(publisher, "")
-	access_key_encryption_key, _ := al.getAccessKeyDecriptionKey(publisher, "")
-
-	access_key_cipher := encryption.New(encryption.Key(access_key_encryption_key), 0, uint32(0), hashFunc)
-	encrypted_access_key, _ := access_key_cipher.Encrypt(access_key)
-
-	act.Add(lookup_key, encrypted_access_key)
-
-	return act, nil
+type ActLogic struct {
+	Session
 }
 
-func (al *DefaultAccessLogic) EncryptRef(act Act, publisherPubKey ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
-	access_key := al.getAccessKey(act, publisherPubKey)
-	ref_cipher := encryption.New(access_key, 0, uint32(0), hashFunc)
-	encrypted_ref, _ := ref_cipher.Encrypt(ref.Bytes())
-	return swarm.NewAddress(encrypted_ref), nil
+var _ Control = (*ActLogic)(nil)
+
+// Adds a new publisher to an empty act
+func (al ActLogic) AddPublisher(storage kvs.KeyValueStore, publisher *ecdsa.PublicKey) error {
+	accessKey := encryption.GenerateRandomKey(encryption.KeyLength)
+
+	return al.AddGrantee(storage, publisher, publisher, &accessKey)
 }
 
-// publisher is public key
-func (al *DefaultAccessLogic) Add_New_Grantee_To_Content(act Act, publisherPubKey, granteePubKey ecdsa.PublicKey) (Act, error) {
+// Encrypts a SWARM reference for a publisher
+func (al ActLogic) EncryptRef(storage kvs.KeyValueStore, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
+	accessKey, err := al.getAccessKey(storage, publisherPubKey)
+	if err != nil {
+		return swarm.EmptyAddress, err
+	}
+	refCipher := encryption.New(accessKey, 0, uint32(0), hashFunc)
+	encryptedRef, _ := refCipher.Encrypt(ref.Bytes())
 
-	// error handling no encrypted_ref
+	return swarm.NewAddress(encryptedRef), nil
+}
 
-	// 2 Diffie-Hellman for the publisher (the Creator)
-	// Get previously generated access key
-	access_key := al.getAccessKey(act, publisherPubKey)
+// Adds a new grantee to the ACT
+func (al ActLogic) AddGrantee(storage kvs.KeyValueStore, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKeyPointer *encryption.Key) error {
+	var accessKey encryption.Key
+	var err error // Declare the "err" variable
 
-	// --Encrypt access key for new Grantee--
-
-	// 2 Diffie-Hellman for the Grantee
-	lookup_key, _ := al.getLookUpKey(granteePubKey, "")
-	access_key_encryption_key, _ := al.getAccessKeyDecriptionKey(granteePubKey, "")
+	if accessKeyPointer == nil {
+		// Get previously generated access key
+		accessKey, err = al.getAccessKey(storage, publisherPubKey)
+		if err != nil {
+			return err
+		}
+	} else {
+		// This is a newly created access key, because grantee is publisher (they are the same)
+		accessKey = *accessKeyPointer
+	}
 
 	// Encrypt the access key for the new Grantee
-	cipher := encryption.New(encryption.Key(access_key_encryption_key), 0, uint32(0), hashFunc)
-	granteeEncryptedAccessKey, _ := cipher.Encrypt(access_key)
+	keys, err := al.getKeys(granteePubKey)
+	if err != nil {
+		return err
+	}
+	lookupKey := keys[0]
+	accessKeyEncryptionKey := keys[1]
+
+	// Encrypt the access key for the new Grantee
+	cipher := encryption.New(encryption.Key(accessKeyEncryptionKey), 0, uint32(0), hashFunc)
+	granteeEncryptedAccessKey, err := cipher.Encrypt(accessKey)
+	if err != nil {
+		return err
+	}
+
 	// Add the new encrypted access key for the Act
-	act.Add(lookup_key, granteeEncryptedAccessKey)
-
-	return act, nil
-
+	return storage.Put(lookupKey, granteeEncryptedAccessKey)
 }
 
-func (al *DefaultAccessLogic) getAccessKey(act Act, publisherPubKey ecdsa.PublicKey) []byte {
-	publisher_lookup_key, _ := al.getLookUpKey(publisherPubKey, "")
-	publisher_ak_decryption_key, _ := al.getAccessKeyDecriptionKey(publisherPubKey, "")
-
-	access_key_decryption_cipher := encryption.New(encryption.Key(publisher_ak_decryption_key), 0, uint32(0), hashFunc)
-	encrypted_ak, _ := al.getEncryptedAccessKey(act, publisher_lookup_key)
-	access_key, _ := access_key_decryption_cipher.Decrypt(encrypted_ak)
-	return access_key
-}
-
-//
-// act[lookupKey] := valamilyen_cipher.Encrypt(access_key)
-
-// end of pseudo code like code
-
-// func (al *DefaultAccessLogic) CreateAccessKey(reference string) {
-// }
-
-func (al *DefaultAccessLogic) getLookUpKey(publisher ecdsa.PublicKey, tag string) ([]byte, error) {
-	zeroByteArray := []byte{0}
-	// Generate lookup key using Diffie Hellman
-	lookup_key, err := al.diffieHellman.SharedSecret(&publisher, tag, zeroByteArray)
+// Will return the access key for a publisher (public key)
+func (al *ActLogic) getAccessKey(storage kvs.KeyValueStore, publisherPubKey *ecdsa.PublicKey) ([]byte, error) {
+	keys, err := al.getKeys(publisherPubKey)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
-	return lookup_key, nil
-
-}
-
-func (al *DefaultAccessLogic) getAccessKeyDecriptionKey(publisher ecdsa.PublicKey, tag string) ([]byte, error) {
-	oneByteArray := []byte{1}
-	// Generate access key decryption key using Diffie Hellman
-	access_key_decryption_key, err := al.diffieHellman.SharedSecret(&publisher, tag, oneByteArray)
+	publisherLookupKey := keys[0]
+	publisherAKDecryptionKey := keys[1]
+	// no need to constructor call if value not found in act
+	accessKeyDecryptionCipher := encryption.New(encryption.Key(publisherAKDecryptionKey), 0, uint32(0), hashFunc)
+	encryptedAK, err := storage.Get(publisherLookupKey)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
-	return access_key_decryption_key, nil
+
+	return accessKeyDecryptionCipher.Decrypt(encryptedAK)
+
 }
 
-func (al *DefaultAccessLogic) getEncryptedAccessKey(act Act, lookup_key []byte) ([]byte, error) {
-	return act.Get(lookup_key), nil
+var oneByteArray = []byte{1}
+var zeroByteArray = []byte{0}
+
+// Generate lookup key and access key decryption key for a given public key
+func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
+	return al.Session.Key(publicKey, [][]byte{zeroByteArray, oneByteArray})
 }
 
-func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, publisher ecdsa.PublicKey, tag string) (swarm.Address, error) {
-
-	lookup_key, err := al.getLookUpKey(publisher, tag)
+// DecryptRef will return a decrypted reference, for given encrypted reference and publisher
+func (al ActLogic) DecryptRef(storage kvs.KeyValueStore, encryptedRef swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error) {
+	keys, err := al.getKeys(publisher)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
-	access_key_decryption_key, err := al.getAccessKeyDecriptionKey(publisher, tag)
-	if err != nil {
-		return swarm.EmptyAddress, err
-	}
+	lookupKey := keys[0]
+	accessKeyDecryptionKey := keys[1]
 
 	// Lookup encrypted access key from the ACT manifest
-
-	encrypted_access_key, err := al.getEncryptedAccessKey(act, lookup_key)
+	encryptedAccessKey, err := storage.Get(lookupKey)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
 
 	// Decrypt access key
-	access_key_cipher := encryption.New(encryption.Key(access_key_decryption_key), 0, uint32(0), hashFunc)
-	access_key, err := access_key_cipher.Decrypt(encrypted_access_key)
+	accessKeyCipher := encryption.New(encryption.Key(accessKeyDecryptionKey), 0, uint32(0), hashFunc)
+	accessKey, err := accessKeyCipher.Decrypt(encryptedAccessKey)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
 
 	// Decrypt reference
-	ref_cipher := encryption.New(access_key, 0, uint32(0), hashFunc)
-	ref, err := ref_cipher.Decrypt(encryped_ref.Bytes())
+	refCipher := encryption.New(accessKey, 0, uint32(0), hashFunc)
+	ref, err := refCipher.Decrypt(encryptedRef.Bytes())
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
@@ -153,18 +148,8 @@ func (al *DefaultAccessLogic) Get(act Act, encryped_ref swarm.Address, publisher
 	return swarm.NewAddress(ref), nil
 }
 
-func NewAccessLogic(diffieHellman DiffieHellman) AccessLogic {
-	return &DefaultAccessLogic{
-		diffieHellman: diffieHellman,
+func NewLogic(S Session) ActLogic {
+	return ActLogic{
+		Session: S,
 	}
 }
-
-// -------
-// act: &mock.ContainerMock{
-// 	AddFunc: func(ref string, publisher string, tag string) error {
-// 		return nil
-// 	},
-// 	GetFunc: func(ref string, publisher string, tag string) (string, error) {
-// 		return "", nil
-// 	},
-// },

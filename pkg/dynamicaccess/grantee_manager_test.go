@@ -8,21 +8,17 @@ import (
 	"testing"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
+	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
 )
 
-func setupAccessLogic(privateKey *ecdsa.PrivateKey) dynamicaccess.AccessLogic {
-	// privateKey, err := crypto.GenerateSecp256k1Key()
-	// if err != nil {
-	// 	errors.New("error creating private key")
-	// }
-	diffieHellman := dynamicaccess.NewDiffieHellman(privateKey)
-	al := dynamicaccess.NewAccessLogic(diffieHellman)
+func setupAccessLogic(privateKey *ecdsa.PrivateKey) dynamicaccess.ActLogic {
+	si := dynamicaccess.NewDefaultSession(privateKey)
+	al := dynamicaccess.NewLogic(si)
 
 	return al
 }
 
 func TestAdd(t *testing.T) {
-	act := dynamicaccess.NewDefaultAct()
 	m := dynamicaccess.NewGranteeManager(setupAccessLogic(getPrivateKey()))
 	pub, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
@@ -36,6 +32,7 @@ func TestAdd(t *testing.T) {
 	if err != nil {
 		t.Errorf("Add() returned an error")
 	}
-	m.Publish(act, pub.PublicKey, "topic")
+	s := kvsmock.New()
+	m.Publish(s, &pub.PublicKey, "topic")
 	fmt.Println("")
 }

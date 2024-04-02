@@ -4,54 +4,41 @@ import (
 	"crypto/ecdsa"
 )
 
-type Grantee interface {
-	//? ÁTBESZÉLNI
-	// Revoke(topic string) error
-	// Publish(topic string) error
-
-	// RevokeList(topic string, removeList []string, addList []string) (string, error)
-	// RevokeGrantees(topic string, removeList []string) (string, error)
-	AddGrantees(topic string, addList []*ecdsa.PublicKey) error
-	RemoveGrantees(topic string, removeList []*ecdsa.PublicKey) error
-	GetGrantees(topic string) []*ecdsa.PublicKey
+type GranteeList interface {
+	Add(topic string, addList []*ecdsa.PublicKey) error
+	Remove(topic string, removeList []*ecdsa.PublicKey) error
+	Get(topic string) []*ecdsa.PublicKey
 }
 
-type defaultGrantee struct {
-	grantees map[string][]*ecdsa.PublicKey // Modified field name to start with an uppercase letter
+type GranteeListStruct struct {
+	grantees map[string][]*ecdsa.PublicKey
 }
 
-func (g *defaultGrantee) GetGrantees(topic string) []*ecdsa.PublicKey {
-	return g.grantees[topic]
+func (g *GranteeListStruct) Get(topic string) []*ecdsa.PublicKey {
+	grantees := g.grantees[topic]
+	keys := make([]*ecdsa.PublicKey, len(grantees))
+	copy(keys, grantees)
+	return keys
 }
 
-// func (g *defaultGrantee) Revoke(topic string) error {
-// 	return nil
-// }
-
-// func (g *defaultGrantee) RevokeList(topic string, removeList []string, addList []string) (string, error) {
-// 	return "", nil
-// }
-
-// func (g *defaultGrantee) Publish(topic string) error {
-// 	return nil
-// }
-
-func (g *defaultGrantee) AddGrantees(topic string, addList []*ecdsa.PublicKey) error {
+func (g *GranteeListStruct) Add(topic string, addList []*ecdsa.PublicKey) error {
 	g.grantees[topic] = append(g.grantees[topic], addList...)
 	return nil
 }
 
-func (g *defaultGrantee) RemoveGrantees(topic string, removeList []*ecdsa.PublicKey) error {
+func (g *GranteeListStruct) Remove(topic string, removeList []*ecdsa.PublicKey) error {
 	for _, remove := range removeList {
 		for i, grantee := range g.grantees[topic] {
-			if grantee == remove {
-				g.grantees[topic] = append(g.grantees[topic][:i], g.grantees[topic][i+1:]...)
+			if *grantee == *remove {
+				g.grantees[topic][i] = g.grantees[topic][len(g.grantees[topic])-1]
+				g.grantees[topic] = g.grantees[topic][:len(g.grantees[topic])-1]
 			}
 		}
 	}
+
 	return nil
 }
 
-func NewGrantee() Grantee {
-	return &defaultGrantee{grantees: make(map[string][]*ecdsa.PublicKey)}
+func NewGrantee() *GranteeListStruct {
+	return &GranteeListStruct{grantees: make(map[string][]*ecdsa.PublicKey)}
 }
