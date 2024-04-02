@@ -31,54 +31,7 @@ func createLs() file.LoadSaver {
 	return loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
 }
 
-// func TestGranteeKeySerialization(t *testing.T) {
-// 	putter := mockStorer.DirectUpload()
-// 	grantee := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
-
-// 	key1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-// 	if err != nil {
-// 		t.Errorf("Expected no error, got %v", err)
-// 	}
-
-// 	serializedPub := grantee.SerializePublicKey(&key1.PublicKey)
-// 	if err != nil {
-// 		t.Errorf("Expected no error, got %v", err)
-// 	}
-
-// 	deSerializedPub := grantee.DeserializeBytes(serializedPub)
-// 	if !key1.PublicKey.Equal(deSerializedPub) {
-// 		t.Errorf("Expected key1.PublicKey.X %v, got %v", &key1.PublicKey.X, &deSerializedPub.X)
-// 	}
-// }
-
-// func TestGranteeListSerialization(t *testing.T) {
-// 	putter := mockStorer.DirectUpload()
-// 	grantee := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
-
-// 	key1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-// 	if err != nil {
-// 		t.Errorf("Expected no error, got %v", err)
-// 	}
-
-// 	key2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-// 	if err != nil {
-// 		t.Errorf("Expected no error, got %v", err)
-// 	}
-
-// 	gl := []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}
-
-// 	serializedPubs := grantee.Serialize(gl)
-
-// 	deSerializedPubs := grantee.Deserialize(serializedPubs)
-// 	if !key1.PublicKey.Equal(deSerializedPubs[0]) {
-// 		t.Errorf("Expected key1.PublicKey.X %v, got %v", &key1.PublicKey.X, &deSerializedPubs[0].X)
-// 	}
-// 	if !key2.PublicKey.Equal(deSerializedPubs[1]) {
-// 		t.Errorf("Expected key1.PublicKey.X %v, got %v", &key1.PublicKey.X, &deSerializedPubs[1].X)
-// 	}
-// }
-
-func TestGranteeAddGrantees(t *testing.T) {
+func TestGranteeAdd(t *testing.T) {
 	putter := mockStorer.DirectUpload()
 	grantee := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
 
@@ -100,12 +53,11 @@ func TestGranteeAddGrantees(t *testing.T) {
 
 	grantees := grantee.Get()
 	if !reflect.DeepEqual(grantees, addList) {
-		t.Errorf("Expected grantees %v, got %v", addList, grantees)
+		t.Errorf("Expected grantees %v, got %v", *addList[0].X, *grantees[0].X)
 	}
 }
 
-// TODO: fix index out of range error
-func TestRemoveGrantees(t *testing.T) {
+func TestGranteeRemove(t *testing.T) {
 	putter := mockStorer.DirectUpload()
 	grantee := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
 
@@ -136,12 +88,12 @@ func TestRemoveGrantees(t *testing.T) {
 
 	for i, grantee := range grantees {
 		if !grantee.Equal(expectedGrantees[i]) {
-			t.Errorf("Expected grantee %v, got %v", &expectedGrantees[i].X, &grantee.X)
+			t.Errorf("Expected grantee %v, got %v", *expectedGrantees[i].X, *grantee.X)
 		}
 	}
 }
 
-func TestGetGrantees(t *testing.T) {
+func TestGranteeGet(t *testing.T) {
 	putter := mockStorer.DirectUpload()
 	grantee := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
 
@@ -164,7 +116,7 @@ func TestGetGrantees(t *testing.T) {
 	grantees := grantee.Get()
 	for i, grantee := range grantees {
 		if !grantee.Equal(addList[i]) {
-			t.Errorf("Expected grantee %v, got %v", &addList[i].X, &grantee.X)
+			t.Errorf("Expected grantee %v, got %v", *addList[i].X, *grantee.X)
 		}
 	}
 }
@@ -198,6 +150,6 @@ func TestGranteeSave(t *testing.T) {
 
 	grantees2 := grantee2.Get()
 	if !reflect.DeepEqual(grantees2, addList) {
-		t.Errorf("Expected grantees %v, got %v", addList, grantees2)
+		t.Errorf("Expected grantees %v, got %v", *addList[0].X, *grantees2[0].X)
 	}
 }
