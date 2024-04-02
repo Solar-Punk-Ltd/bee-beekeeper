@@ -75,8 +75,8 @@ func TestMultiNodeHistoryLookup(t *testing.T) {
 	_, err := h.Store(ctx)
 	assert.NoError(t, err)
 
-	searchedTime := time.Date(2016, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
+	searchedTime := time.Date(2021, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	actRef, err := h.Lookup(ctx, searchedTime, ls)
 	assert.NoError(t, err)
-	assert.True(t, actRef.Equal(testActRef3))
+	assert.True(t, actRef.Equal(testActRef4))
 }

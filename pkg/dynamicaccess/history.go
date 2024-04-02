@@ -54,6 +54,7 @@ func (h *history) Add(ctx context.Context, actRef swarm.Address, timestamp *int6
 	} else {
 		unixTime = time.Now().Unix()
 	}
+
 	key := strconv.FormatInt(math.MaxInt64-unixTime, 10)
 	return h.manifest.Add(ctx, key, manifest.NewEntry(actRef, meta))
 }
@@ -83,7 +84,7 @@ func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64, ls fi
 
 		if currNode.IsValueType() && len(currNode.Entry()) > 0 {
 			match, err := isMatch(pathTimestamp, searchedTimestamp)
-			if match {
+			if match && node == nil {
 				node = currNode
 				// return error to stop the walk, this is how WalkNode works...
 				return errors.New("end iteration")
