@@ -13,7 +13,7 @@ import (
 )
 
 func TestHistoryAdd(t *testing.T) {
-	h, err := dynamicaccess.NewHistory(nil)
+	h, err := dynamicaccess.NewHistory(nil, nil)
 	assert.NoError(t, err)
 
 	addr := swarm.NewAddress([]byte("addr"))
@@ -29,7 +29,7 @@ func TestSingleNodeHistoryLookup(t *testing.T) {
 	ctx := context.Background()
 	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, 0))
 
-	h, err := dynamicaccess.NewHistory(ls)
+	h, err := dynamicaccess.NewHistory(ls, nil)
 	assert.NoError(t, err)
 
 	testActRef := swarm.RandAddress(t)
@@ -50,7 +50,7 @@ func TestMultiNodeHistoryLookup(t *testing.T) {
 	ctx := context.Background()
 	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, 0))
 
-	h, _ := dynamicaccess.NewHistory(ls)
+	h, _ := dynamicaccess.NewHistory(ls, nil)
 
 	testActRef1 := swarm.RandAddress(t)
 	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()

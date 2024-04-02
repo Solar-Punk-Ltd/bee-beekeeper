@@ -26,8 +26,15 @@ type history struct {
 	manifest *manifest.MantarayManifest
 }
 
-func NewHistory(ls file.LoadSaver) (*history, error) {
-	m, err := manifest.NewDefaultManifest(ls, false)
+func NewHistory(ls file.LoadSaver, ref *swarm.Address) (*history, error) {
+	var err error
+	var m manifest.Interface
+
+	if ref != nil {
+		m, err = manifest.NewDefaultManifestReference(*ref, ls)
+	} else {
+		m, err = manifest.NewDefaultManifest(ls, false)
+	}
 	if err != nil {
 		return nil, err
 	}
