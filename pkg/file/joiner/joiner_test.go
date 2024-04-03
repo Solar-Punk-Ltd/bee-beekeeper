@@ -17,21 +17,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethersphere/bee/pkg/cac"
-	"github.com/ethersphere/bee/pkg/file/joiner"
-	"github.com/ethersphere/bee/pkg/file/pipeline/builder"
-	"github.com/ethersphere/bee/pkg/file/redundancy"
-	"github.com/ethersphere/bee/pkg/file/redundancy/getter"
-	"github.com/ethersphere/bee/pkg/file/splitter"
-	filetest "github.com/ethersphere/bee/pkg/file/testing"
-	storage "github.com/ethersphere/bee/pkg/storage"
-	"github.com/ethersphere/bee/pkg/storage/inmemchunkstore"
-	testingc "github.com/ethersphere/bee/pkg/storage/testing"
-	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
-	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/ethersphere/bee/pkg/util/testutil"
-	"github.com/ethersphere/bee/pkg/util/testutil/pseudorand"
-	"github.com/ethersphere/bee/pkg/util/testutil/racedetection"
+	"github.com/ethersphere/bee/v2/pkg/cac"
+	"github.com/ethersphere/bee/v2/pkg/file/joiner"
+	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy/getter"
+	"github.com/ethersphere/bee/v2/pkg/file/splitter"
+	filetest "github.com/ethersphere/bee/v2/pkg/file/testing"
+	"github.com/ethersphere/bee/v2/pkg/log"
+	storage "github.com/ethersphere/bee/v2/pkg/storage"
+	"github.com/ethersphere/bee/v2/pkg/storage/inmemchunkstore"
+	testingc "github.com/ethersphere/bee/v2/pkg/storage/testing"
+	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
+	"github.com/ethersphere/bee/v2/pkg/util/testutil"
+	"github.com/ethersphere/bee/v2/pkg/util/testutil/pseudorand"
 	"gitlab.com/nolash/go-mockbytes"
 	"golang.org/x/sync/errgroup"
 )
@@ -88,7 +88,7 @@ func TestJoinerSingleChunk(t *testing.T) {
 	}
 }
 
-// TestJoinerDecryptingStore_NormalChunk verifies the the mock store that uses
+// TestJoinerDecryptingStore_NormalChunk verifies the mock store that uses
 // the decrypting store manages to retrieve a normal chunk which is not encrypted
 func TestJoinerDecryptingStore_NormalChunk(t *testing.T) {
 	t.Parallel()
@@ -1109,12 +1109,19 @@ func TestJoinerRedundancy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			strategyTimeout := 100 * time.Millisecond
 			// all data can be read back
 			readCheck := func(t *testing.T, expErr error) {
-				ctx, cancel := context.WithTimeout(context.Background(), 15*strategyTimeout)
-				defer cancel()
-				ctx = getter.SetConfigInContext(ctx, getter.RACE, true, (10 * strategyTimeout).String(), strategyTimeout.String())
+				ctx := context.Background()
+
+				decodeTimeoutStr := time.Second.String()
+				fallback := true
+				s := getter.RACE
+
+				ctx, err := getter.SetConfigInContext(ctx, &s, &fallback, &decodeTimeoutStr, log.Noop)
+				if err != nil {
+					t.Fatal(err)
+				}
+
 				joinReader, rootSpan, err := joiner.New(ctx, store, store, swarmAddr)
 				if err != nil {
 					t.Fatal(err)
@@ -1159,14 +1166,14 @@ func TestJoinerRedundancy(t *testing.T) {
 				}
 			}
 			t.Run("no recovery possible with no chunk stored", func(t *testing.T) {
-				readCheck(t, context.DeadlineExceeded)
+				readCheck(t, storage.ErrNotFound)
 			})
 
 			if err := putter.store(shardCnt - 1); err != nil {
 				t.Fatal(err)
 			}
 			t.Run("no recovery possible with 1 short of shardCnt chunks stored", func(t *testing.T) {
-				readCheck(t, context.DeadlineExceeded)
+				readCheck(t, storage.ErrNotFound)
 			})
 
 			if err := putter.store(1); err != nil {
@@ -1220,7 +1227,7 @@ func TestJoinerRedundancy(t *testing.T) {
 // nolint:thelper
 func TestJoinerRedundancyMultilevel(t *testing.T) {
 	t.Parallel()
-	test := func(t *testing.T, rLevel redundancy.Level, encrypt bool, levels, size int) {
+	test := func(t *testing.T, rLevel redundancy.Level, encrypt bool, size int) {
 		t.Helper()
 		store := mockstorer.NewForgettingStore(inmemchunkstore.New())
 		testutil.CleanupCloser(t, store)
@@ -1240,16 +1247,16 @@ func TestJoinerRedundancyMultilevel(t *testing.T) {
 		expRead := swarm.ChunkSize
 		buf := make([]byte, expRead)
 		offset := mrand.Intn(size) * expRead
-		canReadRange := func(t *testing.T, s getter.Strategy, fallback bool, levels int, canRead bool) {
+		canReadRange := func(t *testing.T, s getter.Strategy, fallback bool, canRead bool) {
 			ctx := context.Background()
-			strategyTimeout := 100 * time.Millisecond
-			decodingTimeout := 600 * time.Millisecond
-			if racedetection.IsOn() {
-				decodingTimeout *= 2
+
+			decodingTimeoutStr := (200 * time.Millisecond).String()
+
+			ctx, err := getter.SetConfigInContext(ctx, &s, &fallback, &decodingTimeoutStr, log.Noop)
+			if err != nil {
+				t.Fatal(err)
 			}
-			ctx = getter.SetConfigInContext(ctx, s, fallback, (2 * strategyTimeout).String(), strategyTimeout.String())
-			ctx, cancel := context.WithTimeout(ctx, time.Duration(levels)*(3*strategyTimeout+decodingTimeout))
-			defer cancel()
+
 			j, _, err := joiner.New(ctx, store, store, addr)
 			if err != nil {
 				t.Fatal(err)
@@ -1280,39 +1287,39 @@ func TestJoinerRedundancyMultilevel(t *testing.T) {
 			}
 		}
 
-		// first sanity check and and recover a range
+		// first sanity check and recover a range
 		t.Run("NONE w/o fallback CAN retrieve", func(t *testing.T) {
 			store.Record()
 			defer store.Unrecord()
-			canReadRange(t, getter.NONE, false, levels, true)
+			canReadRange(t, getter.NONE, false, true)
 		})
 
 		// do not forget the root chunk
 		store.Unmiss(swarm.NewAddress(addr.Bytes()[:swarm.HashSize]))
 		// after we forget the chunks on the way to the range, we should not be able to retrieve
 		t.Run("NONE w/o fallback CANNOT retrieve", func(t *testing.T) {
-			canReadRange(t, getter.NONE, false, levels, false)
+			canReadRange(t, getter.NONE, false, false)
 		})
 
 		// we lost a data chunk, we cannot recover using DATA only strategy with no fallback
 		t.Run("DATA w/o fallback CANNOT retrieve", func(t *testing.T) {
-			canReadRange(t, getter.DATA, false, levels, false)
+			canReadRange(t, getter.DATA, false, false)
 		})
 
 		if rLevel == 0 {
 			// allowing fallback mode will not help if no redundancy used for upload
 			t.Run("DATA w fallback CANNOT retrieve", func(t *testing.T) {
-				canReadRange(t, getter.DATA, true, levels, false)
+				canReadRange(t, getter.DATA, true, false)
 			})
 			return
 		}
 		// allowing fallback mode will make the range retrievable using erasure decoding
 		t.Run("DATA w fallback CAN retrieve", func(t *testing.T) {
-			canReadRange(t, getter.DATA, true, levels, true)
+			canReadRange(t, getter.DATA, true, true)
 		})
 		// after the reconstructed data is stored, we can retrieve the range using DATA only mode
 		t.Run("after recovery, NONE w/o fallback CAN retrieve", func(t *testing.T) {
-			canReadRange(t, getter.NONE, false, levels, true)
+			canReadRange(t, getter.NONE, false, true)
 		})
 	}
 	r2level := []int{2, 1, 2, 3, 2}
@@ -1342,7 +1349,7 @@ func TestJoinerRedundancyMultilevel(t *testing.T) {
 						if r2level[rLevel] != levels || encrypt != encryptChunk[rLevel] {
 							t.Skip("skipping to save time")
 						}
-						test(t, rLevel, encrypt, levels, chunkCnt)
+						test(t, rLevel, encrypt, chunkCnt)
 					})
 					switch levels {
 					case 1:
@@ -1353,7 +1360,7 @@ func TestJoinerRedundancyMultilevel(t *testing.T) {
 						continue
 					}
 					t.Run(fmt.Sprintf("encrypt=%v levels=%d chunks=%d full", encrypt, levels, chunkCnt), func(t *testing.T) {
-						test(t, rLevel, encrypt, levels, chunkCnt)
+						test(t, rLevel, encrypt, chunkCnt)
 					})
 				}
 			}

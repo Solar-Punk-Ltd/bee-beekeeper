@@ -14,19 +14,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethersphere/bee/pkg/accounting"
-	"github.com/ethersphere/bee/pkg/cac"
-	"github.com/ethersphere/bee/pkg/log"
-	"github.com/ethersphere/bee/pkg/p2p"
-	"github.com/ethersphere/bee/pkg/p2p/protobuf"
-	"github.com/ethersphere/bee/pkg/pricer"
-	pb "github.com/ethersphere/bee/pkg/retrieval/pb"
-	"github.com/ethersphere/bee/pkg/skippeers"
-	"github.com/ethersphere/bee/pkg/soc"
-	storage "github.com/ethersphere/bee/pkg/storage"
-	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/ethersphere/bee/pkg/topology"
-	"github.com/ethersphere/bee/pkg/tracing"
+	"github.com/ethersphere/bee/v2/pkg/accounting"
+	"github.com/ethersphere/bee/v2/pkg/cac"
+	"github.com/ethersphere/bee/v2/pkg/log"
+	"github.com/ethersphere/bee/v2/pkg/p2p"
+	"github.com/ethersphere/bee/v2/pkg/p2p/protobuf"
+	"github.com/ethersphere/bee/v2/pkg/pricer"
+	pb "github.com/ethersphere/bee/v2/pkg/retrieval/pb"
+	"github.com/ethersphere/bee/v2/pkg/skippeers"
+	"github.com/ethersphere/bee/v2/pkg/soc"
+	storage "github.com/ethersphere/bee/v2/pkg/storage"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
+	"github.com/ethersphere/bee/v2/pkg/topology"
+	"github.com/ethersphere/bee/v2/pkg/tracing"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	olog "github.com/opentracing/opentracing-go/log"
@@ -122,7 +122,7 @@ func (s *Service) Protocol() p2p.ProtocolSpec {
 }
 
 const (
-	retrieveChunkTimeout = time.Second * 30
+	RetrieveChunkTimeout = time.Second * 30
 	preemptiveInterval   = time.Second
 	overDraftRefresh     = time.Millisecond * 600
 	skiplistDur          = time.Minute
@@ -320,7 +320,7 @@ func (s *Service) retrieveChunk(ctx context.Context, quit chan struct{}, chunkAd
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(ctx, retrieveChunkTimeout)
+	ctx, cancel := context.WithTimeout(ctx, RetrieveChunkTimeout)
 	defer cancel()
 
 	stream, err := s.streamer.NewStream(ctx, peer, nil, protocolName, protocolVersion, streamName)
@@ -425,7 +425,7 @@ func (s *Service) closestPeer(addr swarm.Address, skipPeers []swarm.Address, all
 }
 
 func (s *Service) handler(p2pctx context.Context, p p2p.Peer, stream p2p.Stream) (err error) {
-	ctx, cancel := context.WithTimeout(p2pctx, retrieveChunkTimeout)
+	ctx, cancel := context.WithTimeout(p2pctx, RetrieveChunkTimeout)
 	defer cancel()
 
 	w, r := protobuf.NewWriterAndReader(stream)

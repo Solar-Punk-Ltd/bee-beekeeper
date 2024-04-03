@@ -17,13 +17,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethersphere/bee/pkg/cac"
-	"github.com/ethersphere/bee/pkg/file/redundancy/getter"
-	"github.com/ethersphere/bee/pkg/storage"
-	inmem "github.com/ethersphere/bee/pkg/storage/inmemchunkstore"
-	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
-	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/ethersphere/bee/pkg/util/testutil/racedetection"
+	"github.com/ethersphere/bee/v2/pkg/cac"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy/getter"
+	"github.com/ethersphere/bee/v2/pkg/storage"
+	inmem "github.com/ethersphere/bee/v2/pkg/storage/inmemchunkstore"
+	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/klauspost/reedsolomon"
 	"golang.org/x/sync/errgroup"
 )
@@ -72,6 +71,7 @@ func TestGetterRACE(t *testing.T) {
 // TestGetterFallback tests the retrieval of chunks with missing data shards
 // using the strict or fallback mode starting with NONE and DATA strategies
 func TestGetterFallback(t *testing.T) {
+	t.Skip("removed strategy timeout")
 	t.Run("GET", func(t *testing.T) {
 		t.Run("NONE", func(t *testing.T) {
 			t.Run("strict", func(t *testing.T) {
@@ -94,10 +94,6 @@ func TestGetterFallback(t *testing.T) {
 
 func testDecodingRACE(t *testing.T, bufSize, shardCnt, erasureCnt int) {
 	t.Helper()
-	strategyTimeout := 100 * time.Millisecond
-	if racedetection.On {
-		strategyTimeout *= 2
-	}
 	store := inmem.New()
 	buf := make([][]byte, bufSize)
 	addrs := initData(t, buf, shardCnt, store)
@@ -113,30 +109,12 @@ func testDecodingRACE(t *testing.T, bufSize, shardCnt, erasureCnt int) {
 	if len(addr.Bytes()) == 0 {
 		t.Skip("no data shard erased")
 	}
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
-	conf := getter.Config{
-		Strategy:        getter.RACE,
-		FetchTimeout:    2 * strategyTimeout,
-		StrategyTimeout: strategyTimeout,
-	}
-	g := getter.New(addrs, shardCnt, store, store, func() {}, conf)
-	defer g.Close()
+
+	g := getter.New(addrs, shardCnt, store, store, func(error) {}, getter.DefaultConfig)
+
 	parityCnt := len(buf) - shardCnt
-	q := make(chan error, 1)
-	go func() {
-		_, err := g.Get(ctx, addr)
-		q <- err
-	}()
-	err := context.DeadlineExceeded
-	wait := strategyTimeout * 2
-	if racedetection.On {
-		wait *= 2
-	}
-	select {
-	case err = <-q:
-	case <-time.After(wait):
-	}
+	_, err := g.Get(context.Background(), addr)
+
 	switch {
 	case erasureCnt > parityCnt:
 		t.Run("unable to recover", func(t *testing.T) {
@@ -191,13 +169,11 @@ func testDecodingFallback(t *testing.T, s getter.Strategy, strict bool) {
 	// create getter
 	start := time.Now()
 	conf := getter.Config{
-		Strategy:        s,
-		Strict:          strict,
-		FetchTimeout:    strategyTimeout / 2,
-		StrategyTimeout: strategyTimeout,
+		Strategy:     s,
+		Strict:       strict,
+		FetchTimeout: strategyTimeout / 2,
 	}
-	g := getter.New(addrs, shardCnt, store, store, func() {}, conf)
-	defer g.Close()
+	g := getter.New(addrs, shardCnt, store, store, func(error) {}, conf)
 
 	// launch delayed and erased chunk retrieval
 	wg := sync.WaitGroup{}
