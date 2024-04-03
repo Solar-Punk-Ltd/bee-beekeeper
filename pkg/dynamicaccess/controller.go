@@ -1,6 +1,6 @@
 package dynamicaccess
 
-import (
+/* import (
 	"crypto/ecdsa"
 
 	kvsmock "github.com/ethersphere/bee/pkg/kvs/mock"
@@ -52,3 +52,4 @@ func NewController(history History, granteeManager GranteeManager, accessLogic A
 		accessLogic:    accessLogic,
 	}
 }
+*/

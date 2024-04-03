@@ -7,6 +7,9 @@ import (
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/pkg/file/loadsave"
+	"github.com/ethersphere/bee/pkg/file/pipeline"
+	"github.com/ethersphere/bee/pkg/file/pipeline/builder"
+	"github.com/ethersphere/bee/pkg/storage"
 	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +30,7 @@ func TestHistoryAdd(t *testing.T) {
 func TestSingleNodeHistoryLookup(t *testing.T) {
 	storer := mockstorer.New()
 	ctx := context.Background()
-	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, 0))
+	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false))
 
 	h, err := dynamicaccess.NewHistory(ls, nil)
 	assert.NoError(t, err)
@@ -48,27 +51,27 @@ func TestSingleNodeHistoryLookup(t *testing.T) {
 func TestMultiNodeHistoryLookup(t *testing.T) {
 	storer := mockstorer.New()
 	ctx := context.Background()
-	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, 0))
+	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false))
 
 	h, _ := dynamicaccess.NewHistory(ls, nil)
 
-	testActRef1 := swarm.RandAddress(t)
+	testActRef1 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd891"))
 	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	h.Add(ctx, testActRef1, &firstTime)
 
-	testActRef2 := swarm.RandAddress(t)
+	testActRef2 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd892"))
 	secondTime := time.Date(2000, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	h.Add(ctx, testActRef2, &secondTime)
 
-	testActRef3 := swarm.RandAddress(t)
+	testActRef3 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd893"))
 	thirdTime := time.Date(2015, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	h.Add(ctx, testActRef3, &thirdTime)
 
-	testActRef4 := swarm.RandAddress(t)
+	testActRef4 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd894"))
 	fourthTime := time.Date(2020, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	h.Add(ctx, testActRef4, &fourthTime)
 
-	testActRef5 := swarm.RandAddress(t)
+	testActRef5 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd895"))
 	fifthTime := time.Date(2030, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	h.Add(ctx, testActRef5, &fifthTime)
 
@@ -79,4 +82,10 @@ func TestMultiNodeHistoryLookup(t *testing.T) {
 	actRef, err := h.Lookup(ctx, searchedTime, ls)
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef4))
+}
+
+func pipelineFactory(s storage.Putter, encrypt bool) func() pipeline.Interface {
+	return func() pipeline.Interface {
+		return builder.NewPipelineBuilder(context.Background(), s, encrypt, 0)
+	}
 }

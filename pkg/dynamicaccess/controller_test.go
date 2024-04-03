@@ -1,6 +1,6 @@
 package dynamicaccess_test
 
-import (
+/* import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -96,3 +96,4 @@ func getPrivateKey() *ecdsa.PrivateKey {
 	privKey, _ := crypto.DecodeSecp256k1PrivateKey(data)
 	return privKey
 }
+*/

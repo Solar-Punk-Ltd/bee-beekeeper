@@ -83,15 +83,19 @@ func (h *history) Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver
 
 func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64, ls file.LoadSaver) (*mantaray.Node, error) {
 	var node *mantaray.Node
+	countOut := 0
+	countIn := 0
 
 	walker := func(pathTimestamp []byte, currNode *mantaray.Node, err error) error {
 		if err != nil {
 			return err
 		}
+		countOut++
 
 		if currNode.IsValueType() && len(currNode.Entry()) > 0 {
+			countIn++
 			match, err := isMatch(pathTimestamp, searchedTimestamp)
-			if match && node == nil {
+			if match {
 				node = currNode
 				// return error to stop the walk, this is how WalkNode works...
 				return errors.New("end iteration")
@@ -118,11 +122,6 @@ func (h *history) Store(ctx context.Context) (swarm.Address, error) {
 }
 
 func bytesToInt64(b []byte) (int64, error) {
-	if len(b) == 0 {
-		return math.MaxInt, nil
-
-	}
-
 	num, err := strconv.ParseInt(string(b), 10, 64)
 	if err != nil {
 		return -1, err
@@ -135,6 +134,9 @@ func isMatch(pathTimestamp []byte, searchedTimestamp int64) (bool, error) {
 	targetTimestamp, err := bytesToInt64(pathTimestamp)
 	if err != nil {
 		return false, err
+	}
+	if targetTimestamp == 0 {
+		return false, nil
 	}
 	return searchedTimestamp <= targetTimestamp, nil
 }
