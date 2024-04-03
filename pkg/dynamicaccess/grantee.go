@@ -92,6 +92,9 @@ func (g *GranteeListStruct) Save() (swarm.Address, error) {
 }
 
 func (g *GranteeListStruct) Remove(keysToRemove []*ecdsa.PublicKey) error {
+	if len(keysToRemove) == 0 {
+		return fmt.Errorf("nothing to remove")
+	}
 	grantees := g.deserialize(g.grantees)
 	if grantees == nil {
 		return fmt.Errorf("no grantee found")

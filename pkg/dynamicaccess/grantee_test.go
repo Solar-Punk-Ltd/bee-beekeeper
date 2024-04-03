@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"reflect"
 	"testing"
 
 	"github.com/ethersphere/bee/pkg/dynamicaccess"
@@ -17,6 +16,7 @@ import (
 	"github.com/ethersphere/bee/pkg/storage"
 	mockstorer "github.com/ethersphere/bee/pkg/storer/mock"
 	"github.com/ethersphere/bee/pkg/swarm"
+	"github.com/stretchr/testify/assert"
 )
 
 var mockStorer = mockstorer.New()
@@ -31,125 +31,172 @@ func createLs() file.LoadSaver {
 	return loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
 }
 
-func TestGranteeAdd(t *testing.T) {
-	putter := mockStorer.DirectUpload()
-	grantee := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
-
+func generateKeyListFixture() ([]*ecdsa.PublicKey, error) {
 	key1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
 	key2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	key3, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
+		return nil, err
+	}
+	return []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey, &key3.PublicKey}, nil
+}
+
+func TestGranteeAddGet(t *testing.T) {
+	putter := mockStorer.DirectUpload()
+	gl := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
+	keys, err := generateKeyListFixture()
+	if err != nil {
+		t.Errorf("key generation error: %v", err)
 	}
 
-	addList := []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}
-	err = grantee.Add(addList)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
+	t.Run("Get empty grantee list should return error", func(t *testing.T) {
+		val := gl.Get()
+		assert.Nil(t, val)
+	})
 
-	grantees := grantee.Get()
-	if !reflect.DeepEqual(grantees, addList) {
-		t.Errorf("Expected grantees %v, got %v", *addList[0].X, *grantees[0].X)
-	}
+	t.Run("Get should return value equal to put value", func(t *testing.T) {
+		var (
+			addList1 []*ecdsa.PublicKey = []*ecdsa.PublicKey{keys[0]}
+			addList2 []*ecdsa.PublicKey = []*ecdsa.PublicKey{keys[1], keys[0]}
+			addList3 []*ecdsa.PublicKey = keys
+		)
+		testCases := []struct {
+			name string
+			list []*ecdsa.PublicKey
+		}{
+			{
+				name: "Test list = 1",
+				list: addList1,
+			},
+			{
+				name: "Test list = 2",
+				list: addList2,
+			},
+			{
+				name: "Test list = 3",
+				list: addList3,
+			},
+			{
+				name: "Test empty add list",
+				list: nil,
+			},
+		}
+
+		expList := []*ecdsa.PublicKey{}
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				err := gl.Add(tc.list)
+				if tc.list == nil {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+					expList = append(expList, tc.list...)
+					retVal := gl.Get()
+					assert.Equal(t, expList, retVal)
+				}
+			})
+		}
+	})
 }
 
 func TestGranteeRemove(t *testing.T) {
 	putter := mockStorer.DirectUpload()
-	grantee := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
-
-	key1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	gl := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
+	keys, err := generateKeyListFixture()
 	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
+		t.Errorf("key generation error: %v", err)
 	}
 
-	key2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
-	addList := []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}
-	err = grantee.Add(addList)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
-	removeList := []*ecdsa.PublicKey{&key1.PublicKey}
-	err = grantee.Remove(removeList)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
-	grantees := grantee.Get()
-	expectedGrantees := []*ecdsa.PublicKey{&key2.PublicKey}
-
-	for i, grantee := range grantees {
-		if !grantee.Equal(expectedGrantees[i]) {
-			t.Errorf("Expected grantee %v, got %v", *expectedGrantees[i].X, *grantee.X)
-		}
-	}
-}
-
-func TestGranteeGet(t *testing.T) {
-	putter := mockStorer.DirectUpload()
-	grantee := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
-
-	key1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
-	key2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
-	addList := []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}
-	err = grantee.Add(addList)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
-	grantees := grantee.Get()
-	for i, grantee := range grantees {
-		if !grantee.Equal(addList[i]) {
-			t.Errorf("Expected grantee %v, got %v", *addList[i].X, *grantee.X)
-		}
-	}
+	t.Run("Add should NOT return error", func(t *testing.T) {
+		err := gl.Add(keys)
+		assert.NoError(t, err)
+		retVal := gl.Get()
+		assert.Equal(t, keys, retVal)
+	})
+	removeList1 := []*ecdsa.PublicKey{keys[0]}
+	removeList2 := []*ecdsa.PublicKey{keys[2], keys[1]}
+	t.Run("Remove the first item should return NO error", func(t *testing.T) {
+		err := gl.Remove(removeList1)
+		assert.NoError(t, err)
+		retVal := gl.Get()
+		assert.Equal(t, removeList2, retVal)
+	})
+	t.Run("Remove non-existent item should return NO error", func(t *testing.T) {
+		err := gl.Remove(removeList1)
+		assert.NoError(t, err)
+		retVal := gl.Get()
+		assert.Equal(t, removeList2, retVal)
+	})
+	t.Run("Remove second and third item should return NO error", func(t *testing.T) {
+		err := gl.Remove(removeList2)
+		assert.NoError(t, err)
+		retVal := gl.Get()
+		assert.Nil(t, retVal)
+	})
+	t.Run("Remove from empty grantee list should return error", func(t *testing.T) {
+		err := gl.Remove(removeList1)
+		assert.Error(t, err)
+		retVal := gl.Get()
+		assert.Nil(t, retVal)
+	})
+	t.Run("Remove empty remove list should return error", func(t *testing.T) {
+		err := gl.Remove(nil)
+		assert.Error(t, err)
+		retVal := gl.Get()
+		assert.Nil(t, retVal)
+	})
 }
 
 func TestGranteeSave(t *testing.T) {
-	putter := mockStorer.DirectUpload()
-	grantee1 := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
-
-	key1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	keys, err := generateKeyListFixture()
 	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
+		t.Errorf("key generation error: %v", err)
 	}
+	t.Run("Save empty grantee list return NO error", func(t *testing.T) {
+		gl := dynamicaccess.NewGranteeList(createLs(), mockStorer.DirectUpload(), swarm.ZeroAddress)
+		_, err := gl.Save()
+		assert.NoError(t, err)
+	})
+	t.Run("Save not empty grantee list return valid swarm address", func(t *testing.T) {
+		gl := dynamicaccess.NewGranteeList(createLs(), mockStorer.DirectUpload(), swarm.ZeroAddress)
+		err = gl.Add(keys)
+		ref, err := gl.Save()
+		assert.NoError(t, err)
+		assert.True(t, ref.IsValidNonEmpty())
+	})
+	t.Run("Save grantee list with one item, no error, pre-save value exist", func(t *testing.T) {
+		ls := createLs()
+		putter := mockStorer.DirectUpload()
+		gl1 := dynamicaccess.NewGranteeList(ls, putter, swarm.ZeroAddress)
 
-	key2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
+		err := gl1.Add(keys)
+		assert.NoError(t, err)
 
-	addList := []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}
-	err = grantee1.Add(addList)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
+		ref, err := gl1.Save()
+		assert.NoError(t, err)
 
-	addr, err := grantee1.Save()
-	if err != nil {
-		t.Errorf("Save expected no error, got %v", err)
-	}
+		gl2 := dynamicaccess.NewGranteeList(ls, putter, ref)
+		val := gl2.Get()
+		assert.NoError(t, err)
+		assert.Equal(t, keys, val)
+	})
+	t.Run("Save grantee list and add one item, no error, after-save value exist", func(t *testing.T) {
+		ls := createLs()
+		putter := mockStorer.DirectUpload()
 
-	grantee2 := dynamicaccess.NewGranteeList(createLs(), putter, addr)
+		gl1 := dynamicaccess.NewGranteeList(ls, putter, swarm.ZeroAddress)
 
-	grantees2 := grantee2.Get()
-	if !reflect.DeepEqual(grantees2, addList) {
-		t.Errorf("Expected grantees %v, got %v", *addList[0].X, *grantees2[0].X)
-	}
+		err := gl1.Add(keys)
+		assert.NoError(t, err)
+		ref, err := gl1.Save()
+		assert.NoError(t, err)
+
+		// New KVS
+		gl2 := dynamicaccess.NewGranteeList(ls, putter, ref)
+		err = gl2.Add(keys)
+		assert.NoError(t, err)
+
+		val := gl2.Get()
+		assert.Equal(t, append(keys, keys...), val)
+	})
 }
