@@ -6,32 +6,33 @@ package getter
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ethersphere/bee/v2/pkg/log"
+	"github.com/ethersphere/bee/v2/pkg/retrieval"
 )
 
 const (
-	DefaultStrategy        = NONE                   // default prefetching strategy
-	DefaultStrict          = true                   // default fallback modes
-	DefaultFetchTimeout    = 30 * time.Second       // timeout for each chunk retrieval
-	DefaultStrategyTimeout = 300 * time.Millisecond // timeout for each strategy
+	DefaultStrategy     = DATA                           // default prefetching strategy
+	DefaultStrict       = false                          // default fallback modes
+	DefaultFetchTimeout = retrieval.RetrieveChunkTimeout // timeout for each chunk retrieval
 )
 
 type (
-	strategyKey        struct{}
-	modeKey            struct{}
-	fetchTimeoutKey    struct{}
-	strategyTimeoutKey struct{}
-	Strategy           = int
+	strategyKey     struct{}
+	modeKey         struct{}
+	fetchTimeoutKey struct{}
+	loggerKey       struct{}
+	Strategy        = int
 )
 
 // Config is the configuration for the getter - public
 type Config struct {
-	Strategy        Strategy
-	Strict          bool
-	FetchTimeout    time.Duration
-	StrategyTimeout time.Duration
+	Strategy     Strategy
+	Strict       bool
+	FetchTimeout time.Duration
+	Logger       log.Logger
 }
 
 const (
@@ -44,20 +45,17 @@ const (
 
 // DefaultConfig is the default configuration for the getter
 var DefaultConfig = Config{
-	Strategy:        DefaultStrategy,
-	Strict:          DefaultStrict,
-	FetchTimeout:    DefaultFetchTimeout,
-	StrategyTimeout: DefaultStrategyTimeout,
+	Strategy:     DefaultStrategy,
+	Strict:       DefaultStrict,
+	FetchTimeout: DefaultFetchTimeout,
+	Logger:       log.Noop,
 }
 
 // NewConfigFromContext returns a new Config based on the context
 func NewConfigFromContext(ctx context.Context, def Config) (conf Config, err error) {
 	var ok bool
 	conf = def
-	e := func(s string, errs ...error) error {
-		if len(errs) > 0 {
-			return fmt.Errorf("error setting %s from context: %w", s, errors.Join(errs...))
-		}
+	e := func(s string) error {
 		return fmt.Errorf("error setting %s from context", s)
 	}
 	if val := ctx.Value(strategyKey{}); val != nil {
@@ -73,25 +71,18 @@ func NewConfigFromContext(ctx context.Context, def Config) (conf Config, err err
 		}
 	}
 	if val := ctx.Value(fetchTimeoutKey{}); val != nil {
-		fetchTimeoutVal, ok := val.(string)
+		conf.FetchTimeout, ok = val.(time.Duration)
 		if !ok {
 			return conf, e("fetcher timeout")
 		}
-		conf.FetchTimeout, err = time.ParseDuration(fetchTimeoutVal)
-		if err != nil {
-			return conf, e("fetcher timeout", err)
-		}
 	}
-	if val := ctx.Value(strategyTimeoutKey{}); val != nil {
-		strategyTimeoutVal, ok := val.(string)
+	if val := ctx.Value(loggerKey{}); val != nil {
+		conf.Logger, ok = val.(log.Logger)
 		if !ok {
-			return conf, e("fetcher timeout")
-		}
-		conf.StrategyTimeout, err = time.ParseDuration(strategyTimeoutVal)
-		if err != nil {
-			return conf, e("fetcher timeout", err)
+			return conf, e("strategy timeout")
 		}
 	}
+
 	return conf, nil
 }
 
@@ -106,100 +97,35 @@ func SetStrict(ctx context.Context, strict bool) context.Context {
 }
 
 // SetFetchTimeout sets the timeout for each fetch
-func SetFetchTimeout(ctx context.Context, timeout string) context.Context {
+func SetFetchTimeout(ctx context.Context, timeout time.Duration) context.Context {
 	return context.WithValue(ctx, fetchTimeoutKey{}, timeout)
 }
 
-// SetStrategyTimeout sets the timeout for each strategy
-func SetStrategyTimeout(ctx context.Context, timeout string) context.Context {
-	return context.WithValue(ctx, fetchTimeoutKey{}, timeout)
+func SetLogger(ctx context.Context, l log.Logger) context.Context {
+	return context.WithValue(ctx, loggerKey{}, l)
 }
 
 // SetConfigInContext sets the config params in the context
-func SetConfigInContext(ctx context.Context, s Strategy, fallbackmode bool, fetchTimeout, strategyTimeout string) context.Context {
-	ctx = SetStrategy(ctx, s)
-	ctx = SetStrict(ctx, !fallbackmode)
-	ctx = SetFetchTimeout(ctx, fetchTimeout)
-	ctx = SetStrategyTimeout(ctx, strategyTimeout)
-	return ctx
-}
-
-func (g *decoder) prefetch(ctx context.Context) error {
-	if g.config.Strict && g.config.Strategy == NONE {
-		return nil
-	}
-	defer g.remove()
-	var cancels []func()
-	cancelAll := func() {
-		for _, cancel := range cancels {
-			cancel()
-		}
-	}
-	defer cancelAll()
-	run := func(s Strategy) error {
-		if s == PROX { // NOT IMPLEMENTED
-			return errors.New("strategy not implemented")
-		}
-
-		var stop <-chan time.Time
-		if s < RACE {
-			timer := time.NewTimer(g.config.StrategyTimeout)
-			defer timer.Stop()
-			stop = timer.C
-		}
-		lctx, cancel := context.WithCancel(ctx)
-		cancels = append(cancels, cancel)
-		prefetch(lctx, g, s)
-
-		select {
-		// successfully retrieved shardCnt number of chunks
-		case <-g.ready:
-			cancelAll()
-		case <-stop:
-			return fmt.Errorf("prefetching with strategy %d timed out", s)
-		case <-ctx.Done():
-			return nil
-		}
-		// call the erasure decoder
-		// if decoding is successful terminate the prefetch loop
-		return g.recover(ctx) // context to cancel when shardCnt chunks are retrieved
-	}
-	var err error
-	for s := g.config.Strategy; s < strategyCnt; s++ {
-		err = run(s)
-		if g.config.Strict || err == nil {
-			break
-		}
+func SetConfigInContext(ctx context.Context, s *Strategy, fallbackmode *bool, fetchTimeout *string, logger log.Logger) (context.Context, error) {
+	if s != nil {
+		ctx = SetStrategy(ctx, *s)
 	}
 
-	return err
-}
+	if fallbackmode != nil {
+		ctx = SetStrict(ctx, !(*fallbackmode))
+	}
 
-// prefetch launches the retrieval of chunks based on the strategy
-func prefetch(ctx context.Context, g *decoder, s Strategy) {
-	var m []int
-	switch s {
-	case NONE:
-		return
-	case DATA:
-		// only retrieve data shards
-		m = g.missing()
-	case PROX:
-		// proximity driven selective fetching
-		// NOT IMPLEMENTED
-	case RACE:
-		// retrieve all chunks at once enabling race among chunks
-		m = g.missing()
-		for i := g.shardCnt; i < len(g.addrs); i++ {
-			m = append(m, i)
+	if fetchTimeout != nil {
+		dur, err := time.ParseDuration(*fetchTimeout)
+		if err != nil {
+			return nil, err
 		}
+		ctx = SetFetchTimeout(ctx, dur)
 	}
-	for _, i := range m {
-		i := i
-		g.wg.Add(1)
-		go func() {
-			g.fetch(ctx, i)
-			g.wg.Done()
-		}()
+
+	if logger != nil {
+		ctx = SetLogger(ctx, logger)
 	}
+
+	return ctx, nil
 }

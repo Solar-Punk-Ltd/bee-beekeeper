@@ -21,20 +21,20 @@ import (
 	olog "github.com/opentracing/opentracing-go/log"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethersphere/bee/pkg/feeds"
-	"github.com/ethersphere/bee/pkg/file/joiner"
-	"github.com/ethersphere/bee/pkg/file/loadsave"
-	"github.com/ethersphere/bee/pkg/file/redundancy"
-	"github.com/ethersphere/bee/pkg/file/redundancy/getter"
-	"github.com/ethersphere/bee/pkg/jsonhttp"
-	"github.com/ethersphere/bee/pkg/log"
-	"github.com/ethersphere/bee/pkg/manifest"
-	"github.com/ethersphere/bee/pkg/postage"
-	storage "github.com/ethersphere/bee/pkg/storage"
-	storer "github.com/ethersphere/bee/pkg/storer"
-	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/ethersphere/bee/pkg/topology"
-	"github.com/ethersphere/bee/pkg/tracing"
+	"github.com/ethersphere/bee/v2/pkg/feeds"
+	"github.com/ethersphere/bee/v2/pkg/file/joiner"
+	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy/getter"
+	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
+	"github.com/ethersphere/bee/v2/pkg/log"
+	"github.com/ethersphere/bee/v2/pkg/manifest"
+	"github.com/ethersphere/bee/v2/pkg/postage"
+	storage "github.com/ethersphere/bee/v2/pkg/storage"
+	storer "github.com/ethersphere/bee/v2/pkg/storer"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
+	"github.com/ethersphere/bee/v2/pkg/topology"
+	"github.com/ethersphere/bee/v2/pkg/tracing"
 	"github.com/ethersphere/langos"
 	"github.com/gorilla/mux"
 )
@@ -299,18 +299,36 @@ func (s *Service) bzzDownloadHandler(w http.ResponseWriter, r *http.Request) {
 		paths.Path = strings.TrimRight(paths.Path, "/") + "/" // NOTE: leave one slash if there was some.
 	}
 
-	s.serveReference(logger, paths.Address, paths.Path, w, r)
+	s.serveReference(logger, paths.Address, paths.Path, w, r, false)
 }
 
-func (s *Service) serveReference(logger log.Logger, address swarm.Address, pathVar string, w http.ResponseWriter, r *http.Request) {
+func (s *Service) bzzHeadHandler(w http.ResponseWriter, r *http.Request) {
+	logger := tracing.NewLoggerWithTraceID(r.Context(), s.logger.WithName("head_bzz_by_path").Build())
+
+	paths := struct {
+		Address swarm.Address `map:"address,resolve" validate:"required"`
+		Path    string        `map:"path"`
+	}{}
+	if response := s.mapStructure(mux.Vars(r), &paths); response != nil {
+		response("invalid path params", logger, w)
+		return
+	}
+
+	if strings.HasSuffix(paths.Path, "/") {
+		paths.Path = strings.TrimRight(paths.Path, "/") + "/" // NOTE: leave one slash if there was some.
+	}
+
+	s.serveReference(logger, paths.Address, paths.Path, w, r, true)
+}
+
+func (s *Service) serveReference(logger log.Logger, address swarm.Address, pathVar string, w http.ResponseWriter, r *http.Request, headerOnly bool) {
 	loggerV1 := logger.V(1).Build()
 
 	headers := struct {
-		Cache                 *bool           `map:"Swarm-Cache"`
-		Strategy              getter.Strategy `map:"Swarm-Redundancy-Strategy"`
-		FallbackMode          bool            `map:"Swarm-Redundancy-Fallback-Mode"`
-		ChunkRetrievalTimeout string          `map:"Swarm-Chunk-Retrieval-Timeout"`
-		LookaheadBufferSize   *string         `map:"Swarm-Lookahead-Buffer-Size"`
+		Cache                 *bool            `map:"Swarm-Cache"`
+		Strategy              *getter.Strategy `map:"Swarm-Redundancy-Strategy"`
+		FallbackMode          *bool            `map:"Swarm-Redundancy-Fallback-Mode"`
+		ChunkRetrievalTimeout *string          `map:"Swarm-Chunk-Retrieval-Timeout"`
 	}{}
 
 	if response := s.mapStructure(r.Header, &headers); response != nil {
@@ -326,7 +344,12 @@ func (s *Service) serveReference(logger log.Logger, address swarm.Address, pathV
 	feedDereferenced := false
 
 	ctx := r.Context()
-	ctx = getter.SetConfigInContext(ctx, headers.Strategy, headers.FallbackMode, headers.ChunkRetrievalTimeout, getter.DefaultStrategyTimeout.String())
+	ctx, err := getter.SetConfigInContext(ctx, headers.Strategy, headers.FallbackMode, headers.ChunkRetrievalTimeout, logger)
+	if err != nil {
+		logger.Error(err, err.Error())
+		jsonhttp.BadRequest(w, "could not parse headers")
+		return
+	}
 
 FETCH:
 	// read manifest entry
@@ -398,7 +421,7 @@ FETCH:
 				// index document exists
 				logger.Debug("bzz download: serving path", "path", pathWithIndex)
 
-				s.serveManifestEntry(logger, w, r, indexDocumentManifestEntry, !feedDereferenced)
+				s.serveManifestEntry(logger, w, r, indexDocumentManifestEntry, !feedDereferenced, headerOnly)
 				return
 			}
 		}
@@ -441,7 +464,7 @@ FETCH:
 						// index document exists
 						logger.Debug("bzz download: serving path", "path", pathWithIndex)
 
-						s.serveManifestEntry(logger, w, r, indexDocumentManifestEntry, !feedDereferenced)
+						s.serveManifestEntry(logger, w, r, indexDocumentManifestEntry, !feedDereferenced, headerOnly)
 						return
 					}
 				}
@@ -455,7 +478,7 @@ FETCH:
 						// error document exists
 						logger.Debug("bzz download: serving path", "path", errorDocumentPath)
 
-						s.serveManifestEntry(logger, w, r, errorDocumentManifestEntry, !feedDereferenced)
+						s.serveManifestEntry(logger, w, r, errorDocumentManifestEntry, !feedDereferenced, headerOnly)
 						return
 					}
 				}
@@ -469,7 +492,7 @@ FETCH:
 	}
 
 	// serve requested path
-	s.serveManifestEntry(logger, w, r, me, !feedDereferenced)
+	s.serveManifestEntry(logger, w, r, me, !feedDereferenced, headerOnly)
 }
 
 func (s *Service) serveManifestEntry(
@@ -477,7 +500,7 @@ func (s *Service) serveManifestEntry(
 	w http.ResponseWriter,
 	r *http.Request,
 	manifestEntry manifest.Entry,
-	etag bool,
+	etag, headersOnly bool,
 ) {
 	additionalHeaders := http.Header{}
 	mtdt := manifestEntry.Metadata()
@@ -490,17 +513,17 @@ func (s *Service) serveManifestEntry(
 		additionalHeaders[ContentTypeHeader] = []string{mimeType}
 	}
 
-	s.downloadHandler(logger, w, r, manifestEntry.Reference(), additionalHeaders, etag)
+	s.downloadHandler(logger, w, r, manifestEntry.Reference(), additionalHeaders, etag, headersOnly)
 }
 
 // downloadHandler contains common logic for dowloading Swarm file from API
-func (s *Service) downloadHandler(logger log.Logger, w http.ResponseWriter, r *http.Request, reference swarm.Address, additionalHeaders http.Header, etag bool) {
+func (s *Service) downloadHandler(logger log.Logger, w http.ResponseWriter, r *http.Request, reference swarm.Address, additionalHeaders http.Header, etag, headersOnly bool) {
 	headers := struct {
-		Cache                 *bool           `map:"Swarm-Cache"`
-		Strategy              getter.Strategy `map:"Swarm-Redundancy-Strategy"`
-		FallbackMode          bool            `map:"Swarm-Redundancy-Fallback-Mode"`
-		ChunkRetrievalTimeout string          `map:"Swarm-Chunk-Retrieval-Timeout"`
-		LookaheadBufferSize   *int            `map:"Swarm-Lookahead-Buffer-Size"`
+		Strategy              *getter.Strategy `map:"Swarm-Redundancy-Strategy"`
+		FallbackMode          *bool            `map:"Swarm-Redundancy-Fallback-Mode"`
+		ChunkRetrievalTimeout *string          `map:"Swarm-Chunk-Retrieval-Timeout"`
+		LookaheadBufferSize   *int             `map:"Swarm-Lookahead-Buffer-Size"`
+		Cache                 *bool            `map:"Swarm-Cache"`
 	}{}
 
 	if response := s.mapStructure(r.Header, &headers); response != nil {
@@ -513,7 +536,13 @@ func (s *Service) downloadHandler(logger log.Logger, w http.ResponseWriter, r *h
 	}
 
 	ctx := r.Context()
-	ctx = getter.SetConfigInContext(ctx, headers.Strategy, headers.FallbackMode, headers.ChunkRetrievalTimeout, getter.DefaultStrategyTimeout.String())
+	ctx, err := getter.SetConfigInContext(ctx, headers.Strategy, headers.FallbackMode, headers.ChunkRetrievalTimeout, logger)
+	if err != nil {
+		logger.Error(err, err.Error())
+		jsonhttp.BadRequest(w, "could not parse headers")
+		return
+	}
+
 	reader, l, err := joiner.New(ctx, s.storer.Download(cache), s.storer.Cache(), reference)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) || errors.Is(err, topology.ErrNotFound) {
@@ -537,6 +566,12 @@ func (s *Service) downloadHandler(logger log.Logger, w http.ResponseWriter, r *h
 	}
 	w.Header().Set(ContentLengthHeader, strconv.FormatInt(l, 10))
 	w.Header().Set("Access-Control-Expose-Headers", ContentDispositionHeader)
+
+	if headersOnly {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	bufSize := lookaheadBufferSize(l)
 	if headers.LookaheadBufferSize != nil {
 		bufSize = *(headers.LookaheadBufferSize)

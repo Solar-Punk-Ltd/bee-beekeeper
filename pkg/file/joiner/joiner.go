@@ -12,15 +12,15 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ethersphere/bee/pkg/bmt"
-	"github.com/ethersphere/bee/pkg/encryption"
-	"github.com/ethersphere/bee/pkg/encryption/store"
-	"github.com/ethersphere/bee/pkg/file"
-	"github.com/ethersphere/bee/pkg/file/redundancy"
-	"github.com/ethersphere/bee/pkg/file/redundancy/getter"
-	"github.com/ethersphere/bee/pkg/replicas"
-	storage "github.com/ethersphere/bee/pkg/storage"
-	"github.com/ethersphere/bee/pkg/swarm"
+	"github.com/ethersphere/bee/v2/pkg/bmt"
+	"github.com/ethersphere/bee/v2/pkg/encryption"
+	"github.com/ethersphere/bee/v2/pkg/encryption/store"
+	"github.com/ethersphere/bee/v2/pkg/file"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy/getter"
+	"github.com/ethersphere/bee/v2/pkg/replicas"
+	storage "github.com/ethersphere/bee/v2/pkg/storage"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -67,9 +67,16 @@ func fingerprint(addrs []swarm.Address) string {
 
 // GetOrCreate returns a decoder for the given chunk address
 func (g *decoderCache) GetOrCreate(addrs []swarm.Address, shardCnt int) storage.Getter {
+
+	// since a recovery decoder is not allowed, simply return the underlying netstore
+	if g.config.Strict && g.config.Strategy == getter.NONE {
+		return g.fetcher
+	}
+
 	if len(addrs) == shardCnt {
 		return g.fetcher
 	}
+
 	key := fingerprint(addrs)
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -80,10 +87,16 @@ func (g *decoderCache) GetOrCreate(addrs []swarm.Address, shardCnt int) storage.
 		}
 		return d
 	}
-	remove := func() {
+	remove := func(err error) {
 		g.mu.Lock()
 		defer g.mu.Unlock()
-		g.cache[key] = nil
+		if err != nil {
+			// signals that a new getter is needed to reattempt to recover the data
+			delete(g.cache, key)
+		} else {
+			// signals that the chunks were fetched/recovered/cached so a future getter is not needed
+			g.cache[key] = nil
+		}
 	}
 	d = getter.New(addrs, shardCnt, g.fetcher, g.putter, remove, g.config)
 	g.cache[key] = d
@@ -129,7 +142,7 @@ func New(ctx context.Context, g storage.Getter, putter storage.Putter, address s
 			maxBranching = rLevel.GetMaxShards()
 		}
 	} else {
-		// if root chunk has no redundancy, strategy is ignored and set to NONE and strict is set to true
+		// if root chunk has no redundancy, strategy is ignored and set to DATA and strict is set to true
 		conf.Strategy = getter.DATA
 		conf.Strict = true
 	}
@@ -222,7 +235,7 @@ func (j *joiner) readAtOffset(
 		}
 
 		// fast forward the cursor
-		sec := j.subtrieSection(data, cursor, pSize, parity, subTrieSize)
+		sec := j.subtrieSection(cursor, pSize, parity, subTrieSize)
 		if cur+sec <= off {
 			cur += sec
 			continue
@@ -277,7 +290,7 @@ func (j *joiner) getShards(payloadSize, parities int) int {
 }
 
 // brute-forces the subtrie size for each of the sections in this intermediate chunk
-func (j *joiner) subtrieSection(data []byte, startIdx, payloadSize, parities int, subtrieSize int64) int64 {
+func (j *joiner) subtrieSection(startIdx, payloadSize, parities int, subtrieSize int64) int64 {
 	// assume we have a trie of size `y` then we can assume that all of
 	// the forks except for the last one on the right are of equal size
 	// this is due to how the splitter wraps levels.
@@ -375,7 +388,7 @@ func (j *joiner) processChunkAddresses(ctx context.Context, fn swarm.AddressIter
 		if j.refLength == encryption.ReferenceSize {
 			cursor += swarm.HashSize * min(i, shardCnt)
 		}
-		sec := j.subtrieSection(data, cursor, eSize, parity, subTrieSize)
+		sec := j.subtrieSection(cursor, eSize, parity, subTrieSize)
 		if sec <= swarm.ChunkSize {
 			continue
 		}

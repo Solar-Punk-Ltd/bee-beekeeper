@@ -18,16 +18,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ethersphere/bee/pkg/file/loadsave"
-	"github.com/ethersphere/bee/pkg/file/redundancy"
-	"github.com/ethersphere/bee/pkg/jsonhttp"
-	"github.com/ethersphere/bee/pkg/log"
-	"github.com/ethersphere/bee/pkg/manifest"
-	"github.com/ethersphere/bee/pkg/postage"
-	storage "github.com/ethersphere/bee/pkg/storage"
-	storer "github.com/ethersphere/bee/pkg/storer"
-	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/ethersphere/bee/pkg/tracing"
+	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
+	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
+	"github.com/ethersphere/bee/v2/pkg/log"
+	"github.com/ethersphere/bee/v2/pkg/manifest"
+	"github.com/ethersphere/bee/v2/pkg/postage"
+	storage "github.com/ethersphere/bee/v2/pkg/storage"
+	storer "github.com/ethersphere/bee/v2/pkg/storer"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
+	"github.com/ethersphere/bee/v2/pkg/tracing"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	olog "github.com/opentracing/opentracing-go/log"
@@ -276,25 +276,14 @@ func (m *multipartReader) Next() (*FileInfo, error) {
 	if filePath == "" {
 		filePath = part.FormName()
 	}
-	if filePath == "" {
-		return nil, errors.New("filepath missing")
-	}
 
 	fileName := filepath.Base(filePath)
 
 	contentType := part.Header.Get(ContentTypeHeader)
-	if contentType == "" {
-		return nil, errors.New("content-type missing")
-	}
 
 	contentLength := part.Header.Get(ContentLengthHeader)
-	if contentLength == "" {
-		return nil, errors.New("content-length missing")
-	}
-	fileSize, err := strconv.ParseInt(contentLength, 10, 64)
-	if err != nil {
-		return nil, errors.New("invalid file size")
-	}
+
+	fileSize, _ := strconv.ParseInt(contentLength, 10, 64)
 
 	return &FileInfo{
 		Path:        filePath,
