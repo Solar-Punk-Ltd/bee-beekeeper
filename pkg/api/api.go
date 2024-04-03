@@ -27,38 +27,38 @@ import (
 	"unicode/utf8"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethersphere/bee/pkg/accounting"
-	"github.com/ethersphere/bee/pkg/auth"
-	"github.com/ethersphere/bee/pkg/crypto"
-	"github.com/ethersphere/bee/pkg/feeds"
-	"github.com/ethersphere/bee/pkg/file/pipeline"
-	"github.com/ethersphere/bee/pkg/file/pipeline/builder"
-	"github.com/ethersphere/bee/pkg/file/redundancy"
-	"github.com/ethersphere/bee/pkg/jsonhttp"
-	"github.com/ethersphere/bee/pkg/log"
-	"github.com/ethersphere/bee/pkg/p2p"
-	"github.com/ethersphere/bee/pkg/pingpong"
-	"github.com/ethersphere/bee/pkg/postage"
-	"github.com/ethersphere/bee/pkg/postage/postagecontract"
-	"github.com/ethersphere/bee/pkg/pss"
-	"github.com/ethersphere/bee/pkg/resolver"
-	"github.com/ethersphere/bee/pkg/resolver/client/ens"
-	"github.com/ethersphere/bee/pkg/sctx"
-	"github.com/ethersphere/bee/pkg/settlement"
-	"github.com/ethersphere/bee/pkg/settlement/swap"
-	"github.com/ethersphere/bee/pkg/settlement/swap/chequebook"
-	"github.com/ethersphere/bee/pkg/settlement/swap/erc20"
-	"github.com/ethersphere/bee/pkg/status"
-	"github.com/ethersphere/bee/pkg/steward"
-	storage "github.com/ethersphere/bee/pkg/storage"
-	"github.com/ethersphere/bee/pkg/storageincentives"
-	"github.com/ethersphere/bee/pkg/storageincentives/staking"
-	storer "github.com/ethersphere/bee/pkg/storer"
-	"github.com/ethersphere/bee/pkg/swarm"
-	"github.com/ethersphere/bee/pkg/topology"
-	"github.com/ethersphere/bee/pkg/topology/lightnode"
-	"github.com/ethersphere/bee/pkg/tracing"
-	"github.com/ethersphere/bee/pkg/transaction"
+	"github.com/ethersphere/bee/v2/pkg/accounting"
+	"github.com/ethersphere/bee/v2/pkg/auth"
+	"github.com/ethersphere/bee/v2/pkg/crypto"
+	"github.com/ethersphere/bee/v2/pkg/feeds"
+	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
+	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
+	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
+	"github.com/ethersphere/bee/v2/pkg/log"
+	"github.com/ethersphere/bee/v2/pkg/p2p"
+	"github.com/ethersphere/bee/v2/pkg/pingpong"
+	"github.com/ethersphere/bee/v2/pkg/postage"
+	"github.com/ethersphere/bee/v2/pkg/postage/postagecontract"
+	"github.com/ethersphere/bee/v2/pkg/pss"
+	"github.com/ethersphere/bee/v2/pkg/resolver"
+	"github.com/ethersphere/bee/v2/pkg/resolver/client/ens"
+	"github.com/ethersphere/bee/v2/pkg/sctx"
+	"github.com/ethersphere/bee/v2/pkg/settlement"
+	"github.com/ethersphere/bee/v2/pkg/settlement/swap"
+	"github.com/ethersphere/bee/v2/pkg/settlement/swap/chequebook"
+	"github.com/ethersphere/bee/v2/pkg/settlement/swap/erc20"
+	"github.com/ethersphere/bee/v2/pkg/status"
+	"github.com/ethersphere/bee/v2/pkg/steward"
+	storage "github.com/ethersphere/bee/v2/pkg/storage"
+	"github.com/ethersphere/bee/v2/pkg/storageincentives"
+	"github.com/ethersphere/bee/v2/pkg/storageincentives/staking"
+	storer "github.com/ethersphere/bee/v2/pkg/storer"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
+	"github.com/ethersphere/bee/v2/pkg/topology"
+	"github.com/ethersphere/bee/v2/pkg/topology/lightnode"
+	"github.com/ethersphere/bee/v2/pkg/tracing"
+	"github.com/ethersphere/bee/v2/pkg/transaction"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-multierror"
@@ -131,6 +131,10 @@ type Storer interface {
 	storer.Debugger
 }
 
+type PinIntegrity interface {
+	Check(ctx context.Context, logger log.Logger, pin string, out chan storer.PinStat)
+}
+
 type Service struct {
 	auth            auth.Authenticator
 	storer          Storer
@@ -174,7 +178,9 @@ type Service struct {
 
 	batchStore   postage.Storer
 	stamperStore storage.Store
-	syncStatus   func() (bool, error)
+	pinIntegrity PinIntegrity
+
+	syncStatus func() (bool, error)
 
 	swap        swap.Interface
 	transaction transaction.Service
@@ -190,6 +196,8 @@ type Service struct {
 	chainBackend transaction.Backend
 	erc20Service erc20.Service
 	chainID      int64
+
+	whitelistedWithdrawalAddress []common.Address
 
 	preMapHooks map[string]func(v string) (string, error)
 	validate    *validator.Validate
@@ -242,11 +250,13 @@ type ExtraOptions struct {
 	Steward         steward.Interface
 	SyncStatus      func() (bool, error)
 	NodeStatus      *status.Service
+	PinIntegrity    PinIntegrity
 }
 
 func New(
 	publicKey, pssPublicKey ecdsa.PublicKey,
 	ethereumAddress common.Address,
+	whitelistedWithdrawalAddress []string,
 	logger log.Logger,
 	transaction transaction.Service,
 	batchStore postage.Storer,
@@ -295,6 +305,10 @@ func New(
 		return name
 	})
 	s.stamperStore = stamperStore
+
+	for _, v := range whitelistedWithdrawalAddress {
+		s.whitelistedWithdrawalAddress = append(s.whitelistedWithdrawalAddress, common.HexToAddress(v))
+	}
 
 	return s
 }
@@ -348,6 +362,8 @@ func (s *Service) Configure(signer crypto.Signer, auth auth.Authenticator, trace
 			return "", err
 		}
 	}
+
+	s.pinIntegrity = e.PinIntegrity
 }
 
 func (s *Service) SetProbe(probe *Probe) {
