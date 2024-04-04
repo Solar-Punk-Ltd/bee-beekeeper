@@ -34,12 +34,12 @@ func TestWalkNodePathSequence(t *testing.T) {
 			expected: [][]byte{
 				[]byte(""),
 				[]byte("111111"),
-				[]byte("111111435"),
 				[]byte("11111125"),
-				[]byte("111111257"),
 				[]byte("111111256"),
+				[]byte("111111257"),
 				[]byte("111111258"),
 				[]byte("111111334"),
+				[]byte("111111435"),
 			},
 		},
 	} {
