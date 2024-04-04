@@ -1,6 +1,6 @@
 package dynamicaccess_test
 
-/* import (
+import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -35,4 +35,4 @@ func TestAdd(t *testing.T) {
 	s := kvsmock.New()
 	m.Publish(s, &pub.PublicKey)
 	fmt.Println("")
-} */
+}
