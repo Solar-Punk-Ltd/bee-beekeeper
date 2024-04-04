@@ -22,6 +22,8 @@ type History interface {
 
 var _ History = (*history)(nil)
 
+var ErrEndIteration = errors.New("end iteration")
+
 type history struct {
 	manifest *manifest.MantarayManifest
 }
@@ -68,6 +70,10 @@ func (h *history) Add(ctx context.Context, actRef swarm.Address, timestamp *int6
 
 // Lookup finds the entry for a path or returns error if not found
 func (h *history) Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver) (swarm.Address, error) {
+	if timestamp <= 0 {
+		return swarm.Address{}, errors.New("invalid timestamp")
+	}
+
 	reversedTimestamp := math.MaxInt64 - timestamp
 	node, err := h.LookupNode(ctx, reversedTimestamp, ls)
 	if err != nil {
@@ -82,23 +88,26 @@ func (h *history) Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver
 }
 
 func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64, ls file.LoadSaver) (*mantaray.Node, error) {
-	var node *mantaray.Node
-	countOut := 0
-	countIn := 0
+	// before node's timestamp is the closest one that is less than or equal to the searched timestamp
+	// for instance: 2030, 2020, 1994 -> search for 2021 -> before is 2020
+	var beforeNode *mantaray.Node
+	// after node's timestamp is after the latest
+	// for instance: 2030, 2020, 1994 -> search for 1980 -> after is 1994
+	var afterNode *mantaray.Node
 
 	walker := func(pathTimestamp []byte, currNode *mantaray.Node, err error) error {
 		if err != nil {
 			return err
 		}
-		countOut++
 
 		if currNode.IsValueType() && len(currNode.Entry()) > 0 {
-			countIn++
-			match, err := isMatch(pathTimestamp, searchedTimestamp)
+			afterNode = currNode
+
+			match, err := isBeforeMatch(pathTimestamp, searchedTimestamp)
 			if match {
-				node = currNode
+				beforeNode = currNode
 				// return error to stop the walk, this is how WalkNode works...
-				return errors.New("end iteration")
+				return ErrEndIteration
 			}
 
 			return err
@@ -108,13 +117,20 @@ func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64, ls fi
 	}
 
 	rootNode := h.manifest.Root()
-	err := rootNode.WalkNode(ctx, []byte{}, ls, walker)
+	err := rootNode.WalkNode(ctx, []byte{}, ls, walker, true)
 
-	if node == nil && err != nil {
+	if err != nil && err != ErrEndIteration {
 		return nil, fmt.Errorf("history lookup node error: %w", err)
 	}
 
-	return node, nil
+	if beforeNode != nil {
+		return beforeNode, nil
+	}
+	if afterNode != nil {
+		return afterNode, nil
+
+	}
+	return nil, nil
 }
 
 func (h *history) Store(ctx context.Context) (swarm.Address, error) {
@@ -130,7 +146,7 @@ func bytesToInt64(b []byte) (int64, error) {
 	return num, nil
 }
 
-func isMatch(pathTimestamp []byte, searchedTimestamp int64) (bool, error) {
+func isBeforeMatch(pathTimestamp []byte, searchedTimestamp int64) (bool, error) {
 	targetTimestamp, err := bytesToInt64(pathTimestamp)
 	if err != nil {
 		return false, err
