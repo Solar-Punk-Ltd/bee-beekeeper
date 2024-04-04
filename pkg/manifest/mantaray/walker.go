@@ -18,7 +18,8 @@ func walkNodeFnCopyBytes(ctx context.Context, path []byte, node *Node, err error
 }
 
 // walkNode recursively descends path, calling walkFn.
-func walkNode(ctx context.Context, path []byte, l Loader, n *Node, walkFn WalkNodeFunc) error {
+// visits the nodes in sequence
+func walkNodeInSequence(ctx context.Context, path []byte, l Loader, n *Node, walkFn WalkNodeFunc) error {
 	if n.forks == nil {
 		if err := n.load(ctx, l); err != nil {
 			return err
@@ -35,11 +36,37 @@ func walkNode(ctx context.Context, path []byte, l Loader, n *Node, walkFn WalkNo
 	for k := range n.forks {
 		keys = append(keys, k)
 	}
-	// Sort the keys.
+
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-	// a := keys[0]
+
 	for _, k := range keys {
 		v := n.forks[k]
+		nextPath := append(path[:0:0], path...)
+		nextPath = append(nextPath, v.prefix...)
+
+		err := walkNodeInSequence(ctx, nextPath, l, v.Node, walkFn)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// walkNode recursively descends path, calling walkFn.
+func walkNode(ctx context.Context, path []byte, l Loader, n *Node, walkFn WalkNodeFunc) error {
+	if n.forks == nil {
+		if err := n.load(ctx, l); err != nil {
+			return err
+		}
+	}
+
+	err := walkNodeFnCopyBytes(ctx, path, n, nil, walkFn)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range n.forks {
 		nextPath := append(path[:0:0], path...)
 		nextPath = append(nextPath, v.prefix...)
 
@@ -55,14 +82,17 @@ func walkNode(ctx context.Context, path []byte, l Loader, n *Node, walkFn WalkNo
 // WalkNode walks the node tree structure rooted at root, calling walkFn for
 // each node in the tree, including root. All errors that arise visiting nodes
 // are filtered by walkFn.
-func (n *Node) WalkNode(ctx context.Context, root []byte, l Loader, walkFn WalkNodeFunc) error {
+func (n *Node) WalkNode(ctx context.Context, root []byte, l Loader, walkFn WalkNodeFunc, shouldSort bool) error {
 	node, err := n.LookupNode(ctx, root, l)
 	if err != nil {
-		err = walkFn(root, nil, err)
-	} else {
-		err = walkNode(ctx, root, l, node, walkFn)
+		return walkFn(root, nil, err) // Directly return after handling error.
 	}
-	return err
+
+	if shouldSort {
+		return walkNodeInSequence(ctx, root, l, node, walkFn) // Handle sorted walking.
+	}
+
+	return walkNode(ctx, root, l, node, walkFn)
 }
 
 // WalkFunc is the type of the function called for each file or directory
