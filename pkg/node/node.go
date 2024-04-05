@@ -118,7 +118,7 @@ type Bee struct {
 	shutdownInProgress       bool
 	shutdownMutex            sync.Mutex
 	syncingStopped           *syncutil.Signaler
-	dacService               dynamicaccess.ActLogic
+	dacService               dynamicaccess.Controller
 }
 
 type Options struct {
@@ -654,7 +654,9 @@ func NewBee(
 		return nil, fmt.Errorf("p2p service: %w", err)
 	}
 
-	b.dacService = dynamicaccess.NewLogic(session)
+	actLogic := dynamicaccess.NewLogic(session)
+	history := dynamicaccess.NewHistory([]byte(""), common.HexToAddress(""))
+	b.dacService = dynamicaccess.NewController(history, actLogic)
 
 	apiService.SetP2P(p2ps)
 

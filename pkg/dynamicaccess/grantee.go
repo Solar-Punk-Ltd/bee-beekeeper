@@ -132,3 +132,7 @@ func NewGranteeList(ls file.LoadSaver, putter storer.PutterSession, reference sw
 		putter:   putter,
 	}
 }
+
+func (g *GranteeListStruct) Store() (swarm.Address, error) {
+	return swarm.EmptyAddress, nil
+}

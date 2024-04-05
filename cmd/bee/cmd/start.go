@@ -293,7 +293,7 @@ func buildBeeNode(ctx context.Context, c *command, cmd *cobra.Command, logger lo
 		neighborhoodSuggester = c.config.GetString(optionNameNeighborhoodSuggester)
 	}
 
-	b, err := node.NewBee(ctx, c.config.GetString(optionNameP2PAddr), signerConfig.publicKey, signerConfig.signer, networkID, logger, signerConfig.libp2pPrivateKey, signerConfig.pssPrivateKey, &node.Options{
+	b, err := node.NewBee(ctx, c.config.GetString(optionNameP2PAddr), signerConfig.publicKey, signerConfig.signer, networkID, logger, signerConfig.libp2pPrivateKey, signerConfig.pssPrivateKey, signerConfig.session, &node.Options{
 		DataDir:                       c.config.GetString(optionNameDataDir),
 		CacheCapacity:                 c.config.GetUint64(optionNameCacheCapacity),
 		DBOpenFilesLimit:              c.config.GetUint64(optionNameDBOpenFilesLimit),
