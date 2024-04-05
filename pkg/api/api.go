@@ -148,7 +148,7 @@ type Service struct {
 	feedFactory     feeds.Factory
 	signer          crypto.Signer
 	post            postage.Service
-	dacService      dynamicaccess.ActLogic
+	dac             dynamicaccess.Service
 	postageContract postagecontract.Interface
 	probe           *Probe
 	metricsRegistry *prometheus.Registry
@@ -253,6 +253,7 @@ type ExtraOptions struct {
 	SyncStatus      func() (bool, error)
 	NodeStatus      *status.Service
 	PinIntegrity    PinIntegrity
+	Dac             dynamicaccess.Service
 }
 
 func New(

@@ -118,7 +118,7 @@ type Bee struct {
 	shutdownInProgress       bool
 	shutdownMutex            sync.Mutex
 	syncingStopped           *syncutil.Signaler
-	dacService               dynamicaccess.Controller
+	dacCloser                io.Closer
 }
 
 type Options struct {
@@ -654,9 +654,15 @@ func NewBee(
 		return nil, fmt.Errorf("p2p service: %w", err)
 	}
 
+	//TODO: act, history and ctrl should be moved to dynamic access service
 	actLogic := dynamicaccess.NewLogic(session)
 	history := dynamicaccess.NewHistory([]byte(""), common.HexToAddress(""))
-	b.dacService = dynamicaccess.NewController(history, actLogic)
+	ctrl := dynamicaccess.NewController(history, actLogic)
+	dacCloser, err := dynamicaccess.NewService(ctrl)
+	if err != nil {
+		return nil, fmt.Errorf("dac service: %w", err)
+	}
+	b.dacCloser = dacCloser
 
 	apiService.SetP2P(p2ps)
 
@@ -1100,6 +1106,7 @@ func NewBee(
 		SyncStatus:      syncStatusFn,
 		NodeStatus:      nodeStatus,
 		PinIntegrity:    localStore.PinIntegrity(),
+		Dac:             dacCloser,
 	}
 
 	if o.APIAddr != "" {
@@ -1284,6 +1291,10 @@ func (b *Bee) Shutdown() error {
 
 	var wg sync.WaitGroup
 	wg.Add(7)
+	go func() {
+		defer wg.Done()
+		tryClose(b.dacCloser, "dac")
+	}()
 	go func() {
 		defer wg.Done()
 		tryClose(b.pssCloser, "pss")
