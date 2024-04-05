@@ -1,8 +1,8 @@
 package dynamicaccess
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethersphere/bee/v2/pkg/kvs"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
 type History interface {
@@ -17,7 +17,7 @@ type history struct {
 	history map[int64]*kvs.KeyValueStore
 }
 
-func NewHistory(topic []byte, owner common.Address) *history {
+func NewHistory(topic []byte, owner swarm.Address) *history {
 	return &history{history: make(map[int64]*kvs.KeyValueStore)}
 }
 

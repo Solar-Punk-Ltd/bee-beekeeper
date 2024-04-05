@@ -48,7 +48,7 @@ type Controller interface {
 }
 
 type controller struct {
-	history     History
+	//history     History
 	accessLogic ActLogic
 	granteeList GranteeList
 	//[ ]: do we need to protect this with a mutex?
@@ -59,7 +59,8 @@ var _ Controller = (*controller)(nil)
 
 func (c *controller) DownloadHandler(timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
 	//FIXME: newHistoryReference
-	act, err := c.history.Lookup(timestamp)
+	history := NewHistory([]byte(""), historyRootHash)
+	act, err := history.Lookup(timestamp)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
@@ -68,10 +69,12 @@ func (c *controller) DownloadHandler(timestamp int64, enryptedRef swarm.Address,
 }
 
 func (c *controller) UploadHandler(ref swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
-	act, _ := c.history.Lookup(0)
+	history := NewHistory([]byte(""), historyRootHash)
+	act, _ := history.Lookup(0)
 	// if actRootHash.Equal(swarm.EmptyAddress) {
 	// 	actRootHash = c.granteeManager.Publish(actRootHash, publisher)
 	// }
+	// TODO: add to history
 	return c.accessLogic.EncryptRef(act, publisher, ref)
 }
 
@@ -85,10 +88,10 @@ func createLs() file.LoadSaver {
 	return loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
 }
 
-func NewController(history History, accessLogic ActLogic) Controller {
+func NewController(accessLogic ActLogic) Controller {
 	return &controller{
 		granteeList: NewGranteeList(createLs(), mockStorer.DirectUpload(), swarm.EmptyAddress),
-		history:     history,
+		//history:     NewHistory([]byte(""), common.HexToAddress("")),
 		accessLogic: accessLogic,
 	}
 }

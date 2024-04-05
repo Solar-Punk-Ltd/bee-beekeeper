@@ -656,8 +656,8 @@ func NewBee(
 
 	//TODO: act, history and ctrl should be moved to dynamic access service
 	actLogic := dynamicaccess.NewLogic(session)
-	history := dynamicaccess.NewHistory([]byte(""), common.HexToAddress(""))
-	ctrl := dynamicaccess.NewController(history, actLogic)
+	//history := dynamicaccess.NewHistory([]byte(""), common.HexToAddress(""))
+	ctrl := dynamicaccess.NewController(actLogic)
 	dacCloser, err := dynamicaccess.NewService(ctrl)
 	if err != nil {
 		return nil, fmt.Errorf("dac service: %w", err)

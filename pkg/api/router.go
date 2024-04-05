@@ -276,6 +276,7 @@ func (s *Service) mountAPI() {
 		"GET": web.ChainHandlers(
 			s.contentLengthMetricMiddleware(),
 			s.newTracingHandler("bzz-download"),
+			s.actHandler(),
 			web.FinalHandlerFunc(s.bzzDownloadHandler),
 		),
 		"HEAD": web.ChainHandlers(

@@ -78,8 +78,8 @@ func TestControllerUploadHandler(t *testing.T) {
 
 func TestControllerGrant(t *testing.T) {
 	al := setupAccessLogic2()
-	h := mock.NewHistory()
-	c := dynamicaccess.NewController(h, al)
+	//h := mock.NewHistory()
+	c := dynamicaccess.NewController(al)
 
 	gladdr := swarm.RandAddress(t)
 	gl := kvsmock.NewReference(gladdr)
