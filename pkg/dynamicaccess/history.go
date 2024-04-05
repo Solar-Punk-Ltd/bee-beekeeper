@@ -16,7 +16,7 @@ import (
 
 type History interface {
 	Add(ctx context.Context, actRef swarm.Address, timestamp *int64) error
-	Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver) (swarm.Address, error)
+	Lookup(ctx context.Context, timestamp int64) (swarm.Address, error)
 	Store(ctx context.Context) (swarm.Address, error)
 }
 
@@ -26,6 +26,7 @@ var ErrEndIteration = errors.New("end iteration")
 
 type history struct {
 	manifest *manifest.MantarayManifest
+	ls       file.LoadSaver
 }
 
 func NewHistory(ls file.LoadSaver, ref *swarm.Address) (*history, error) {
@@ -46,11 +47,7 @@ func NewHistory(ls file.LoadSaver, ref *swarm.Address) (*history, error) {
 		return nil, fmt.Errorf("expected MantarayManifest, got %T", m)
 	}
 
-	return &history{manifest: mm}, nil
-}
-
-func (h *history) Manifest() *manifest.MantarayManifest {
-	return h.manifest
+	return &history{manifest: mm, ls: ls}, nil
 }
 
 func (h *history) Add(ctx context.Context, actRef swarm.Address, timestamp *int64) error {
@@ -69,13 +66,13 @@ func (h *history) Add(ctx context.Context, actRef swarm.Address, timestamp *int6
 }
 
 // Lookup finds the entry for a path or returns error if not found
-func (h *history) Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver) (swarm.Address, error) {
+func (h *history) Lookup(ctx context.Context, timestamp int64) (swarm.Address, error) {
 	if timestamp <= 0 {
 		return swarm.Address{}, errors.New("invalid timestamp")
 	}
 
 	reversedTimestamp := math.MaxInt64 - timestamp
-	node, err := h.LookupNode(ctx, reversedTimestamp, ls)
+	node, err := h.LookupNode(ctx, reversedTimestamp)
 	if err != nil {
 		return swarm.Address{}, err
 	}
@@ -87,7 +84,7 @@ func (h *history) Lookup(ctx context.Context, timestamp int64, ls file.LoadSaver
 	return swarm.Address{}, nil
 }
 
-func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64, ls file.LoadSaver) (*mantaray.Node, error) {
+func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64) (*mantaray.Node, error) {
 	// before node's timestamp is the closest one that is less than or equal to the searched timestamp
 	// for instance: 2030, 2020, 1994 -> search for 2021 -> before is 2020
 	var beforeNode *mantaray.Node
@@ -117,7 +114,7 @@ func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64, ls fi
 	}
 
 	rootNode := h.manifest.Root()
-	err := rootNode.WalkNode(ctx, []byte{}, ls, walker, true)
+	err := rootNode.WalkNode(ctx, []byte{}, h.ls, walker, true)
 
 	if err != nil && err != ErrEndIteration {
 		return nil, fmt.Errorf("history lookup node error: %w", err)
