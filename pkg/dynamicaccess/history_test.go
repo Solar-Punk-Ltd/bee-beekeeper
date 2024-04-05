@@ -43,7 +43,7 @@ func TestSingleNodeHistoryLookup(t *testing.T) {
 	assert.NoError(t, err)
 
 	searchedTime := time.Now().Unix()
-	actRef, err := h.Lookup(ctx, searchedTime, ls)
+	actRef, err := h.Lookup(ctx, searchedTime)
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef))
 }
@@ -80,25 +80,25 @@ func TestMultiNodeHistoryLookup(t *testing.T) {
 
 	// latest
 	searchedTime := time.Date(1980, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	actRef, err := h.Lookup(ctx, searchedTime, ls)
+	actRef, err := h.Lookup(ctx, searchedTime)
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef1))
 
 	// before first time
 	searchedTime = time.Date(2021, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	actRef, err = h.Lookup(ctx, searchedTime, ls)
+	actRef, err = h.Lookup(ctx, searchedTime)
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef4))
 
 	// same time
 	searchedTime = time.Date(2000, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	actRef, err = h.Lookup(ctx, searchedTime, ls)
+	actRef, err = h.Lookup(ctx, searchedTime)
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef2))
 
 	// after time
 	searchedTime = time.Date(2045, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	actRef, err = h.Lookup(ctx, searchedTime, ls)
+	actRef, err = h.Lookup(ctx, searchedTime)
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef5))
 
