@@ -27,6 +27,7 @@ import (
 	chaincfg "github.com/ethersphere/bee/v2/pkg/config"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
 	"github.com/ethersphere/bee/v2/pkg/crypto/clef"
+	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/v2/pkg/keystore"
 	filekeystore "github.com/ethersphere/bee/v2/pkg/keystore/file"
 	memkeystore "github.com/ethersphere/bee/v2/pkg/keystore/mem"
@@ -372,6 +373,7 @@ type signerConfig struct {
 	publicKey        *ecdsa.PublicKey
 	libp2pPrivateKey *ecdsa.PrivateKey
 	pssPrivateKey    *ecdsa.PrivateKey
+	session          dynamicaccess.Session
 }
 
 func waitForClef(logger log.Logger, maxRetries uint64, endpoint string) (externalSigner *external.ExternalSigner, err error) {
@@ -402,6 +404,7 @@ func (c *command) configureSigner(cmd *cobra.Command, logger log.Logger) (config
 	var signer crypto.Signer
 	var password string
 	var publicKey *ecdsa.PublicKey
+	var session dynamicaccess.Session
 	if p := c.config.GetString(optionNamePassword); p != "" {
 		password = p
 	} else if pf := c.config.GetString(optionNamePasswordFile); pf != "" {
@@ -474,6 +477,7 @@ func (c *command) configureSigner(cmd *cobra.Command, logger log.Logger) (config
 		}
 		signer = crypto.NewDefaultSigner(swarmPrivateKey)
 		publicKey = &swarmPrivateKey.PublicKey
+		session = dynamicaccess.NewDefaultSession(swarmPrivateKey)
 	}
 
 	logger.Info("swarm public key", "public_key", hex.EncodeToString(crypto.EncodeSecp256k1PublicKey(publicKey)))
@@ -512,6 +516,7 @@ func (c *command) configureSigner(cmd *cobra.Command, logger log.Logger) (config
 		publicKey:        publicKey,
 		libp2pPrivateKey: libp2pPrivateKey,
 		pssPrivateKey:    pssPrivateKey,
+		session:          session,
 	}, nil
 }
 

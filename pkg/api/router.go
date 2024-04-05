@@ -258,6 +258,14 @@ func (s *Service) mountAPI() {
 		),
 	})
 
+	handle("/grantee", jsonhttp.MethodHandler{
+		"POST": web.ChainHandlers(
+			s.contentLengthMetricMiddleware(),
+			s.newTracingHandler("bzz-grantee"),
+			web.FinalHandlerFunc(s.bzzUploadHandler), //TODO: change to grantee handler
+		),
+	})
+
 	handle("/bzz/{address}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u := r.URL
 		u.Path += "/"
