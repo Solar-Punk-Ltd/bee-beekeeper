@@ -68,20 +68,20 @@ func (h *history) Add(ctx context.Context, actRef swarm.Address, timestamp *int6
 // Lookup finds the entry for a path or returns error if not found
 func (h *history) Lookup(ctx context.Context, timestamp int64) (swarm.Address, error) {
 	if timestamp <= 0 {
-		return swarm.Address{}, errors.New("invalid timestamp")
+		return swarm.ZeroAddress, errors.New("invalid timestamp")
 	}
 
 	reversedTimestamp := math.MaxInt64 - timestamp
 	node, err := h.LookupNode(ctx, reversedTimestamp)
 	if err != nil {
-		return swarm.Address{}, err
+		return swarm.ZeroAddress, err
 	}
 
 	if node != nil {
 		return swarm.NewAddress(node.Entry()), nil
 	}
 
-	return swarm.Address{}, nil
+	return swarm.ZeroAddress, nil
 }
 
 func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64) (*mantaray.Node, error) {
