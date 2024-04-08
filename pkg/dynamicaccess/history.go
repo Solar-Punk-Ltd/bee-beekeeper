@@ -15,7 +15,7 @@ import (
 )
 
 type History interface {
-	Add(ctx context.Context, actRef swarm.Address, timestamp *int64) error
+	Add(ctx context.Context, ref swarm.Address, timestamp *int64) error
 	Lookup(ctx context.Context, timestamp int64) (swarm.Address, error)
 	Store(ctx context.Context) (swarm.Address, error)
 }
@@ -50,7 +50,7 @@ func NewHistory(ls file.LoadSaver, ref *swarm.Address) (*history, error) {
 	return &history{manifest: mm, ls: ls}, nil
 }
 
-func (h *history) Add(ctx context.Context, actRef swarm.Address, timestamp *int64) error {
+func (h *history) Add(ctx context.Context, ref swarm.Address, timestamp *int64) error {
 	// Do we need any extra meta/act?
 	meta := map[string]string{}
 	// add timestamps transformed so that the latests timestamp becomes the smallest key
@@ -62,7 +62,7 @@ func (h *history) Add(ctx context.Context, actRef swarm.Address, timestamp *int6
 	}
 
 	key := strconv.FormatInt(math.MaxInt64-unixTime, 10)
-	return h.manifest.Add(ctx, key, manifest.NewEntry(actRef, meta))
+	return h.manifest.Add(ctx, key, manifest.NewEntry(ref, meta))
 }
 
 // Lookup finds the entry for a path or returns error if not found
