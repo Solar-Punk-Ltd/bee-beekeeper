@@ -19,7 +19,7 @@ import (
 var mockStorer = mockstorer.New()
 
 // TODO: refactor grantees to not use topic
-const topic = "grantees"
+// const topic = "grantees"
 
 type GranteeManager interface {
 	//PUT /grantees/{grantee}
@@ -59,23 +59,36 @@ var _ Controller = (*controller)(nil)
 
 func (c *controller) DownloadHandler(timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
 	//FIXME: newHistoryReference
-	history := NewHistory([]byte(""), historyRootHash)
-	act, err := history.Lookup(timestamp)
+	var mockStorer = mockstorer.New()
+	ls := loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
+	history, err := NewHistory(ls, &enryptedRef)
 	if err != nil {
 		return swarm.EmptyAddress, err
 	}
-	addr, err := c.accessLogic.DecryptRef(act, enryptedRef, publisher)
+
+	kvsRef, err := history.Lookup(context.Background(), timestamp)
+	if err != nil {
+		return swarm.EmptyAddress, err
+	}
+	kvs := kvs.New(ls, mockStorer.DirectUpload(), kvsRef)
+	addr, err := c.accessLogic.DecryptRef(kvs, enryptedRef, publisher)
 	return addr, err
 }
 
 func (c *controller) UploadHandler(ref swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
-	history := NewHistory([]byte(""), historyRootHash)
-	act, _ := history.Lookup(0)
+	var mockStorer = mockstorer.New()
+	ls := loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
+	history, err := NewHistory(ls, &ref)
+	kvsRef, _ := history.Lookup(context.Background(), 0)
+	if err != nil {
+		return swarm.EmptyAddress, err
+	}
 	// if actRootHash.Equal(swarm.EmptyAddress) {
 	// 	actRootHash = c.granteeManager.Publish(actRootHash, publisher)
 	// }
 	// TODO: add to history
-	return c.accessLogic.EncryptRef(act, publisher, ref)
+	kvs := kvs.New(ls, mockStorer.DirectUpload(), kvsRef)
+	return c.accessLogic.EncryptRef(kvs, publisher, ref)
 }
 
 func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {
