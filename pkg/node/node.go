@@ -663,6 +663,7 @@ func NewBee(
 		return nil, fmt.Errorf("dac service: %w", err)
 	}
 	b.dacCloser = dacCloser
+	apiService.SetDac(dacCloser)
 
 	apiService.SetP2P(p2ps)
 

@@ -42,9 +42,10 @@ func (s *Service) actHandler() func(h http.Handler) http.Handler {
 			// TODO: refactor DownloadHandler to accept a context
 			// TODO: if ACT?
 
-			addr, _ := s.dac.DownloadHandler(headers.Timestamp, paths.Address, deserializeBytes(headers.Publisher), headers.HistoryAddress)
+			ref, _ := s.dac.DownloadHandler(headers.Timestamp, paths.Address, deserializeBytes(headers.Publisher), headers.HistoryAddress)
 			//r.Header.Set("address", addr.String())
-			w.Header().Set("address", addr.String())
+			w.Header().Set("address", ref.String())
+			h.ServeHTTP(w, r)
 		})
 	}
 

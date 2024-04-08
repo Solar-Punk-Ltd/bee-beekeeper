@@ -28,6 +28,7 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/auth"
 	mockauth "github.com/ethersphere/bee/v2/pkg/auth/mock"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
+	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/v2/pkg/feeds"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
@@ -102,13 +103,14 @@ type testServerOptions struct {
 	PostageContract    postagecontract.Interface
 	StakingContract    staking.Contract
 	Post               postage.Service
-	Steward            steward.Interface
-	WsHeaders          http.Header
-	Authenticator      auth.Authenticator
-	DebugAPI           bool
-	Restricted         bool
-	DirectUpload       bool
-	Probe              *api.Probe
+	// Dac                dynamicaccess.Service
+	Steward       steward.Interface
+	WsHeaders     http.Header
+	Authenticator auth.Authenticator
+	DebugAPI      bool
+	Restricted    bool
+	DirectUpload  bool
+	Probe         *api.Probe
 
 	Overlay         swarm.Address
 	PublicKey       ecdsa.PublicKey
@@ -204,6 +206,7 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 		Staking:         o.StakingContract,
 		NodeStatus:      o.NodeStatus,
 		PinIntegrity:    o.PinIntegrity,
+		// Dac:             o.Dac,
 	}
 
 	// By default bee mode is set to full mode.
@@ -213,6 +216,12 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 
 	s := api.New(o.PublicKey, o.PSSPublicKey, o.EthereumAddress, []string{o.WhitelistedAddr}, o.Logger, transaction, o.BatchStore, o.BeeMode, true, true, backend, o.CORSAllowedOrigins, inmemstore.New())
 	testutil.CleanupCloser(t, s)
+
+	session := dynamicaccess.NewDefaultSession(pk)
+	actLogic := dynamicaccess.NewLogic(session)
+	ctrl := dynamicaccess.NewController(actLogic)
+	dac, _ := dynamicaccess.NewService(ctrl)
+	s.SetDac(dac)
 
 	s.SetP2P(o.P2P)
 

@@ -246,7 +246,10 @@ func TestBzzUploadDownloadWithRedundancy_FLAKY(t *testing.T) {
 
 func TestBzzFiles(t *testing.T) {
 	t.Parallel()
-
+	// session := dynamicaccess.NewDefaultSession(pk)
+	// actLogic := dynamicaccess.NewLogic(session)
+	// ctrl := dynamicaccess.NewController(actLogic)
+	// dac, _ := dynamicaccess.NewService(ctrl)
 	var (
 		fileUploadResource   = "/bzz"
 		fileDownloadResource = func(addr string) string { return "/bzz/" + addr }
@@ -257,6 +260,7 @@ func TestBzzFiles(t *testing.T) {
 			Storer: storerMock,
 			Logger: logger,
 			Post:   mockpost.New(mockpost.WithAcceptAll()),
+			// Dac:    dac,
 		})
 	)
 

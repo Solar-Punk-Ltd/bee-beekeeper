@@ -215,6 +215,12 @@ func (s *Service) SetP2P(p2p p2p.DebugService) {
 	}
 }
 
+func (s *Service) SetDac(dac dynamicaccess.Service) {
+	if s != nil {
+		s.dac = dac
+	}
+}
+
 func (s *Service) SetSwarmAddress(addr *swarm.Address) {
 	if s != nil {
 		s.overlay = addr
