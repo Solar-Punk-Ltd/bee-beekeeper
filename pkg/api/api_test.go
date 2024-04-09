@@ -206,7 +206,6 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 		Staking:         o.StakingContract,
 		NodeStatus:      o.NodeStatus,
 		PinIntegrity:    o.PinIntegrity,
-		// Dac:             o.Dac,
 	}
 
 	// By default bee mode is set to full mode.
@@ -217,9 +216,10 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 	s := api.New(o.PublicKey, o.PSSPublicKey, o.EthereumAddress, []string{o.WhitelistedAddr}, o.Logger, transaction, o.BatchStore, o.BeeMode, true, true, backend, o.CORSAllowedOrigins, inmemstore.New())
 	testutil.CleanupCloser(t, s)
 
+	mockStorer := mockstorer.New()
 	session := dynamicaccess.NewDefaultSession(pk)
 	actLogic := dynamicaccess.NewLogic(session)
-	ctrl := dynamicaccess.NewController(actLogic)
+	ctrl := dynamicaccess.NewController(context.Background(), actLogic, mockStorer.ChunkStore(), mockStorer.Cache())
 	dac, _ := dynamicaccess.NewService(ctrl)
 	s.SetDac(dac)
 

@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/manifest"
-	"github.com/ethersphere/bee/v2/pkg/storer"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
@@ -23,7 +22,6 @@ type KeyValueStore interface {
 
 type keyValueStore struct {
 	manifest manifest.Interface
-	putter   storer.PutterSession
 	putCnt   int
 }
 
@@ -56,15 +54,11 @@ func (s *keyValueStore) Save() (swarm.Address, error) {
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
-	err = s.putter.Done(ref)
-	if err != nil {
-		return swarm.ZeroAddress, err
-	}
 	s.putCnt = 0
 	return ref, nil
 }
 
-func New(ls file.LoadSaver, putter storer.PutterSession, rootHash swarm.Address) KeyValueStore {
+func New(ls file.LoadSaver, rootHash swarm.Address) KeyValueStore {
 	var (
 		manif manifest.Interface
 		err   error
@@ -80,6 +74,5 @@ func New(ls file.LoadSaver, putter storer.PutterSession, rootHash swarm.Address)
 
 	return &keyValueStore{
 		manifest: manif,
-		putter:   putter,
 	}
 }

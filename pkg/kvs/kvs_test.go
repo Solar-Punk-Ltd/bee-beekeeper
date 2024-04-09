@@ -38,7 +38,7 @@ func keyValuePair(t *testing.T) ([]byte, []byte) {
 
 func TestKvs(t *testing.T) {
 
-	s := kvs.New(createLs(), mockStorer.DirectUpload(), swarm.ZeroAddress)
+	s := kvs.New(createLs(), swarm.ZeroAddress)
 	key, val := keyValuePair(t)
 
 	t.Run("Get non-existent key should return error", func(t *testing.T) {
@@ -119,12 +119,12 @@ func TestKvs_Save(t *testing.T) {
 	key1, val1 := keyValuePair(t)
 	key2, val2 := keyValuePair(t)
 	t.Run("Save empty KVS return error", func(t *testing.T) {
-		s := kvs.New(createLs(), mockStorer.DirectUpload(), swarm.ZeroAddress)
+		s := kvs.New(createLs(), swarm.ZeroAddress)
 		_, err := s.Save()
 		assert.Error(t, err)
 	})
 	t.Run("Save not empty KVS return valid swarm address", func(t *testing.T) {
-		s := kvs.New(createLs(), mockStorer.DirectUpload(), swarm.ZeroAddress)
+		s := kvs.New(createLs(), swarm.ZeroAddress)
 		s.Put(key1, val1)
 		ref, err := s.Save()
 		assert.NoError(t, err)
@@ -132,8 +132,7 @@ func TestKvs_Save(t *testing.T) {
 	})
 	t.Run("Save KVS with one item, no error, pre-save value exist", func(t *testing.T) {
 		ls := createLs()
-		putter := mockStorer.DirectUpload()
-		s1 := kvs.New(ls, putter, swarm.ZeroAddress)
+		s1 := kvs.New(ls, swarm.ZeroAddress)
 
 		err := s1.Put(key1, val1)
 		assert.NoError(t, err)
@@ -141,16 +140,15 @@ func TestKvs_Save(t *testing.T) {
 		ref, err := s1.Save()
 		assert.NoError(t, err)
 
-		s2 := kvs.New(ls, putter, ref)
+		s2 := kvs.New(ls, ref)
 		val, err := s2.Get(key1)
 		assert.NoError(t, err)
 		assert.Equal(t, val1, val)
 	})
 	t.Run("Save KVS and add one item, no error, after-save value exist", func(t *testing.T) {
 		ls := createLs()
-		putter := mockStorer.DirectUpload()
 
-		kvs1 := kvs.New(ls, putter, swarm.ZeroAddress)
+		kvs1 := kvs.New(ls, swarm.ZeroAddress)
 
 		err := kvs1.Put(key1, val1)
 		assert.NoError(t, err)
@@ -158,7 +156,7 @@ func TestKvs_Save(t *testing.T) {
 		assert.NoError(t, err)
 
 		// New KVS
-		kvs2 := kvs.New(ls, putter, ref)
+		kvs2 := kvs.New(ls, ref)
 		err = kvs2.Put(key2, val2)
 		assert.NoError(t, err)
 

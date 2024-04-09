@@ -14,7 +14,7 @@ import (
 )
 
 // Generates a new test environment with a fix private key
-func setupAccessLogic2() dynamicaccess.ActLogic {
+func setupAccessLogic() dynamicaccess.ActLogic {
 	privateKey := getPrivKey(1)
 	diffieHellman := dynamicaccess.NewDefaultSession(privateKey)
 	al := dynamicaccess.NewLogic(diffieHellman)
@@ -52,7 +52,7 @@ func getPrivKey(keyNumber int) *ecdsa.PrivateKey {
 func TestDecryptRef_Success(t *testing.T) {
 	id0 := getPrivKey(0)
 	s := kvsmock.New()
-	al := setupAccessLogic2()
+	al := setupAccessLogic()
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
@@ -129,7 +129,7 @@ func TestDecryptRef_Error(t *testing.T) {
 	id0 := getPrivKey(0)
 
 	s := kvsmock.New()
-	al := setupAccessLogic2()
+	al := setupAccessLogic()
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
@@ -151,7 +151,7 @@ func TestAddPublisher(t *testing.T) {
 	savedLookupKey := "b6ee086390c280eeb9824c331a4427596f0c8510d5564bc1b6168d0059a46e2b"
 	s := kvsmock.New()
 
-	al := setupAccessLogic2()
+	al := setupAccessLogic()
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
@@ -189,7 +189,7 @@ func TestAddNewGranteeToContent(t *testing.T) {
 	secondAddedGranteeLookupKey := "d5e9a6499ca74f5b8b958a4b89b7338045b2baa9420e115443a8050e26986564"
 
 	s := kvsmock.New()
-	al := setupAccessLogic2()
+	al := setupAccessLogic()
 	err := al.AddPublisher(s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)

@@ -654,17 +654,6 @@ func NewBee(
 		return nil, fmt.Errorf("p2p service: %w", err)
 	}
 
-	//TODO: act, history and ctrl should be moved to dynamic access service
-	actLogic := dynamicaccess.NewLogic(session)
-	//history := dynamicaccess.NewHistory([]byte(""), common.HexToAddress(""))
-	ctrl := dynamicaccess.NewController(actLogic)
-	dacCloser, err := dynamicaccess.NewService(ctrl)
-	if err != nil {
-		return nil, fmt.Errorf("dac service: %w", err)
-	}
-	b.dacCloser = dacCloser
-	apiService.SetDac(dacCloser)
-
 	apiService.SetP2P(p2ps)
 
 	b.p2pService = p2ps
@@ -785,6 +774,15 @@ func NewBee(
 	}
 	b.localstoreCloser = localStore
 	evictFn = func(id []byte) error { return localStore.EvictBatch(context.Background(), id) }
+
+	actLogic := dynamicaccess.NewLogic(session)
+	ctrl := dynamicaccess.NewController(ctx, actLogic, localStore.ChunkStore(), localStore.Cache())
+	dac, err := dynamicaccess.NewService(ctrl)
+	if err != nil {
+		return nil, fmt.Errorf("dac service: %w", err)
+	}
+	b.dacCloser = dac
+	apiService.SetDac(dac)
 
 	var (
 		syncErr    atomic.Value
@@ -1107,7 +1105,7 @@ func NewBee(
 		SyncStatus:      syncStatusFn,
 		NodeStatus:      nodeStatus,
 		PinIntegrity:    localStore.PinIntegrity(),
-		Dac:             dacCloser,
+		Dac:             dac,
 	}
 
 	if o.APIAddr != "" {

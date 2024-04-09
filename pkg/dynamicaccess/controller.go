@@ -3,6 +3,7 @@ package dynamicaccess
 import (
 	"context"
 	"crypto/ecdsa"
+	"time"
 
 	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
@@ -12,14 +13,8 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/kvs"
 	kvsmock "github.com/ethersphere/bee/v2/pkg/kvs/mock"
 	"github.com/ethersphere/bee/v2/pkg/storage"
-	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
-
-var mockStorer = mockstorer.New()
-
-// TODO: refactor grantees to not use topic
-// const topic = "grantees"
 
 type GranteeManager interface {
 	//PUT /grantees/{grantee}
@@ -41,54 +36,73 @@ type GranteeManager interface {
 	GetGrantees(rootHash swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
+// TODO: ądd granteeList ref to history metadata to solve inconsistency
 type Controller interface {
 	GranteeManager
-	DownloadHandler(timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error)
-	UploadHandler(ref swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error)
+	DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error)
+	UploadHandler(ctx context.Context, ref swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, error)
 }
 
 type controller struct {
-	//history     History
 	accessLogic ActLogic
 	granteeList GranteeList
 	//[ ]: do we need to protect this with a mutex?
 	revokeFlag []swarm.Address
+	loadsaver  file.LoadSaver
 }
 
 var _ Controller = (*controller)(nil)
 
-func (c *controller) DownloadHandler(timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
-	//FIXME: newHistoryReference
-	var mockStorer = mockstorer.New()
-	ls := loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
-	history, err := NewHistory(ls, &enryptedRef)
+func (c *controller) DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
+	history, err := NewHistory(c.loadsaver, &historyRootHash)
 	if err != nil {
-		return swarm.EmptyAddress, err
+		return swarm.ZeroAddress, err
 	}
 
-	kvsRef, err := history.Lookup(context.Background(), timestamp)
+	kvsRef, err := history.Lookup(ctx, timestamp)
 	if err != nil {
-		return swarm.EmptyAddress, err
+		return swarm.ZeroAddress, err
 	}
-	kvs := kvs.New(ls, mockStorer.DirectUpload(), kvsRef)
-	addr, err := c.accessLogic.DecryptRef(kvs, enryptedRef, publisher)
-	return addr, err
+	kvs := kvs.New(c.loadsaver, kvsRef)
+	return c.accessLogic.DecryptRef(kvs, enryptedRef, publisher)
 }
 
-func (c *controller) UploadHandler(ref swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
-	var mockStorer = mockstorer.New()
-	ls := loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
-	history, err := NewHistory(ls, &ref)
-	kvsRef, _ := history.Lookup(context.Background(), 0)
-	if err != nil {
-		return swarm.EmptyAddress, err
+// TODO: review return params: how to get back history ref ?
+func (c *controller) UploadHandler(ctx context.Context, ref swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, error) {
+	var hptr *swarm.Address
+	if !historyRootHash.Equal(swarm.ZeroAddress) {
+		hptr = &historyRootHash
 	}
-	// if actRootHash.Equal(swarm.EmptyAddress) {
-	// 	actRootHash = c.granteeManager.Publish(actRootHash, publisher)
-	// }
-	// TODO: add to history
-	kvs := kvs.New(ls, mockStorer.DirectUpload(), kvsRef)
-	return c.accessLogic.EncryptRef(kvs, publisher, ref)
+	history, err := NewHistory(c.loadsaver, hptr)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+	now := time.Now().Unix()
+	kvsRef, err := history.Lookup(ctx, now)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+	kvs := kvs.New(c.loadsaver, kvsRef)
+	if kvsRef.Equal(swarm.ZeroAddress) {
+		err = c.accessLogic.AddPublisher(kvs, publisher)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
+		kvsRef, err = kvs.Save()
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
+	}
+	err = history.Add(ctx, kvsRef, &now)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+	hRef, err := history.Store(ctx)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+	enryptedRef, err := c.accessLogic.EncryptRef(kvs, publisher, ref)
+	return hRef, enryptedRef, err
 }
 
 func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {
@@ -97,15 +111,12 @@ func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool,
 	}
 }
 
-func createLs() file.LoadSaver {
-	return loadsave.New(mockStorer.ChunkStore(), mockStorer.Cache(), requestPipelineFactory(context.Background(), mockStorer.Cache(), false, redundancy.NONE))
-}
-
-func NewController(accessLogic ActLogic) Controller {
+func NewController(ctx context.Context, accessLogic ActLogic, getter storage.Getter, putter storage.Putter) Controller {
 	return &controller{
-		granteeList: NewGranteeList(createLs(), mockStorer.DirectUpload(), swarm.EmptyAddress),
-		//history:     NewHistory([]byte(""), common.HexToAddress("")),
+		granteeList: nil, //NewGranteeList(ls, ps, swarm.EmptyAddress),
 		accessLogic: accessLogic,
+		// TODO: set redundancy level and encryption flag
+		loadsaver: loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE)),
 	}
 }
 
