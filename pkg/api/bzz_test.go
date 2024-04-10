@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ethersphere/bee/v2/pkg/api"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
@@ -481,9 +482,11 @@ func TestBzzFiles(t *testing.T) {
 
 		</body>
 		</html>`
-
+		timestamp := time.Now().Unix()
+		// TODO: proper mocked act headers
 		jsonhttptest.Request(t, client, http.MethodPost, fileUploadResource+"?name="+fileName, http.StatusCreated,
-			jsonhttptest.WithRequestHeader(api.SwarmDeferredUploadHeader, "true"),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, ""),
+			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, ""),
 			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
 			jsonhttptest.WithRequestBody(strings.NewReader(sampleHtml)),
 			jsonhttptest.WithExpectedJSONResponse(api.BzzUploadResponse{
@@ -495,9 +498,13 @@ func TestBzzFiles(t *testing.T) {
 		)
 
 		// try to fetch the same file and check the data
+		// TODO: pass on history ref somehow from the upload request
 		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(rootHash), http.StatusOK,
 			jsonhttptest.WithExpectedResponse([]byte(sampleHtml)),
 			jsonhttptest.WithExpectedContentLength(len(sampleHtml)),
+			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, fmt.Sprint(timestamp)),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, ""),
+			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, ""),
 			jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
 			jsonhttptest.WithExpectedResponseHeader(api.ContentDispositionHeader, fmt.Sprintf(`inline; filename="%s"`, fileName)),
 		)

@@ -19,21 +19,21 @@ import (
 type GranteeManager interface {
 	//PUT /grantees/{grantee}
 	//body: {publisher?, grantee root hash ,grantee}
-	Grant(granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error
+	Grant(ctx context.Context, granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error
 	//DELETE /grantees/{grantee}
 	//body: {publisher?, grantee root hash , grantee}
-	Revoke(granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error
+	Revoke(ctx context.Context, granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error
 	//[ ]
 	//POST /grantees
 	//body: {publisher, historyRootHash}
-	Commit(granteesAddress swarm.Address, actRootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, swarm.Address, error)
+	Commit(ctx context.Context, granteesAddress swarm.Address, actRootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, swarm.Address, error)
 
 	//Post /grantees
 	//{publisher, addList, removeList}
-	HandleGrantees(rootHash swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) error
+	HandleGrantees(ctx context.Context, rootHash swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) error
 
 	//GET /grantees/{history root hash}
-	GetGrantees(rootHash swarm.Address) ([]*ecdsa.PublicKey, error)
+	GetGrantees(ctx context.Context, rootHash swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
 // TODO: ądd granteeList ref to history metadata to solve inconsistency
@@ -64,7 +64,7 @@ func (c *controller) DownloadHandler(ctx context.Context, timestamp int64, enryp
 		return swarm.ZeroAddress, err
 	}
 	kvs := kvs.New(c.loadsaver, kvsRef)
-	return c.accessLogic.DecryptRef(kvs, enryptedRef, publisher)
+	return c.accessLogic.DecryptRef(ctx, kvs, enryptedRef, publisher)
 }
 
 // TODO: review return params: how to get back history ref ?
@@ -84,11 +84,11 @@ func (c *controller) UploadHandler(ctx context.Context, ref swarm.Address, publi
 	}
 	kvs := kvs.New(c.loadsaver, kvsRef)
 	if kvsRef.Equal(swarm.ZeroAddress) {
-		err = c.accessLogic.AddPublisher(kvs, publisher)
+		err = c.accessLogic.AddPublisher(ctx, kvs, publisher)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		kvsRef, err = kvs.Save()
+		kvsRef, err = kvs.Save(ctx)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -101,7 +101,7 @@ func (c *controller) UploadHandler(ctx context.Context, ref swarm.Address, publi
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
-	enryptedRef, err := c.accessLogic.EncryptRef(kvs, publisher, ref)
+	enryptedRef, err := c.accessLogic.EncryptRef(ctx, kvs, publisher, ref)
 	return hRef, enryptedRef, err
 }
 
@@ -120,39 +120,39 @@ func NewController(ctx context.Context, accessLogic ActLogic, getter storage.Get
 	}
 }
 
-func (c *controller) Grant(granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error {
+func (c *controller) Grant(ctx context.Context, granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error {
 	return c.granteeList.Add([]*ecdsa.PublicKey{grantee})
 }
 
-func (c *controller) Revoke(granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error {
+func (c *controller) Revoke(ctx context.Context, granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error {
 	if !c.isRevokeFlagged(granteesAddress) {
 		c.setRevokeFlag(granteesAddress, true)
 	}
 	return c.granteeList.Remove([]*ecdsa.PublicKey{grantee})
 }
 
-func (c *controller) Commit(granteesAddress swarm.Address, actRootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
+func (c *controller) Commit(ctx context.Context, granteesAddress swarm.Address, actRootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
 	//HACKreplace mock with real kvs
 	var act kvs.KeyValueStore
 	if c.isRevokeFlagged(granteesAddress) {
 		act = kvsmock.New()
-		c.accessLogic.AddPublisher(act, publisher)
+		c.accessLogic.AddPublisher(ctx, act, publisher)
 	} else {
 		act = kvsmock.NewReference(actRootHash)
 	}
 
 	grantees := c.granteeList.Get()
 	for _, grantee := range grantees {
-		c.accessLogic.AddGrantee(act, publisher, grantee, nil)
+		c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
 	}
 
 	//HACK: Store not implemented
-	granteeref, err := c.granteeList.Save()
+	granteeref, err := c.granteeList.Save(ctx)
 	if err != nil {
 		return swarm.EmptyAddress, swarm.EmptyAddress, err
 	}
 
-	actref, err := act.Save()
+	actref, err := act.Save(ctx)
 	if err != nil {
 		return swarm.EmptyAddress, swarm.EmptyAddress, err
 	}
@@ -161,18 +161,18 @@ func (c *controller) Commit(granteesAddress swarm.Address, actRootHash swarm.Add
 	return granteeref, actref, err
 }
 
-func (c *controller) HandleGrantees(granteesAddress swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) error {
+func (c *controller) HandleGrantees(ctx context.Context, granteesAddress swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) error {
 	act := kvsmock.New()
 
-	c.accessLogic.AddPublisher(act, publisher)
+	c.accessLogic.AddPublisher(ctx, act, publisher)
 	for _, grantee := range addList {
-		c.accessLogic.AddGrantee(act, publisher, grantee, nil)
+		c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
 	}
 	// granteeList.Store()
 	return nil
 }
 
-func (c *controller) GetGrantees(granteeRootHash swarm.Address) ([]*ecdsa.PublicKey, error) {
+func (c *controller) GetGrantees(ctx context.Context, granteeRootHash swarm.Address) ([]*ecdsa.PublicKey, error) {
 	//[ ]: grantee list address deterministic or stored?
 	// grateeListAddress, _ := hash(append([]byte(topic), []byte("grantee")...))
 	return c.granteeList.Get(), nil

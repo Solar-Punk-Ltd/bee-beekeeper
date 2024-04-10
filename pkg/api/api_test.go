@@ -29,6 +29,7 @@ import (
 	mockauth "github.com/ethersphere/bee/v2/pkg/auth/mock"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
 	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
+	mockdac "github.com/ethersphere/bee/v2/pkg/dynamicaccess/mock"
 	"github.com/ethersphere/bee/v2/pkg/feeds"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
@@ -103,14 +104,13 @@ type testServerOptions struct {
 	PostageContract    postagecontract.Interface
 	StakingContract    staking.Contract
 	Post               postage.Service
-	// Dac                dynamicaccess.Service
-	Steward       steward.Interface
-	WsHeaders     http.Header
-	Authenticator auth.Authenticator
-	DebugAPI      bool
-	Restricted    bool
-	DirectUpload  bool
-	Probe         *api.Probe
+	Steward            steward.Interface
+	WsHeaders          http.Header
+	Authenticator      auth.Authenticator
+	DebugAPI           bool
+	Restricted         bool
+	DirectUpload       bool
+	Probe              *api.Probe
 
 	Overlay         swarm.Address
 	PublicKey       ecdsa.PublicKey
@@ -219,8 +219,9 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 	mockStorer := mockstorer.New()
 	session := dynamicaccess.NewDefaultSession(pk)
 	actLogic := dynamicaccess.NewLogic(session)
+	// TODO: proper mock service and test
 	ctrl := dynamicaccess.NewController(context.Background(), actLogic, mockStorer.ChunkStore(), mockStorer.Cache())
-	dac, _ := dynamicaccess.NewService(ctrl)
+	dac := mockdac.New(ctrl, pk)
 	s.SetDac(dac)
 
 	s.SetP2P(o.P2P)

@@ -40,22 +40,23 @@ func TestKvs(t *testing.T) {
 
 	s := kvs.New(createLs(), swarm.ZeroAddress)
 	key, val := keyValuePair(t)
+	ctx := context.Background()
 
 	t.Run("Get non-existent key should return error", func(t *testing.T) {
-		_, err := s.Get([]byte{1})
+		_, err := s.Get(ctx, []byte{1})
 		assert.Error(t, err)
 	})
 
 	t.Run("Multiple Get with same key, no error", func(t *testing.T) {
-		err := s.Put(key, val)
+		err := s.Put(ctx, key, val)
 		assert.NoError(t, err)
 
 		// get #1
-		v, err := s.Get(key)
+		v, err := s.Get(ctx, key)
 		assert.NoError(t, err)
 		assert.Equal(t, val, v)
 		// get #2
-		v, err = s.Get(key)
+		v, err = s.Get(ctx, key)
 		assert.NoError(t, err)
 		assert.Equal(t, val, v)
 	})
@@ -105,9 +106,9 @@ func TestKvs(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				err := s.Put(tc.key, tc.val)
+				err := s.Put(ctx, tc.key, tc.val)
 				assert.NoError(t, err)
-				retVal, err := s.Get(tc.key)
+				retVal, err := s.Get(ctx, tc.key)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.val, retVal)
 			})
@@ -116,17 +117,19 @@ func TestKvs(t *testing.T) {
 }
 
 func TestKvs_Save(t *testing.T) {
+	ctx := context.Background()
+
 	key1, val1 := keyValuePair(t)
 	key2, val2 := keyValuePair(t)
 	t.Run("Save empty KVS return error", func(t *testing.T) {
 		s := kvs.New(createLs(), swarm.ZeroAddress)
-		_, err := s.Save()
+		_, err := s.Save(ctx)
 		assert.Error(t, err)
 	})
 	t.Run("Save not empty KVS return valid swarm address", func(t *testing.T) {
 		s := kvs.New(createLs(), swarm.ZeroAddress)
-		s.Put(key1, val1)
-		ref, err := s.Save()
+		s.Put(ctx, key1, val1)
+		ref, err := s.Save(ctx)
 		assert.NoError(t, err)
 		assert.True(t, ref.IsValidNonEmpty())
 	})
@@ -134,14 +137,14 @@ func TestKvs_Save(t *testing.T) {
 		ls := createLs()
 		s1 := kvs.New(ls, swarm.ZeroAddress)
 
-		err := s1.Put(key1, val1)
+		err := s1.Put(ctx, key1, val1)
 		assert.NoError(t, err)
 
-		ref, err := s1.Save()
+		ref, err := s1.Save(ctx)
 		assert.NoError(t, err)
 
 		s2 := kvs.New(ls, ref)
-		val, err := s2.Get(key1)
+		val, err := s2.Get(ctx, key1)
 		assert.NoError(t, err)
 		assert.Equal(t, val1, val)
 	})
@@ -150,17 +153,17 @@ func TestKvs_Save(t *testing.T) {
 
 		kvs1 := kvs.New(ls, swarm.ZeroAddress)
 
-		err := kvs1.Put(key1, val1)
+		err := kvs1.Put(ctx, key1, val1)
 		assert.NoError(t, err)
-		ref, err := kvs1.Save()
+		ref, err := kvs1.Save(ctx)
 		assert.NoError(t, err)
 
 		// New KVS
 		kvs2 := kvs.New(ls, ref)
-		err = kvs2.Put(key2, val2)
+		err = kvs2.Put(ctx, key2, val2)
 		assert.NoError(t, err)
 
-		val, err := kvs2.Get(key2)
+		val, err := kvs2.Get(ctx, key2)
 		assert.NoError(t, err)
 		assert.Equal(t, val2, val)
 	})
