@@ -6,7 +6,6 @@ package api
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -275,8 +274,7 @@ func (s *Service) fileUploadHandler(
 	finalReference := manifestReference
 	if act {
 		headers := struct {
-			Publisher      *ecdsa.PublicKey `map:"Swarm-Act-Publisher"`
-			HistoryAddress swarm.Address    `map:"Swarm-Act-History-Address"`
+			HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address"`
 		}{}
 		if response := s.mapStructure(r.Header, &headers); response != nil {
 			response("invalid header params", logger, w)
@@ -284,7 +282,8 @@ func (s *Service) fileUploadHandler(
 		}
 		// TODO: is context needed ?
 		// TODO: wrap this act logic into a wrapper func
-		historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), manifestReference, headers.Publisher, headers.HistoryAddress)
+		publisherPublicKey := &s.publicKey
+		historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), manifestReference, publisherPublicKey, headers.HistoryAddress, encrypt, rLevel)
 		if err != nil {
 			logger.Debug("act failed to encrypt file", "file_name", queries.FileName, "error", err)
 			logger.Error(nil, "act failed to encrypt file", "file_name", queries.FileName)

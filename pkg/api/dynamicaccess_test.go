@@ -62,8 +62,6 @@ func TestDacUploadDownload(t *testing.T) {
 		// TODO: expect different root hash because of encryption
 		header := jsonhttptest.Request(t, client, http.MethodPost, fileUploadResource+"?name="+fileName, http.StatusCreated,
 			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
-			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, ""),
-			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
 			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
 			jsonhttptest.WithRequestBody(strings.NewReader(sampleHtml)),
 			jsonhttptest.WithExpectedJSONResponse(api.BzzUploadResponse{
@@ -82,7 +80,7 @@ func TestDacUploadDownload(t *testing.T) {
 			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
 			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(timestamp, 10)), // Convert timestamp to int
 			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, historyRef),
-			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, ""),
+			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
 			jsonhttptest.WithExpectedResponse([]byte(sampleHtml)),
 			jsonhttptest.WithExpectedContentLength(len(sampleHtml)),
 			jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),

@@ -7,7 +7,6 @@ package api
 import (
 	"archive/tar"
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io"
@@ -112,16 +111,16 @@ func (s *Service) dirUploadHandler(
 	finalReference := reference
 	if act {
 		headers := struct {
-			Publisher      *ecdsa.PublicKey `map:"Swarm-Act-Publisher"`
-			HistoryAddress swarm.Address    `map:"Swarm-Act-History-Address"`
+			HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address"`
 		}{}
 		if response := s.mapStructure(r.Header, &headers); response != nil {
 			response("invalid header params", logger, w)
 			return
 		}
-		// TODO: pass publisher
 		// TODO: is context needed ?
-		historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), reference, headers.Publisher, headers.HistoryAddress)
+		// TODO: wrap this act logic into a wrapper func
+		publisherPublicKey := &s.publicKey
+		historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), reference, publisherPublicKey, headers.HistoryAddress, encrypt, rLevel)
 		if err != nil {
 			logger.Debug("act failed to encrypt dir", "error", err)
 			logger.Error(nil, "act failed to encrypt dir")

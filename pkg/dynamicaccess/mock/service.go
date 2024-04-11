@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
@@ -21,12 +22,12 @@ func NewService(ctrl dynamicaccess.Controller) *MockDacService {
 	return &MockDacService{ctrl: ctrl}
 }
 
-func (m *MockDacService) DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, pubkey *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
-	return m.ctrl.DownloadHandler(ctx, timestamp, enryptedRef, pubkey, historyRootHash)
+func (s *MockDacService) DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, error) {
+	return s.ctrl.DownloadHandler(ctx, timestamp, enryptedRef, publisher, historyRootHash, encrypt, rLevel)
 }
 
-func (m *MockDacService) UploadHandler(ctx context.Context, ref swarm.Address, pubkey *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, error) {
-	return m.ctrl.UploadHandler(ctx, ref, pubkey, historyRootHash)
+func (s *MockDacService) UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, error) {
+	return s.ctrl.UploadHandler(ctx, reference, publisher, historyRootHash, encrypt, rLevel)
 }
 
 func (m *MockDacService) Close() error {

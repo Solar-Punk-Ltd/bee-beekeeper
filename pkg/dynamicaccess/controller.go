@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"time"
 
-	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
@@ -39,8 +38,8 @@ type GranteeManager interface {
 // TODO: ądd granteeList ref to history metadata to solve inconsistency
 type Controller interface {
 	GranteeManager
-	DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error)
-	UploadHandler(ctx context.Context, ref swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, error)
+	DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, error)
+	UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, error)
 }
 
 type controller struct {
@@ -48,13 +47,23 @@ type controller struct {
 	granteeList GranteeList
 	//[ ]: do we need to protect this with a mutex?
 	revokeFlag []swarm.Address
-	loadsaver  file.LoadSaver
+	getter     storage.Getter
+	putter     storage.Putter
 }
 
 var _ Controller = (*controller)(nil)
 
-func (c *controller) DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, error) {
-	history, err := NewHistory(c.loadsaver, &historyRootHash)
+func (c *controller) DownloadHandler(
+	ctx context.Context,
+	timestamp int64,
+	enryptedRef swarm.Address,
+	publisher *ecdsa.PublicKey,
+	historyRootHash swarm.Address,
+	encrypt bool,
+	rLevel redundancy.Level,
+) (swarm.Address, error) {
+	ls := loadsave.New(c.getter, c.putter, requestPipelineFactory(ctx, c.putter, encrypt, rLevel))
+	history, err := NewHistory(ls, &historyRootHash)
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
@@ -63,17 +72,21 @@ func (c *controller) DownloadHandler(ctx context.Context, timestamp int64, enryp
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
-	kvs := kvs.New(c.loadsaver, kvsRef)
+	kvs := kvs.New(ls, kvsRef)
 	return c.accessLogic.DecryptRef(ctx, kvs, enryptedRef, publisher)
 }
 
 // TODO: review return params: how to get back history ref ?
-func (c *controller) UploadHandler(ctx context.Context, ref swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, error) {
-	var hptr *swarm.Address
-	if !historyRootHash.Equal(swarm.ZeroAddress) {
-		hptr = &historyRootHash
-	}
-	history, err := NewHistory(c.loadsaver, hptr)
+func (c *controller) UploadHandler(
+	ctx context.Context,
+	refrefence swarm.Address,
+	publisher *ecdsa.PublicKey,
+	historyRootHash *swarm.Address,
+	encrypt bool,
+	rLevel redundancy.Level,
+) (swarm.Address, swarm.Address, error) {
+	ls := loadsave.New(c.getter, c.putter, requestPipelineFactory(ctx, c.putter, encrypt, rLevel))
+	history, err := NewHistory(ls, historyRootHash)
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
@@ -82,7 +95,7 @@ func (c *controller) UploadHandler(ctx context.Context, ref swarm.Address, publi
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
-	kvs := kvs.New(c.loadsaver, kvsRef)
+	kvs := kvs.New(ls, kvsRef)
 	if kvsRef.Equal(swarm.ZeroAddress) {
 		err = c.accessLogic.AddPublisher(ctx, kvs, publisher)
 		if err != nil {
@@ -101,22 +114,16 @@ func (c *controller) UploadHandler(ctx context.Context, ref swarm.Address, publi
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
-	enryptedRef, err := c.accessLogic.EncryptRef(ctx, kvs, publisher, ref)
+	enryptedRef, err := c.accessLogic.EncryptRef(ctx, kvs, publisher, refrefence)
 	return hRef, enryptedRef, err
-}
-
-func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {
-	return func() pipeline.Interface {
-		return builder.NewPipelineBuilder(ctx, s, encrypt, rLevel)
-	}
 }
 
 func NewController(ctx context.Context, accessLogic ActLogic, getter storage.Getter, putter storage.Putter) Controller {
 	return &controller{
 		granteeList: nil, //NewGranteeList(ls, ps, swarm.EmptyAddress),
 		accessLogic: accessLogic,
-		// TODO: set redundancy level and encryption flag
-		loadsaver: loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE)),
+		getter:      getter,
+		putter:      putter,
 	}
 }
 
@@ -196,5 +203,11 @@ func (c *controller) setRevokeFlag(granteeRootHash swarm.Address, set bool) {
 				c.revokeFlag = append(c.revokeFlag[:i], c.revokeFlag[i+1:]...)
 			}
 		}
+	}
+}
+
+func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {
+	return func() pipeline.Interface {
+		return builder.NewPipelineBuilder(ctx, s, encrypt, rLevel)
 	}
 }

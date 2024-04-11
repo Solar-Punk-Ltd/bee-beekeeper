@@ -263,7 +263,6 @@ type ExtraOptions struct {
 	SyncStatus      func() (bool, error)
 	NodeStatus      *status.Service
 	PinIntegrity    PinIntegrity
-	Dac             dynamicaccess.Service
 }
 
 func New(

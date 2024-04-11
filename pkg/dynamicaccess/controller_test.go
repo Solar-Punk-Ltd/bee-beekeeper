@@ -10,6 +10,7 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/file"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/kvs"
 	kvsmock "github.com/ethersphere/bee/v2/pkg/kvs/mock"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
@@ -19,7 +20,7 @@ import (
 
 var hashFunc = sha3.NewLegacyKeccak256
 
-func getHistoryFixture(t *testing.T, ctx context.Context, ls file.LoadSaver, al dynamicaccess.ActLogic, publisher *ecdsa.PublicKey) (swarm.Address, error) {
+func getHistoryFixture(ctx context.Context, ls file.LoadSaver, al dynamicaccess.ActLogic, publisher *ecdsa.PublicKey) (swarm.Address, error) {
 	h, err := dynamicaccess.NewHistory(ls, nil)
 	if err != nil {
 		return swarm.ZeroAddress, nil
@@ -56,9 +57,9 @@ func TestController_NewUploadDownload(t *testing.T) {
 	al := dynamicaccess.NewLogic(diffieHellman)
 	c := dynamicaccess.NewController(ctx, al, mockStorer.ChunkStore(), mockStorer.Cache())
 	ref := swarm.RandAddress(t)
-	hRef, enryptedRef, err := c.UploadHandler(ctx, ref, &publisher.PublicKey, swarm.ZeroAddress)
+	hRef, enryptedRef, err := c.UploadHandler(ctx, ref, &publisher.PublicKey, nil, false, redundancy.NONE)
 	assert.NoError(t, err)
-	dref, err := c.DownloadHandler(ctx, time.Now().Unix(), enryptedRef, &publisher.PublicKey, hRef)
+	dref, err := c.DownloadHandler(ctx, time.Now().Unix(), enryptedRef, &publisher.PublicKey, hRef, false, redundancy.NONE)
 	assert.NoError(t, err)
 	assert.Equal(t, ref, dref)
 }
@@ -71,11 +72,11 @@ func TestController_ExistingUploadDownload(t *testing.T) {
 	al := dynamicaccess.NewLogic(diffieHellman)
 	c := dynamicaccess.NewController(ctx, al, mockStorer.ChunkStore(), mockStorer.Cache())
 	ref := swarm.RandAddress(t)
-	hRef, err := getHistoryFixture(t, ctx, ls, al, &publisher.PublicKey)
+	hRef, err := getHistoryFixture(ctx, ls, al, &publisher.PublicKey)
 	assert.NoError(t, err)
-	hRef, enryptedRef, err := c.UploadHandler(ctx, ref, &publisher.PublicKey, hRef)
+	hRef, enryptedRef, err := c.UploadHandler(ctx, ref, &publisher.PublicKey, &hRef, false, redundancy.NONE)
 	assert.NoError(t, err)
-	dref, err := c.DownloadHandler(ctx, time.Now().Unix(), enryptedRef, &publisher.PublicKey, hRef)
+	dref, err := c.DownloadHandler(ctx, time.Now().Unix(), enryptedRef, &publisher.PublicKey, hRef, false, redundancy.NONE)
 	assert.NoError(t, err)
 	assert.Equal(t, ref, dref)
 }
