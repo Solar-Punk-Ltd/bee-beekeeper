@@ -504,6 +504,7 @@ func (b *DevBee) Shutdown() error {
 	}
 
 	tryClose(b.pssCloser, "pss")
+	tryClose(b.dacCloser, "dac")
 	tryClose(b.tracerCloser, "tracer")
 	tryClose(b.stateStoreCloser, "statestore")
 	tryClose(b.localstoreCloser, "localstore")
