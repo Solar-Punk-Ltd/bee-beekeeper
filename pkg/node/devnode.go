@@ -22,6 +22,7 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/auth"
 	"github.com/ethersphere/bee/v2/pkg/bzz"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
+	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/v2/pkg/feeds/factory"
 	"github.com/ethersphere/bee/v2/pkg/log"
 	mockP2P "github.com/ethersphere/bee/v2/pkg/p2p/mock"
@@ -66,6 +67,7 @@ type DevBee struct {
 	localstoreCloser io.Closer
 	apiCloser        io.Closer
 	pssCloser        io.Closer
+	dacCloser        io.Closer
 	errorLogWriter   io.Writer
 	apiServer        *http.Server
 	debugAPIServer   *http.Server
@@ -233,6 +235,15 @@ func NewDevBee(logger log.Logger, o *DevOptions) (b *DevBee, err error) {
 		return nil, fmt.Errorf("localstore: %w", err)
 	}
 	b.localstoreCloser = localStore
+
+	session := dynamicaccess.NewDefaultSession(mockKey)
+	actLogic := dynamicaccess.NewLogic(session)
+	ctrl := dynamicaccess.NewController(context.Background(), actLogic, localStore.ChunkStore(), localStore.Cache())
+	dac, err := dynamicaccess.NewService(ctrl)
+	if err != nil {
+		return nil, fmt.Errorf("dac service: %w", err)
+	}
+	b.dacCloser = dac
 
 	pssService := pss.New(mockKey, logger)
 	b.pssCloser = pssService
@@ -407,6 +418,7 @@ func NewDevBee(logger log.Logger, o *DevOptions) (b *DevBee, err error) {
 	}, debugOpts, 1, erc20)
 	apiService.MountAPI()
 	apiService.SetProbe(probe)
+	apiService.SetDac(dac)
 
 	if o.Restricted {
 		apiService.SetP2P(p2ps)
