@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/ethersphere/bee/v2/pkg/cac"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/postage"
 	"github.com/ethersphere/bee/v2/pkg/soc"
@@ -43,8 +44,10 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	headers := struct {
-		BatchID []byte `map:"Swarm-Postage-Batch-Id" validate:"required"`
-		Pin     bool   `map:"Swarm-Pin"`
+		BatchID        []byte         `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		Pin            bool           `map:"Swarm-Pin"`
+		Act            bool           `map:"Swarm-Act"`
+		HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
@@ -171,11 +174,25 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if !act {
-	// 	return created
-	// } else {
-	// ref := actEncryptionHandler()
-	// }
+	finalReference := sch.Address()
+	if headers.Act {
+		publisherPublicKey := &s.publicKey
+		historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), sch.Address(), publisherPublicKey, headers.HistoryAddress, false, redundancy.NONE)
+		if err != nil {
+			logger.Debug("act failed to encrypt soc", "error", err)
+			logger.Error(nil, "act failed to encrypt soc")
+			jsonhttp.InternalServerError(w, "act failed to encrypt soc")
+		}
+		err = putter.Done(historyReference)
+		if err != nil {
+			logger.Debug("done split history failed", "error", err)
+			logger.Error(nil, "done split history failed")
+			jsonhttp.InternalServerError(w, "done split history failed")
+			return
+		}
+		finalReference = encryptedRef
+		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
+	}
 
-	jsonhttp.Created(w, chunkAddressResponse{Reference: sch.Address()})
+	jsonhttp.Created(w, chunkAddressResponse{Reference: finalReference})
 }

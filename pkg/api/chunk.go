@@ -13,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/ethersphere/bee/v2/pkg/cac"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/soc"
 
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
@@ -30,8 +31,10 @@ func (s *Service) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("post_chunk").Build()
 
 	headers := struct {
-		BatchID  []byte `map:"Swarm-Postage-Batch-Id" validate:"required"`
-		SwarmTag uint64 `map:"Swarm-Tag"`
+		BatchID        []byte         `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		SwarmTag       uint64         `map:"Swarm-Tag"`
+		Act            bool           `map:"Swarm-Act"`
+		HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
@@ -160,12 +163,32 @@ func (s *Service) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	finalReference := chunk.Address()
+	if headers.Act {
+		publisherPublicKey := &s.publicKey
+		historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), chunk.Address(), publisherPublicKey, headers.HistoryAddress, false, redundancy.NONE)
+		if err != nil {
+			logger.Debug("act failed to encrypt chunk", "error", err)
+			logger.Error(nil, "act failed to encrypt chunk")
+			jsonhttp.InternalServerError(w, "act failed to encrypt chunk")
+		}
+		err = putter.Done(historyReference)
+		if err != nil {
+			logger.Debug("done split history failed", "error", err)
+			logger.Error(nil, "done split history failed")
+			jsonhttp.InternalServerError(w, "done split history failed")
+			return
+		}
+		finalReference = encryptedRef
+		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
+	}
+
 	if tag != 0 {
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tag))
 	}
 
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
-	jsonhttp.Created(w, chunkAddressResponse{Reference: chunk.Address()})
+	jsonhttp.Created(w, chunkAddressResponse{Reference: finalReference})
 }
 
 func (s *Service) chunkGetHandler(w http.ResponseWriter, r *http.Request) {

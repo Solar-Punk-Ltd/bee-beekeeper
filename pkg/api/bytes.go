@@ -33,12 +33,14 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer span.Finish()
 
 	headers := struct {
-		BatchID  []byte           `map:"Swarm-Postage-Batch-Id" validate:"required"`
-		SwarmTag uint64           `map:"Swarm-Tag"`
-		Pin      bool             `map:"Swarm-Pin"`
-		Deferred *bool            `map:"Swarm-Deferred-Upload"`
-		Encrypt  bool             `map:"Swarm-Encrypt"`
-		RLevel   redundancy.Level `map:"Swarm-Redundancy-Level"`
+		BatchID        []byte           `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		SwarmTag       uint64           `map:"Swarm-Tag"`
+		Pin            bool             `map:"Swarm-Pin"`
+		Deferred       *bool            `map:"Swarm-Deferred-Upload"`
+		Encrypt        bool             `map:"Swarm-Encrypt"`
+		RLevel         redundancy.Level `map:"Swarm-Redundancy-Level"`
+		Act            bool             `map:"Swarm-Act"`
+		HistoryAddress *swarm.Address   `map:"Swarm-Act-History-Address"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
@@ -125,6 +127,27 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	finalReference := address
+	if headers.Act {
+		publisherPublicKey := &s.publicKey
+		historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), address, publisherPublicKey, headers.HistoryAddress, headers.Encrypt, headers.RLevel)
+		if err != nil {
+			logger.Debug("act failed to encrypt bytes", "error", err)
+			logger.Error(nil, "act failed to encrypt bytes")
+			jsonhttp.InternalServerError(w, "act failed to encrypt bytes")
+		}
+		err = putter.Done(historyReference)
+		if err != nil {
+			logger.Debug("done split history failed", "error", err)
+			logger.Error(nil, "done split history failed")
+			jsonhttp.InternalServerError(w, "done split history failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
+		finalReference = encryptedRef
+		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
+	}
+
 	if tag != 0 {
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tag))
 	}
@@ -133,7 +156,7 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
 	jsonhttp.Created(w, bytesPostResponse{
-		Reference: address,
+		Reference: finalReference,
 	})
 }
 

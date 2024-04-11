@@ -46,8 +46,3 @@ func (s *Service) actDecrpytionHandler() func(h http.Handler) http.Handler {
 	}
 
 }
-
-// func (s *Service) actEncryptionHandler(publisher *ecdsa.PublicKey, history, reference swarm.Address) (swarm.Address, swarm.Address, error) {
-// 	ctx := context.Background()
-// 	return s.dac.UploadHandler(ctx, reference, publisher, history)
-// }

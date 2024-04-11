@@ -20,7 +20,6 @@ import (
 
 	"github.com/ethersphere/bee/v2/pkg/api"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp/jsonhttptest"
-	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
 // nolint:paralleltest,tparallel
@@ -64,18 +63,12 @@ func TestDacUploadDownload(t *testing.T) {
 			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
 			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
 			jsonhttptest.WithRequestBody(strings.NewReader(sampleHtml)),
-			jsonhttptest.WithExpectedJSONResponse(api.BzzUploadResponse{
-				Reference: swarm.MustParseHexAddress(rootHash),
-			}),
 			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
 			jsonhttptest.WithNonEmptyResponseHeader(api.SwarmTagHeader),
-			jsonhttptest.WithExpectedResponseHeader(api.ETagHeader, fmt.Sprintf("%q", rootHash)),
 		)
 
-		historyRef := header.Get(api.SwarmActHistoryAddressHeader)
-
 		// try to fetch the same file and check the data
-		// TODO: pass on history ref somehow from the upload request
+		historyRef := header.Get(api.SwarmActHistoryAddressHeader)
 		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(rootHash), http.StatusOK,
 			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
 			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(timestamp, 10)), // Convert timestamp to int

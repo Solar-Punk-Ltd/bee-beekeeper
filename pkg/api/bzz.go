@@ -63,15 +63,16 @@ func (s *Service) bzzUploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer span.Finish()
 
 	headers := struct {
-		ContentType string           `map:"Content-Type,mimeMediaType" validate:"required"`
-		BatchID     []byte           `map:"Swarm-Postage-Batch-Id" validate:"required"`
-		SwarmTag    uint64           `map:"Swarm-Tag"`
-		Pin         bool             `map:"Swarm-Pin"`
-		Deferred    *bool            `map:"Swarm-Deferred-Upload"`
-		Encrypt     bool             `map:"Swarm-Encrypt"`
-		IsDir       bool             `map:"Swarm-Collection"`
-		RLevel      redundancy.Level `map:"Swarm-Redundancy-Level"`
-		Act         bool             `map:"Swarm-Act"`
+		ContentType    string           `map:"Content-Type,mimeMediaType" validate:"required"`
+		BatchID        []byte           `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		SwarmTag       uint64           `map:"Swarm-Tag"`
+		Pin            bool             `map:"Swarm-Pin"`
+		Deferred       *bool            `map:"Swarm-Deferred-Upload"`
+		Encrypt        bool             `map:"Swarm-Encrypt"`
+		IsDir          bool             `map:"Swarm-Collection"`
+		RLevel         redundancy.Level `map:"Swarm-Redundancy-Level"`
+		Act            bool             `map:"Swarm-Act"`
+		HistoryAddress *swarm.Address   `map:"Swarm-Act-History-Address"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
@@ -133,10 +134,10 @@ func (s *Service) bzzUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if headers.IsDir || headers.ContentType == multiPartFormData {
-		s.dirUploadHandler(ctx, logger, span, ow, r, putter, r.Header.Get(ContentTypeHeader), headers.Encrypt, tag, headers.RLevel, headers.Act)
+		s.dirUploadHandler(ctx, logger, span, ow, r, putter, r.Header.Get(ContentTypeHeader), headers.Encrypt, tag, headers.RLevel, headers.Act, headers.HistoryAddress)
 		return
 	}
-	s.fileUploadHandler(ctx, logger, span, ow, r, putter, headers.Encrypt, tag, headers.RLevel, headers.Act)
+	s.fileUploadHandler(ctx, logger, span, ow, r, putter, headers.Encrypt, tag, headers.RLevel, headers.Act, headers.HistoryAddress)
 }
 
 // fileUploadResponse is returned when an HTTP request to upload a file is successful
@@ -157,6 +158,7 @@ func (s *Service) fileUploadHandler(
 	tagID uint64,
 	rLevel redundancy.Level,
 	act bool,
+	historyAddress *swarm.Address,
 ) {
 	queries := struct {
 		FileName string `map:"name" validate:"startsnotwith=/"`
@@ -273,17 +275,10 @@ func (s *Service) fileUploadHandler(
 	// TODO: what to do if act encrypt fails but the file is already stored ?
 	finalReference := manifestReference
 	if act {
-		headers := struct {
-			HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address"`
-		}{}
-		if response := s.mapStructure(r.Header, &headers); response != nil {
-			response("invalid header params", logger, w)
-			return
-		}
 		// TODO: is context needed ?
 		// TODO: wrap this act logic into a wrapper func
 		publisherPublicKey := &s.publicKey
-		historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), manifestReference, publisherPublicKey, headers.HistoryAddress, encrypt, rLevel)
+		historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), manifestReference, publisherPublicKey, historyAddress, encrypt, rLevel)
 		if err != nil {
 			logger.Debug("act failed to encrypt file", "file_name", queries.FileName, "error", err)
 			logger.Error(nil, "act failed to encrypt file", "file_name", queries.FileName)
@@ -297,9 +292,6 @@ func (s *Service) fileUploadHandler(
 			ext.LogError(span, err, olog.String("action", "putter.Done"))
 			return
 		}
-		fmt.Printf("historyReference: %s\n", historyReference.String())
-		fmt.Printf("manifestReference: %s\n", manifestReference.String())
-		fmt.Printf("encryptedRef: %s\n", encryptedRef.String())
 		finalReference = encryptedRef
 		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	}

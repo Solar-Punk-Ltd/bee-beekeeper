@@ -210,10 +210,12 @@ func (s *Service) mountAPI() {
 		"GET": web.ChainHandlers(
 			s.contentLengthMetricMiddleware(),
 			s.newTracingHandler("bytes-download"),
+			s.actDecrpytionHandler(),
 			web.FinalHandlerFunc(s.bytesGetHandler),
 		),
 		"HEAD": web.ChainHandlers(
 			s.newTracingHandler("bytes-head"),
+			s.actDecrpytionHandler(),
 			web.FinalHandlerFunc(s.bytesHeadHandler),
 		),
 	})
@@ -231,8 +233,14 @@ func (s *Service) mountAPI() {
 	))
 
 	handle("/chunks/{address}", jsonhttp.MethodHandler{
-		"GET":  http.HandlerFunc(s.chunkGetHandler),
-		"HEAD": http.HandlerFunc(s.hasChunkHandler),
+		"GET": web.ChainHandlers(
+			s.actDecrpytionHandler(),
+			web.FinalHandlerFunc(s.chunkGetHandler),
+		),
+		"HEAD": web.ChainHandlers(
+			s.actDecrpytionHandler(),
+			web.FinalHandlerFunc(s.hasChunkHandler),
+		),
 	})
 
 	handle("/soc/{owner}/{id}", jsonhttp.MethodHandler{
@@ -280,6 +288,7 @@ func (s *Service) mountAPI() {
 			web.FinalHandlerFunc(s.bzzDownloadHandler),
 		),
 		"HEAD": web.ChainHandlers(
+			s.actDecrpytionHandler(),
 			web.FinalHandlerFunc(s.bzzHeadHandler),
 		),
 	})
@@ -416,9 +425,12 @@ func (s *Service) mountBusinessDebug(restricted bool) {
 	handle("/peers/{address}", jsonhttp.MethodHandler{
 		"DELETE": http.HandlerFunc(s.peerDisconnectHandler),
 	})
-
+	// TODO: review if chunk has needs act
 	handle("/chunks/{address}", jsonhttp.MethodHandler{
-		"GET": http.HandlerFunc(s.hasChunkHandler),
+		"GET": web.ChainHandlers(
+			s.actDecrpytionHandler(),
+			web.FinalHandlerFunc(s.hasChunkHandler),
+		),
 	})
 
 	handle("/topology", jsonhttp.MethodHandler{
