@@ -254,7 +254,6 @@ func (s *Service) mountAPI() {
 		"POST": web.ChainHandlers(
 			s.contentLengthMetricMiddleware(),
 			s.newTracingHandler("bzz-upload"),
-			s.actUpHandler(),
 			web.FinalHandlerFunc(s.bzzUploadHandler),
 		),
 	})
@@ -277,7 +276,7 @@ func (s *Service) mountAPI() {
 		"GET": web.ChainHandlers(
 			s.contentLengthMetricMiddleware(),
 			s.newTracingHandler("bzz-download"),
-			s.actDownHandler(),
+			s.actDecrpytionHandler(),
 			web.FinalHandlerFunc(s.bzzDownloadHandler),
 		),
 		"HEAD": web.ChainHandlers(

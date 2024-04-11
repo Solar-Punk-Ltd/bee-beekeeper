@@ -221,7 +221,7 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 	actLogic := dynamicaccess.NewLogic(session)
 	// TODO: proper mock service and test
 	ctrl := dynamicaccess.NewController(context.Background(), actLogic, mockStorer.ChunkStore(), mockStorer.Cache())
-	dac := mockdac.New(ctrl, pk)
+	dac := mockdac.NewService(ctrl)
 	s.SetDac(dac)
 
 	s.SetP2P(o.P2P)

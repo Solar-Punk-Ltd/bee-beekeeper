@@ -6,6 +6,7 @@ package api
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -71,6 +72,7 @@ func (s *Service) bzzUploadHandler(w http.ResponseWriter, r *http.Request) {
 		Encrypt     bool             `map:"Swarm-Encrypt"`
 		IsDir       bool             `map:"Swarm-Collection"`
 		RLevel      redundancy.Level `map:"Swarm-Redundancy-Level"`
+		Act         bool             `map:"Swarm-Act"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
@@ -132,10 +134,10 @@ func (s *Service) bzzUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if headers.IsDir || headers.ContentType == multiPartFormData {
-		s.dirUploadHandler(ctx, logger, span, ow, r, putter, r.Header.Get(ContentTypeHeader), headers.Encrypt, tag, headers.RLevel)
+		s.dirUploadHandler(ctx, logger, span, ow, r, putter, r.Header.Get(ContentTypeHeader), headers.Encrypt, tag, headers.RLevel, headers.Act)
 		return
 	}
-	s.fileUploadHandler(ctx, logger, span, ow, r, putter, headers.Encrypt, tag, headers.RLevel)
+	s.fileUploadHandler(ctx, logger, span, ow, r, putter, headers.Encrypt, tag, headers.RLevel, headers.Act)
 }
 
 // fileUploadResponse is returned when an HTTP request to upload a file is successful
@@ -155,6 +157,7 @@ func (s *Service) fileUploadHandler(
 	encrypt bool,
 	tagID uint64,
 	rLevel redundancy.Level,
+	act bool,
 ) {
 	queries := struct {
 		FileName string `map:"name" validate:"startsnotwith=/"`
@@ -268,18 +271,51 @@ func (s *Service) fileUploadHandler(
 		ext.LogError(span, err, olog.String("action", "putter.Done"))
 		return
 	}
+	// TODO: what to do if act encrypt fails but the file is already stored ?
+	finalReference := manifestReference
+	if act {
+		headers := struct {
+			Publisher      *ecdsa.PublicKey `map:"Swarm-Act-Publisher"`
+			HistoryAddress swarm.Address    `map:"Swarm-Act-History-Address"`
+		}{}
+		if response := s.mapStructure(r.Header, &headers); response != nil {
+			response("invalid header params", logger, w)
+			return
+		}
+		// TODO: is context needed ?
+		// TODO: wrap this act logic into a wrapper func
+		historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), manifestReference, headers.Publisher, headers.HistoryAddress)
+		if err != nil {
+			logger.Debug("act failed to encrypt file", "file_name", queries.FileName, "error", err)
+			logger.Error(nil, "act failed to encrypt file", "file_name", queries.FileName)
+			jsonhttp.InternalServerError(w, "act failed to encrypt file")
+		}
+		err = putter.Done(historyReference)
+		if err != nil {
+			logger.Debug("done split history failed", "error", err)
+			logger.Error(nil, "done split history failed")
+			jsonhttp.InternalServerError(w, "done split history failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
+		fmt.Printf("historyReference: %s\n", historyReference.String())
+		fmt.Printf("manifestReference: %s\n", manifestReference.String())
+		fmt.Printf("encryptedRef: %s\n", encryptedRef.String())
+		finalReference = encryptedRef
+		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
+	}
 
 	span.LogFields(olog.Bool("success", true))
-	span.SetTag("root_address", manifestReference)
+	span.SetTag("root_address", finalReference)
 
 	if tagID != 0 {
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tagID))
 		span.SetTag("tagID", tagID)
 	}
-	w.Header().Set(ETagHeader, fmt.Sprintf("%q", manifestReference.String()))
+	w.Header().Set(ETagHeader, fmt.Sprintf("%q", finalReference.String()))
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
 	jsonhttp.Created(w, bzzUploadResponse{
-		Reference: manifestReference,
+		Reference: finalReference,
 	})
 }
 

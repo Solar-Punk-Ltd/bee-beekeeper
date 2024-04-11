@@ -171,5 +171,11 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// if !act {
+	// 	return created
+	// } else {
+	// ref := actEncryptionHandler()
+	// }
+
 	jsonhttp.Created(w, chunkAddressResponse{Reference: sch.Address()})
 }

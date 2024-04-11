@@ -7,6 +7,7 @@ package api
 import (
 	"archive/tar"
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io"
@@ -47,6 +48,7 @@ func (s *Service) dirUploadHandler(
 	encrypt bool,
 	tag uint64,
 	rLevel redundancy.Level,
+	act bool,
 ) {
 	if r.Body == http.NoBody {
 		logger.Error(nil, "request has no body")
@@ -107,13 +109,46 @@ func (s *Service) dirUploadHandler(
 		return
 	}
 
+	finalReference := reference
+	if act {
+		headers := struct {
+			Publisher      *ecdsa.PublicKey `map:"Swarm-Act-Publisher"`
+			HistoryAddress swarm.Address    `map:"Swarm-Act-History-Address"`
+		}{}
+		if response := s.mapStructure(r.Header, &headers); response != nil {
+			response("invalid header params", logger, w)
+			return
+		}
+		// TODO: pass publisher
+		// TODO: is context needed ?
+		historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), reference, headers.Publisher, headers.HistoryAddress)
+		if err != nil {
+			logger.Debug("act failed to encrypt dir", "error", err)
+			logger.Error(nil, "act failed to encrypt dir")
+			jsonhttp.InternalServerError(w, "act failed to encrypt dir")
+		}
+		err = putter.Done(historyReference)
+		if err != nil {
+			logger.Debug("done split history failed", "error", err)
+			logger.Error(nil, "done split history failed")
+			jsonhttp.InternalServerError(w, "done split history failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
+		fmt.Printf("historyReference: %s\n", historyReference.String())
+		fmt.Printf("reference: %s\n", reference.String())
+		fmt.Printf("encryptedRef: %s\n", encryptedRef.String())
+		finalReference = encryptedRef
+		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
+	}
+
 	if tag != 0 {
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tag))
 		span.LogFields(olog.Bool("success", true))
 	}
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
 	jsonhttp.Created(w, bzzUploadResponse{
-		Reference: reference,
+		Reference: finalReference,
 	})
 }
 
