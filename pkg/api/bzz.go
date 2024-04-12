@@ -278,7 +278,7 @@ func (s *Service) fileUploadHandler(
 		// TODO: is context needed ?
 		// TODO: wrap this act logic into a wrapper func
 		publisherPublicKey := &s.publicKey
-		historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), manifestReference, publisherPublicKey, historyAddress, encrypt, rLevel)
+		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), manifestReference, publisherPublicKey, historyAddress, encrypt, rLevel)
 		if err != nil {
 			logger.Debug("act failed to encrypt file", "file_name", queries.FileName, "error", err)
 			logger.Error(nil, "act failed to encrypt file", "file_name", queries.FileName)
@@ -292,9 +292,28 @@ func (s *Service) fileUploadHandler(
 			ext.LogError(span, err, olog.String("action", "putter.Done"))
 			return
 		}
+		err = putter.Done(encryptedRef)
+		if err != nil {
+			logger.Debug("done split encrypted reference failed", "error", err)
+			logger.Error(nil, "done split encrypted reference failed")
+			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
+		err = putter.Done(kvsReference)
+		if err != nil {
+			logger.Debug("done split kvs reference failed", "error", err)
+			logger.Error(nil, "done split kvs reference failed")
+			jsonhttp.InternalServerError(w, "done split kvs reference failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
 		finalReference = encryptedRef
 		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	}
+	// swarm-cli stamp buy --depth 21 --amount 1000000 -y
+	// swarm-cli upload /Users/ujvaribalint/repos/solarpunk/bee/hello.txt --curl -H "Swarm-Act: true" --verbose
+	// swarm-cli download c327f33f46bbc4f95a0035fe5461f5119b10ee5b9ad12b1087fa1884cd79081c --curl -H "Swarm-Act: true" -H "Swarm-Act-History-Address: 14f3a6c44b1dba0f7e1ac24d9bdb491f79be9ff81bb5398669df1c34ecf32b0d" -H "Swarm-Act-Publisher: 03e34c0e4b66bf76838521aef3a0e08ff2ce11152264ee6d5d5ac672e4d124c85e" -H "Swarm-Act-Timestamp: 1712916331" -y
 
 	span.LogFields(olog.Bool("success", true))
 	span.SetTag("root_address", finalReference)
@@ -322,11 +341,16 @@ func (s *Service) bzzDownloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	address := paths.Address
+	if v := getAddressFromContext(r.Context()); !v.Equal(swarm.ZeroAddress) {
+		address = v
+	}
+
 	if strings.HasSuffix(paths.Path, "/") {
 		paths.Path = strings.TrimRight(paths.Path, "/") + "/" // NOTE: leave one slash if there was some.
 	}
 
-	s.serveReference(logger, paths.Address, paths.Path, w, r, false)
+	s.serveReference(logger, address, paths.Path, w, r, false)
 }
 
 func (s *Service) bzzHeadHandler(w http.ResponseWriter, r *http.Request) {
@@ -341,11 +365,16 @@ func (s *Service) bzzHeadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	address := paths.Address
+	if v := getAddressFromContext(r.Context()); !v.Equal(swarm.ZeroAddress) {
+		address = v
+	}
+
 	if strings.HasSuffix(paths.Path, "/") {
 		paths.Path = strings.TrimRight(paths.Path, "/") + "/" // NOTE: leave one slash if there was some.
 	}
 
-	s.serveReference(logger, paths.Address, paths.Path, w, r, true)
+	s.serveReference(logger, address, paths.Path, w, r, true)
 }
 
 func (s *Service) serveReference(logger log.Logger, address swarm.Address, pathVar string, w http.ResponseWriter, r *http.Request, headerOnly bool) {
@@ -578,8 +607,8 @@ func (s *Service) downloadHandler(logger log.Logger, w http.ResponseWriter, r *h
 			jsonhttp.NotFound(w, nil)
 			return
 		}
-		logger.Debug("api download: unexpected error", "address", reference, "error", err)
-		logger.Error(nil, "api download: unexpected error")
+		logger.Info("api download: unexpected error", "address", reference, "error", err)
+		logger.Error(err, "api download: unexpected error")
 		jsonhttp.InternalServerError(w, "joiner failed")
 		return
 	}

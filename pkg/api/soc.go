@@ -177,7 +177,7 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 	finalReference := sch.Address()
 	if headers.Act {
 		publisherPublicKey := &s.publicKey
-		historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), sch.Address(), publisherPublicKey, headers.HistoryAddress, false, redundancy.NONE)
+		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), sch.Address(), publisherPublicKey, headers.HistoryAddress, false, redundancy.NONE)
 		if err != nil {
 			logger.Debug("act failed to encrypt soc", "error", err)
 			logger.Error(nil, "act failed to encrypt soc")
@@ -188,6 +188,20 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Debug("done split history failed", "error", err)
 			logger.Error(nil, "done split history failed")
 			jsonhttp.InternalServerError(w, "done split history failed")
+			return
+		}
+		err = putter.Done(encryptedRef)
+		if err != nil {
+			logger.Debug("done split encrypted reference failed", "error", err)
+			logger.Error(nil, "done split encrypted reference failed")
+			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
+			return
+		}
+		err = putter.Done(kvsReference)
+		if err != nil {
+			logger.Debug("done split kvs reference failed", "error", err)
+			logger.Error(nil, "done split kvs reference failed")
+			jsonhttp.InternalServerError(w, "done split kvs reference failed")
 			return
 		}
 		finalReference = encryptedRef

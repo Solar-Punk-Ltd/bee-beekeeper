@@ -11,7 +11,7 @@ import (
 
 type Service interface {
 	DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, error)
-	UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, error)
+	UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, swarm.Address, error)
 	io.Closer
 }
 
@@ -23,7 +23,7 @@ func (s *service) DownloadHandler(ctx context.Context, timestamp int64, enrypted
 	return s.controller.DownloadHandler(ctx, timestamp, enryptedRef, publisher, historyRootHash, encrypt, rLevel)
 }
 
-func (s *service) UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, error) {
+func (s *service) UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, swarm.Address, error) {
 	return s.controller.UploadHandler(ctx, reference, publisher, historyRootHash, encrypt, rLevel)
 }
 

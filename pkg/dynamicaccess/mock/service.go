@@ -26,7 +26,7 @@ func (s *MockDacService) DownloadHandler(ctx context.Context, timestamp int64, e
 	return s.ctrl.DownloadHandler(ctx, timestamp, enryptedRef, publisher, historyRootHash, encrypt, rLevel)
 }
 
-func (s *MockDacService) UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, error) {
+func (s *MockDacService) UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, swarm.Address, error) {
 	return s.ctrl.UploadHandler(ctx, reference, publisher, historyRootHash, encrypt, rLevel)
 }
 

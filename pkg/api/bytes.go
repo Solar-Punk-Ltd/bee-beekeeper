@@ -130,7 +130,7 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 	finalReference := address
 	if headers.Act {
 		publisherPublicKey := &s.publicKey
-		historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), address, publisherPublicKey, headers.HistoryAddress, headers.Encrypt, headers.RLevel)
+		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), address, publisherPublicKey, headers.HistoryAddress, headers.Encrypt, headers.RLevel)
 		if err != nil {
 			logger.Debug("act failed to encrypt bytes", "error", err)
 			logger.Error(nil, "act failed to encrypt bytes")
@@ -141,6 +141,22 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 			logger.Debug("done split history failed", "error", err)
 			logger.Error(nil, "done split history failed")
 			jsonhttp.InternalServerError(w, "done split history failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
+		err = putter.Done(encryptedRef)
+		if err != nil {
+			logger.Debug("done split encrypted reference failed", "error", err)
+			logger.Error(nil, "done split encrypted reference failed")
+			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
+		err = putter.Done(kvsReference)
+		if err != nil {
+			logger.Debug("done split kvs reference failed", "error", err)
+			logger.Error(nil, "done split kvs reference failed")
+			jsonhttp.InternalServerError(w, "done split kvs reference failed")
 			ext.LogError(span, err, olog.String("action", "putter.Done"))
 			return
 		}
@@ -172,11 +188,16 @@ func (s *Service) bytesGetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	address := paths.Address
+	if v := getAddressFromContext(r.Context()); !v.Equal(swarm.ZeroAddress) {
+		address = v
+	}
+
 	additionalHeaders := http.Header{
 		ContentTypeHeader: {"application/octet-stream"},
 	}
 
-	s.downloadHandler(logger, w, r, paths.Address, additionalHeaders, true, false)
+	s.downloadHandler(logger, w, r, address, additionalHeaders, true, false)
 }
 
 func (s *Service) bytesHeadHandler(w http.ResponseWriter, r *http.Request) {
@@ -190,11 +211,16 @@ func (s *Service) bytesHeadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	address := paths.Address
+	if v := getAddressFromContext(r.Context()); !v.Equal(swarm.ZeroAddress) {
+		address = v
+	}
+
 	getter := s.storer.Download(true)
 
-	ch, err := getter.Get(r.Context(), paths.Address)
+	ch, err := getter.Get(r.Context(), address)
 	if err != nil {
-		logger.Debug("get root chunk failed", "chunk_address", paths.Address, "error", err)
+		logger.Debug("get root chunk failed", "chunk_address", address, "error", err)
 		logger.Error(nil, "get rook chunk failed")
 		w.WriteHeader(http.StatusNotFound)
 		return

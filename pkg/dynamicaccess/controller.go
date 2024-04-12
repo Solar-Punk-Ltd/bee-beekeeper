@@ -39,7 +39,7 @@ type GranteeManager interface {
 type Controller interface {
 	GranteeManager
 	DownloadHandler(ctx context.Context, timestamp int64, enryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, error)
-	UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, error)
+	UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash *swarm.Address, encrypt bool, rLevel redundancy.Level) (swarm.Address, swarm.Address, swarm.Address, error)
 }
 
 type controller struct {
@@ -84,38 +84,38 @@ func (c *controller) UploadHandler(
 	historyRootHash *swarm.Address,
 	encrypt bool,
 	rLevel redundancy.Level,
-) (swarm.Address, swarm.Address, error) {
+) (swarm.Address, swarm.Address, swarm.Address, error) {
 	ls := loadsave.New(c.getter, c.putter, requestPipelineFactory(ctx, c.putter, encrypt, rLevel))
 	history, err := NewHistory(ls, historyRootHash)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 	now := time.Now().Unix()
 	kvsRef, err := history.Lookup(ctx, now)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 	kvs := kvs.New(ls, kvsRef)
 	if kvsRef.Equal(swarm.ZeroAddress) {
 		err = c.accessLogic.AddPublisher(ctx, kvs, publisher)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		kvsRef, err = kvs.Save(ctx)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 	err = history.Add(ctx, kvsRef, &now)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 	hRef, err := history.Store(ctx)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 	enryptedRef, err := c.accessLogic.EncryptRef(ctx, kvs, publisher, refrefence)
-	return hRef, enryptedRef, err
+	return kvsRef, hRef, enryptedRef, err
 }
 
 func NewController(ctx context.Context, accessLogic ActLogic, getter storage.Getter, putter storage.Putter) Controller {

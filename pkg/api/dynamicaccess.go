@@ -1,12 +1,31 @@
 package api
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"net/http"
 
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
+	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
+	"github.com/gorilla/mux"
 )
+
+type addressKey struct{}
+
+// getAddressFromContext is a helper function to extract the address from the context
+func getAddressFromContext(ctx context.Context) swarm.Address {
+	v, ok := ctx.Value(addressKey{}).([]byte)
+	if ok {
+		return swarm.NewAddress(v)
+	}
+	return swarm.ZeroAddress
+}
+
+// setAddress sets the redundancy level in the context
+func setAddress(ctx context.Context, address []byte) context.Context {
+	return context.WithValue(ctx, addressKey{}, address)
+}
 
 func (s *Service) actDecrpytionHandler() func(h http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
@@ -15,7 +34,7 @@ func (s *Service) actDecrpytionHandler() func(h http.Handler) http.Handler {
 			paths := struct {
 				Address swarm.Address `map:"address,resolve" validate:"required"`
 			}{}
-			if response := s.mapStructure(r.Header, &paths); response != nil {
+			if response := s.mapStructure(mux.Vars(r), &paths); response != nil {
 				response("invalid path params", logger, w)
 				return
 			}
@@ -31,17 +50,19 @@ func (s *Service) actDecrpytionHandler() func(h http.Handler) http.Handler {
 				response("invalid header params", logger, w)
 				return
 			}
+
+			// Try to download the file wihtout decryption, if the act headers are not present
 			if headers.Publisher == nil || headers.Timestamp == nil || headers.HistoryAddress == nil {
 				h.ServeHTTP(w, r)
 				return
 			}
-
-			reference, err := s.dac.DownloadHandler(r.Context(), *headers.Timestamp, paths.Address, headers.Publisher, *headers.HistoryAddress, headers.Encrypt, headers.RLevel)
+			ctx := r.Context()
+			reference, err := s.dac.DownloadHandler(ctx, *headers.Timestamp, paths.Address, headers.Publisher, *headers.HistoryAddress, headers.Encrypt, headers.RLevel)
 			if err != nil {
+				jsonhttp.InternalServerError(w, "failed to get reference from act")
 				return
 			}
-			w.Header().Set("address", reference.String())
-			h.ServeHTTP(w, r)
+			h.ServeHTTP(w, r.WithContext(setAddress(ctx, reference.Bytes())))
 		})
 	}
 

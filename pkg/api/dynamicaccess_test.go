@@ -29,11 +29,11 @@ func TestDacUploadDownload(t *testing.T) {
 	var (
 		pk, _                = crypto.GenerateSecp256k1Key()
 		publicKeyBytes       = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
+		publisher            = hex.EncodeToString(publicKeyBytes)
 		fileUploadResource   = "/bzz"
 		fileDownloadResource = func(addr string) string { return "/bzz/" + addr }
 		storerMock           = mockstorer.New()
 		logger               = log.Noop
-		publisher            = hex.EncodeToString(publicKeyBytes)
 		client, _, _, _      = newTestServer(t, testServerOptions{
 			Storer:    storerMock,
 			Logger:    logger,

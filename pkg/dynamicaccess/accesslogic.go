@@ -47,7 +47,7 @@ func (al ActLogic) AddPublisher(ctx context.Context, storage kvs.KeyValueStore, 
 func (al ActLogic) EncryptRef(ctx context.Context, storage kvs.KeyValueStore, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
 	accessKey, err := al.getAccessKey(ctx, storage, publisherPubKey)
 	if err != nil {
-		return swarm.EmptyAddress, err
+		return swarm.ZeroAddress, err
 	}
 	refCipher := encryption.New(accessKey, 0, uint32(0), hashFunc)
 	encryptedRef, _ := refCipher.Encrypt(ref.Bytes())
@@ -122,7 +122,7 @@ func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
 func (al ActLogic) DecryptRef(ctx context.Context, storage kvs.KeyValueStore, encryptedRef swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error) {
 	keys, err := al.getKeys(publisher)
 	if err != nil {
-		return swarm.EmptyAddress, err
+		return swarm.ZeroAddress, err
 	}
 	lookupKey := keys[0]
 	accessKeyDecryptionKey := keys[1]
@@ -130,21 +130,21 @@ func (al ActLogic) DecryptRef(ctx context.Context, storage kvs.KeyValueStore, en
 	// Lookup encrypted access key from the ACT manifest
 	encryptedAccessKey, err := storage.Get(ctx, lookupKey)
 	if err != nil {
-		return swarm.EmptyAddress, err
+		return swarm.ZeroAddress, err
 	}
 
 	// Decrypt access key
 	accessKeyCipher := encryption.New(encryption.Key(accessKeyDecryptionKey), 0, uint32(0), hashFunc)
 	accessKey, err := accessKeyCipher.Decrypt(encryptedAccessKey)
 	if err != nil {
-		return swarm.EmptyAddress, err
+		return swarm.ZeroAddress, err
 	}
 
 	// Decrypt reference
 	refCipher := encryption.New(accessKey, 0, uint32(0), hashFunc)
 	ref, err := refCipher.Decrypt(encryptedRef.Bytes())
 	if err != nil {
-		return swarm.EmptyAddress, err
+		return swarm.ZeroAddress, err
 	}
 
 	return swarm.NewAddress(ref), nil

@@ -112,7 +112,7 @@ func (s *Service) dirUploadHandler(
 	finalReference := reference
 	if act {
 		publisherPublicKey := &s.publicKey
-		historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), reference, publisherPublicKey, historyAddress, encrypt, rLevel)
+		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), reference, publisherPublicKey, historyAddress, encrypt, rLevel)
 		if err != nil {
 			logger.Debug("act failed to encrypt dir", "error", err)
 			logger.Error(nil, "act failed to encrypt dir")
@@ -123,6 +123,22 @@ func (s *Service) dirUploadHandler(
 			logger.Debug("done split history failed", "error", err)
 			logger.Error(nil, "done split history failed")
 			jsonhttp.InternalServerError(w, "done split history failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
+		err = putter.Done(encryptedRef)
+		if err != nil {
+			logger.Debug("done split encrypted reference failed", "error", err)
+			logger.Error(nil, "done split encrypted reference failed")
+			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
+			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			return
+		}
+		err = putter.Done(kvsReference)
+		if err != nil {
+			logger.Debug("done split kvs reference failed", "error", err)
+			logger.Error(nil, "done split kvs reference failed")
+			jsonhttp.InternalServerError(w, "done split kvs reference failed")
 			ext.LogError(span, err, olog.String("action", "putter.Done"))
 			return
 		}
