@@ -311,9 +311,6 @@ func (s *Service) fileUploadHandler(
 		finalReference = encryptedRef
 		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	}
-	// swarm-cli stamp buy --depth 21 --amount 1000000 -y
-	// swarm-cli upload /Users/ujvaribalint/repos/solarpunk/bee/hello.txt --curl -H "Swarm-Act: true" --verbose
-	// swarm-cli download c327f33f46bbc4f95a0035fe5461f5119b10ee5b9ad12b1087fa1884cd79081c --curl -H "Swarm-Act: true" -H "Swarm-Act-History-Address: 14f3a6c44b1dba0f7e1ac24d9bdb491f79be9ff81bb5398669df1c34ecf32b0d" -H "Swarm-Act-Publisher: 03e34c0e4b66bf76838521aef3a0e08ff2ce11152264ee6d5d5ac672e4d124c85e" -H "Swarm-Act-Timestamp: 1712916331" -y
 
 	span.LogFields(olog.Bool("success", true))
 	span.SetTag("root_address", finalReference)

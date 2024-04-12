@@ -15,15 +15,15 @@ type addressKey struct{}
 
 // getAddressFromContext is a helper function to extract the address from the context
 func getAddressFromContext(ctx context.Context) swarm.Address {
-	v, ok := ctx.Value(addressKey{}).([]byte)
+	v, ok := ctx.Value(addressKey{}).(swarm.Address)
 	if ok {
-		return swarm.NewAddress(v)
+		return v
 	}
 	return swarm.ZeroAddress
 }
 
 // setAddress sets the redundancy level in the context
-func setAddress(ctx context.Context, address []byte) context.Context {
+func setAddress(ctx context.Context, address swarm.Address) context.Context {
 	return context.WithValue(ctx, addressKey{}, address)
 }
 
@@ -62,7 +62,7 @@ func (s *Service) actDecrpytionHandler() func(h http.Handler) http.Handler {
 				jsonhttp.InternalServerError(w, "failed to get reference from act")
 				return
 			}
-			h.ServeHTTP(w, r.WithContext(setAddress(ctx, reference.Bytes())))
+			h.ServeHTTP(w, r.WithContext(setAddress(ctx, reference)))
 		})
 	}
 
