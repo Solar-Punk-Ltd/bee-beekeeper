@@ -128,7 +128,7 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if headers.Act {
-		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
+		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
 		if err != nil {
 			jsonhttp.InternalServerError(w, "act upload failed")
 			return

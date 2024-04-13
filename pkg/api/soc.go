@@ -175,7 +175,7 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	reference := sch.Address()
 	if headers.Act {
-		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
+		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
 		if err != nil {
 			jsonhttp.InternalServerError(w, "act upload failed")
 			return

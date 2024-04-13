@@ -256,7 +256,7 @@ func (s *Service) feedPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// TODO: do we want to allow feed act upload/ download?
 	if headers.Act {
-		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &ref, headers.HistoryAddress)
+		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &ref, headers.HistoryAddress)
 		if err != nil {
 			jsonhttp.InternalServerError(w, "act upload failed")
 			return

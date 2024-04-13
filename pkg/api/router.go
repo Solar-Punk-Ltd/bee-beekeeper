@@ -210,12 +210,12 @@ func (s *Service) mountAPI() {
 		"GET": web.ChainHandlers(
 			s.contentLengthMetricMiddleware(),
 			s.newTracingHandler("bytes-download"),
-			s.actDecrpytionHandler(),
+			s.actDecryptionHandler(),
 			web.FinalHandlerFunc(s.bytesGetHandler),
 		),
 		"HEAD": web.ChainHandlers(
 			s.newTracingHandler("bytes-head"),
-			s.actDecrpytionHandler(),
+			s.actDecryptionHandler(),
 			web.FinalHandlerFunc(s.bytesHeadHandler),
 		),
 	})
@@ -234,11 +234,11 @@ func (s *Service) mountAPI() {
 
 	handle("/chunks/{address}", jsonhttp.MethodHandler{
 		"GET": web.ChainHandlers(
-			s.actDecrpytionHandler(),
+			s.actDecryptionHandler(),
 			web.FinalHandlerFunc(s.chunkGetHandler),
 		),
 		"HEAD": web.ChainHandlers(
-			s.actDecrpytionHandler(),
+			s.actDecryptionHandler(),
 			web.FinalHandlerFunc(s.hasChunkHandler),
 		),
 	})
@@ -284,11 +284,11 @@ func (s *Service) mountAPI() {
 		"GET": web.ChainHandlers(
 			s.contentLengthMetricMiddleware(),
 			s.newTracingHandler("bzz-download"),
-			s.actDecrpytionHandler(),
+			s.actDecryptionHandler(),
 			web.FinalHandlerFunc(s.bzzDownloadHandler),
 		),
 		"HEAD": web.ChainHandlers(
-			s.actDecrpytionHandler(),
+			s.actDecryptionHandler(),
 			web.FinalHandlerFunc(s.bzzHeadHandler),
 		),
 	})
@@ -428,7 +428,7 @@ func (s *Service) mountBusinessDebug(restricted bool) {
 	// TODO: review if chunk has needs act
 	handle("/chunks/{address}", jsonhttp.MethodHandler{
 		"GET": web.ChainHandlers(
-			s.actDecrpytionHandler(),
+			s.actDecryptionHandler(),
 			web.FinalHandlerFunc(s.hasChunkHandler),
 		),
 	})

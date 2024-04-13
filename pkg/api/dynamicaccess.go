@@ -24,12 +24,12 @@ func getAddressFromContext(ctx context.Context) swarm.Address {
 	return swarm.ZeroAddress
 }
 
-// setAddress sets the redundancy level in the context
-func setAddress(ctx context.Context, address swarm.Address) context.Context {
+// setAddress sets the swarm address in the context
+func setAddressInContext(ctx context.Context, address swarm.Address) context.Context {
 	return context.WithValue(ctx, addressKey{}, address)
 }
 
-func (s *Service) actDecrpytionHandler() func(h http.Handler) http.Handler {
+func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := s.logger.WithName("acthandler").Build()
@@ -64,14 +64,14 @@ func (s *Service) actDecrpytionHandler() func(h http.Handler) http.Handler {
 				jsonhttp.InternalServerError(w, "failed to get reference from act")
 				return
 			}
-			h.ServeHTTP(w, r.WithContext(setAddress(ctx, reference)))
+			h.ServeHTTP(w, r.WithContext(setAddressInContext(ctx, reference)))
 		})
 	}
 
 }
 
 // TODO: is ctx needed in ctrl upload ?
-func (s *Service) actEncrpytionHandler(
+func (s *Service) actEncryptionHandler(
 	ctx context.Context,
 	logger log.Logger,
 	w http.ResponseWriter,

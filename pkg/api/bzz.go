@@ -274,7 +274,7 @@ func (s *Service) fileUploadHandler(
 	}
 	// TODO: what to do if act encrypt fails but the file is already stored ?
 	if act {
-		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &manifestReference, historyAddress)
+		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &manifestReference, historyAddress)
 		if err != nil {
 			jsonhttp.InternalServerError(w, "act upload failed")
 			return
