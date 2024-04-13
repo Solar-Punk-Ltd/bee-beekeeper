@@ -102,7 +102,7 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p := requestPipelineFn(putter, headers.Encrypt, headers.RLevel)
-	address, err := p(ctx, r.Body)
+	reference, err := p(ctx, r.Body)
 	if err != nil {
 		logger.Debug("split write all failed", "error", err)
 		logger.Error(nil, "split write all failed")
@@ -116,9 +116,9 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	span.SetTag("root_address", address)
+	span.SetTag("root_address", reference)
 
-	err = putter.Done(address)
+	err = putter.Done(reference)
 	if err != nil {
 		logger.Debug("done split failed", "error", err)
 		logger.Error(nil, "done split failed")
@@ -127,41 +127,12 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	finalReference := address
 	if headers.Act {
-		publisherPublicKey := &s.publicKey
-		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), address, publisherPublicKey, headers.HistoryAddress, headers.Encrypt, headers.RLevel)
+		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
 		if err != nil {
-			logger.Debug("act failed to encrypt bytes", "error", err)
-			logger.Error(nil, "act failed to encrypt bytes")
-			jsonhttp.InternalServerError(w, "act failed to encrypt bytes")
-		}
-		err = putter.Done(historyReference)
-		if err != nil {
-			logger.Debug("done split history failed", "error", err)
-			logger.Error(nil, "done split history failed")
-			jsonhttp.InternalServerError(w, "done split history failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			jsonhttp.InternalServerError(w, "act upload failed")
 			return
 		}
-		err = putter.Done(encryptedRef)
-		if err != nil {
-			logger.Debug("done split encrypted reference failed", "error", err)
-			logger.Error(nil, "done split encrypted reference failed")
-			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
-			return
-		}
-		err = putter.Done(kvsReference)
-		if err != nil {
-			logger.Debug("done split kvs reference failed", "error", err)
-			logger.Error(nil, "done split kvs reference failed")
-			jsonhttp.InternalServerError(w, "done split kvs reference failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
-			return
-		}
-		finalReference = encryptedRef
-		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	}
 
 	if tag != 0 {
@@ -172,7 +143,7 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
 	jsonhttp.Created(w, bytesPostResponse{
-		Reference: finalReference,
+		Reference: reference,
 	})
 }
 

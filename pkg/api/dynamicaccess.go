@@ -7,6 +7,8 @@ import (
 
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
+	"github.com/ethersphere/bee/v2/pkg/log"
+	storer "github.com/ethersphere/bee/v2/pkg/storer"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/gorilla/mux"
 )
@@ -66,4 +68,44 @@ func (s *Service) actDecrpytionHandler() func(h http.Handler) http.Handler {
 		})
 	}
 
+}
+
+// TODO: is ctx needed in ctrl upload ?
+func (s *Service) actEncrpytionHandler(
+	ctx context.Context,
+	logger log.Logger,
+	w http.ResponseWriter,
+	putter storer.PutterSession,
+	reference *swarm.Address,
+	historyAddress *swarm.Address,
+) error {
+	publisherPublicKey := &s.publicKey
+	kvsReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, *reference, publisherPublicKey, historyAddress, false, redundancy.NONE)
+	if err != nil {
+		logger.Debug("act failed to encrypt reference", "error", err)
+		logger.Error(nil, "act failed to encrypt reference")
+		return err
+	}
+	err = putter.Done(historyReference)
+	if err != nil {
+		logger.Debug("done split history failed", "error", err)
+		logger.Error(nil, "done split history failed")
+		return err
+	}
+	err = putter.Done(encryptedReference)
+	if err != nil {
+		logger.Debug("done split encrypted reference failed", "error", err)
+		logger.Error(nil, "done split encrypted reference failed")
+		return err
+	}
+	err = putter.Done(kvsReference)
+	if err != nil {
+		logger.Debug("done split kvs reference failed", "error", err)
+		logger.Error(nil, "done split kvs reference failed")
+		return err
+	}
+	*reference = encryptedReference
+	w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
+
+	return nil
 }

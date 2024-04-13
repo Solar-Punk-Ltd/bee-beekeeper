@@ -137,9 +137,11 @@ func (s *Service) feedPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	headers := struct {
-		BatchID  []byte `map:"Swarm-Postage-Batch-Id" validate:"required"`
-		Pin      bool   `map:"Swarm-Pin"`
-		Deferred *bool  `map:"Swarm-Deferred-Upload"`
+		BatchID        []byte         `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		Pin            bool           `map:"Swarm-Pin"`
+		Deferred       *bool          `map:"Swarm-Deferred-Upload"`
+		Act            bool           `map:"Swarm-Act"`
+		HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
@@ -251,6 +253,14 @@ func (s *Service) feedPostHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Error(nil, "done split failed")
 		jsonhttp.InternalServerError(ow, "done split failed")
 		return
+	}
+	// TODO: do we want to allow feed act upload/ download?
+	if headers.Act {
+		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &ref, headers.HistoryAddress)
+		if err != nil {
+			jsonhttp.InternalServerError(w, "act upload failed")
+			return
+		}
 	}
 
 	jsonhttp.Created(w, feedReferenceResponse{Reference: ref})

@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	"github.com/ethersphere/bee/v2/pkg/cac"
-	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/postage"
 	"github.com/ethersphere/bee/v2/pkg/soc"
@@ -174,39 +173,14 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	finalReference := sch.Address()
+	reference := sch.Address()
 	if headers.Act {
-		publisherPublicKey := &s.publicKey
-		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), sch.Address(), publisherPublicKey, headers.HistoryAddress, false, redundancy.NONE)
+		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
 		if err != nil {
-			logger.Debug("act failed to encrypt soc", "error", err)
-			logger.Error(nil, "act failed to encrypt soc")
-			jsonhttp.InternalServerError(w, "act failed to encrypt soc")
-		}
-		err = putter.Done(historyReference)
-		if err != nil {
-			logger.Debug("done split history failed", "error", err)
-			logger.Error(nil, "done split history failed")
-			jsonhttp.InternalServerError(w, "done split history failed")
+			jsonhttp.InternalServerError(w, "act upload failed")
 			return
 		}
-		err = putter.Done(encryptedRef)
-		if err != nil {
-			logger.Debug("done split encrypted reference failed", "error", err)
-			logger.Error(nil, "done split encrypted reference failed")
-			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
-			return
-		}
-		err = putter.Done(kvsReference)
-		if err != nil {
-			logger.Debug("done split kvs reference failed", "error", err)
-			logger.Error(nil, "done split kvs reference failed")
-			jsonhttp.InternalServerError(w, "done split kvs reference failed")
-			return
-		}
-		finalReference = encryptedRef
-		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	}
 
-	jsonhttp.Created(w, chunkAddressResponse{Reference: finalReference})
+	jsonhttp.Created(w, chunkAddressResponse{Reference: reference})
 }

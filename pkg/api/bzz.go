@@ -273,56 +273,25 @@ func (s *Service) fileUploadHandler(
 		return
 	}
 	// TODO: what to do if act encrypt fails but the file is already stored ?
-	finalReference := manifestReference
 	if act {
-		// TODO: is context needed ?
-		// TODO: wrap this act logic into a wrapper func
-		publisherPublicKey := &s.publicKey
-		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), manifestReference, publisherPublicKey, historyAddress, encrypt, rLevel)
+		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &manifestReference, historyAddress)
 		if err != nil {
-			logger.Debug("act failed to encrypt file", "file_name", queries.FileName, "error", err)
-			logger.Error(nil, "act failed to encrypt file", "file_name", queries.FileName)
-			jsonhttp.InternalServerError(w, "act failed to encrypt file")
-		}
-		err = putter.Done(historyReference)
-		if err != nil {
-			logger.Debug("done split history failed", "error", err)
-			logger.Error(nil, "done split history failed")
-			jsonhttp.InternalServerError(w, "done split history failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			jsonhttp.InternalServerError(w, "act upload failed")
 			return
 		}
-		err = putter.Done(encryptedRef)
-		if err != nil {
-			logger.Debug("done split encrypted reference failed", "error", err)
-			logger.Error(nil, "done split encrypted reference failed")
-			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
-			return
-		}
-		err = putter.Done(kvsReference)
-		if err != nil {
-			logger.Debug("done split kvs reference failed", "error", err)
-			logger.Error(nil, "done split kvs reference failed")
-			jsonhttp.InternalServerError(w, "done split kvs reference failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
-			return
-		}
-		finalReference = encryptedRef
-		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	}
 
 	span.LogFields(olog.Bool("success", true))
-	span.SetTag("root_address", finalReference)
+	span.SetTag("root_address", manifestReference)
 
 	if tagID != 0 {
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tagID))
 		span.SetTag("tagID", tagID)
 	}
-	w.Header().Set(ETagHeader, fmt.Sprintf("%q", finalReference.String()))
+	w.Header().Set(ETagHeader, fmt.Sprintf("%q", manifestReference.String()))
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
 	jsonhttp.Created(w, bzzUploadResponse{
-		Reference: finalReference,
+		Reference: manifestReference,
 	})
 }
 

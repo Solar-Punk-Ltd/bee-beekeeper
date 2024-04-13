@@ -109,41 +109,12 @@ func (s *Service) dirUploadHandler(
 		return
 	}
 
-	finalReference := reference
 	if act {
-		publisherPublicKey := &s.publicKey
-		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(context.Background(), reference, publisherPublicKey, historyAddress, encrypt, rLevel)
+		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &reference, historyAddress)
 		if err != nil {
-			logger.Debug("act failed to encrypt dir", "error", err)
-			logger.Error(nil, "act failed to encrypt dir")
-			jsonhttp.InternalServerError(w, "act failed to encrypt dir")
-		}
-		err = putter.Done(historyReference)
-		if err != nil {
-			logger.Debug("done split history failed", "error", err)
-			logger.Error(nil, "done split history failed")
-			jsonhttp.InternalServerError(w, "done split history failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
+			jsonhttp.InternalServerError(w, "act upload failed")
 			return
 		}
-		err = putter.Done(encryptedRef)
-		if err != nil {
-			logger.Debug("done split encrypted reference failed", "error", err)
-			logger.Error(nil, "done split encrypted reference failed")
-			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
-			return
-		}
-		err = putter.Done(kvsReference)
-		if err != nil {
-			logger.Debug("done split kvs reference failed", "error", err)
-			logger.Error(nil, "done split kvs reference failed")
-			jsonhttp.InternalServerError(w, "done split kvs reference failed")
-			ext.LogError(span, err, olog.String("action", "putter.Done"))
-			return
-		}
-		finalReference = encryptedRef
-		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	}
 
 	if tag != 0 {
@@ -152,7 +123,7 @@ func (s *Service) dirUploadHandler(
 	}
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
 	jsonhttp.Created(w, bzzUploadResponse{
-		Reference: finalReference,
+		Reference: reference,
 	})
 }
 

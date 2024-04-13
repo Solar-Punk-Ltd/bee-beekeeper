@@ -13,7 +13,6 @@ import (
 	"strconv"
 
 	"github.com/ethersphere/bee/v2/pkg/cac"
-	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/soc"
 
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
@@ -163,38 +162,13 @@ func (s *Service) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	finalReference := chunk.Address()
+	reference := chunk.Address()
 	if headers.Act {
-		publisherPublicKey := &s.publicKey
-		kvsReference, historyReference, encryptedRef, err := s.dac.UploadHandler(r.Context(), chunk.Address(), publisherPublicKey, headers.HistoryAddress, false, redundancy.NONE)
+		err = s.actEncrpytionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
 		if err != nil {
-			logger.Debug("act failed to encrypt chunk", "error", err)
-			logger.Error(nil, "act failed to encrypt chunk")
-			jsonhttp.InternalServerError(w, "act failed to encrypt chunk")
-		}
-		err = putter.Done(historyReference)
-		if err != nil {
-			logger.Debug("done split history failed", "error", err)
-			logger.Error(nil, "done split history failed")
-			jsonhttp.InternalServerError(w, "done split history failed")
+			jsonhttp.InternalServerError(w, "act upload failed")
 			return
 		}
-		err = putter.Done(encryptedRef)
-		if err != nil {
-			logger.Debug("done split encrypted reference failed", "error", err)
-			logger.Error(nil, "done split encrypted reference failed")
-			jsonhttp.InternalServerError(w, "done split encrypted reference failed")
-			return
-		}
-		err = putter.Done(kvsReference)
-		if err != nil {
-			logger.Debug("done split kvs reference failed", "error", err)
-			logger.Error(nil, "done split kvs reference failed")
-			jsonhttp.InternalServerError(w, "done split kvs reference failed")
-			return
-		}
-		finalReference = encryptedRef
-		w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	}
 
 	if tag != 0 {
@@ -202,7 +176,7 @@ func (s *Service) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
-	jsonhttp.Created(w, chunkAddressResponse{Reference: finalReference})
+	jsonhttp.Created(w, chunkAddressResponse{Reference: reference})
 }
 
 func (s *Service) chunkGetHandler(w http.ResponseWriter, r *http.Request) {
