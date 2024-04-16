@@ -112,7 +112,7 @@ func (s *Service) dirUploadHandler(
 	if act {
 		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &reference, historyAddress)
 		if err != nil {
-			jsonhttp.InternalServerError(w, "act upload failed")
+			jsonhttp.InternalServerError(w, errActUpload)
 			return
 		}
 	}

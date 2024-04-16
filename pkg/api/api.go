@@ -122,6 +122,8 @@ var (
 	errBatchUnusable                    = errors.New("batch not usable")
 	errUnsupportedDevNodeOperation      = errors.New("operation not supported in dev mode")
 	errOperationSupportedOnlyInFullMode = errors.New("operation is supported only in full mode")
+	errActDownload                      = errors.New("act download failed")
+	errActUpload                        = errors.New("act upload failed")
 )
 
 // Storer interface provides the functionality required from the local storage

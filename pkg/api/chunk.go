@@ -166,7 +166,7 @@ func (s *Service) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 	if headers.Act {
 		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
 		if err != nil {
-			jsonhttp.InternalServerError(w, "act upload failed")
+			jsonhttp.InternalServerError(w, errActUpload)
 			return
 		}
 	}

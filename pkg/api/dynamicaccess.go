@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"net/http"
 
-	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/log"
 	storer "github.com/ethersphere/bee/v2/pkg/storer"
@@ -45,8 +44,6 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 				Timestamp      *int64           `map:"Swarm-Act-Timestamp"`
 				Publisher      *ecdsa.PublicKey `map:"Swarm-Act-Publisher"`
 				HistoryAddress *swarm.Address   `map:"Swarm-Act-History-Address"`
-				Encrypt        bool             `map:"Swarm-Encrypt"`
-				RLevel         redundancy.Level `map:"Swarm-Redundancy-Level"`
 			}{}
 			if response := s.mapStructure(r.Header, &headers); response != nil {
 				response("invalid header params", logger, w)
@@ -59,9 +56,9 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 				return
 			}
 			ctx := r.Context()
-			reference, err := s.dac.DownloadHandler(ctx, *headers.Timestamp, paths.Address, headers.Publisher, *headers.HistoryAddress, headers.Encrypt, headers.RLevel)
+			reference, err := s.dac.DownloadHandler(ctx, *headers.Timestamp, paths.Address, headers.Publisher, *headers.HistoryAddress)
 			if err != nil {
-				jsonhttp.InternalServerError(w, "failed to get reference from act")
+				jsonhttp.InternalServerError(w, errActDownload)
 				return
 			}
 			h.ServeHTTP(w, r.WithContext(setAddressInContext(ctx, reference)))
@@ -80,7 +77,7 @@ func (s *Service) actEncryptionHandler(
 	historyAddress *swarm.Address,
 ) error {
 	publisherPublicKey := &s.publicKey
-	kvsReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, *reference, publisherPublicKey, historyAddress, false, redundancy.NONE)
+	kvsReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, *reference, publisherPublicKey, historyAddress)
 	if err != nil {
 		logger.Debug("act failed to encrypt reference", "error", err)
 		logger.Error(nil, "act failed to encrypt reference")

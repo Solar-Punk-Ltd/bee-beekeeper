@@ -104,6 +104,7 @@ type testServerOptions struct {
 	PostageContract    postagecontract.Interface
 	StakingContract    staking.Contract
 	Post               postage.Service
+	Dac                dynamicaccess.Service
 	Steward            steward.Interface
 	WsHeaders          http.Header
 	Authenticator      auth.Authenticator
@@ -153,6 +154,9 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 	}
 	if o.Post == nil {
 		o.Post = mockpost.New()
+	}
+	if o.Dac == nil {
+		o.Dac = mockdac.New()
 	}
 	if o.BatchStore == nil {
 		o.BatchStore = mockbatchstore.New(mockbatchstore.WithAcceptAllExistsFunc()) // default is with accept-all Exists() func
@@ -216,13 +220,7 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 	s := api.New(o.PublicKey, o.PSSPublicKey, o.EthereumAddress, []string{o.WhitelistedAddr}, o.Logger, transaction, o.BatchStore, o.BeeMode, true, true, backend, o.CORSAllowedOrigins, inmemstore.New())
 	testutil.CleanupCloser(t, s)
 
-	mockStorer := mockstorer.New()
-	session := dynamicaccess.NewDefaultSession(pk)
-	actLogic := dynamicaccess.NewLogic(session)
-	// TODO: proper mock service and test
-	ctrl := dynamicaccess.NewController(context.Background(), actLogic, mockStorer.ChunkStore(), mockStorer.Cache())
-	dac := mockdac.NewService(ctrl)
-	s.SetDac(dac)
+	s.SetDac(o.Dac)
 
 	s.SetP2P(o.P2P)
 

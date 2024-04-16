@@ -10,7 +10,6 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/file"
-	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
@@ -56,9 +55,9 @@ func TestController_NewUploadDownload(t *testing.T) {
 	al := dynamicaccess.NewLogic(diffieHellman)
 	c := dynamicaccess.NewController(ctx, al, mockStorer.ChunkStore(), mockStorer.Cache())
 	ref := swarm.RandAddress(t)
-	_, hRef, enryptedRef, err := c.UploadHandler(ctx, ref, &publisher.PublicKey, nil, false, redundancy.NONE)
+	_, hRef, encryptedRef, err := c.UploadHandler(ctx, ref, &publisher.PublicKey, nil)
 	assert.NoError(t, err)
-	dref, err := c.DownloadHandler(ctx, time.Now().Unix(), enryptedRef, &publisher.PublicKey, hRef, false, redundancy.NONE)
+	dref, err := c.DownloadHandler(ctx, time.Now().Unix(), encryptedRef, &publisher.PublicKey, hRef)
 	assert.NoError(t, err)
 	assert.Equal(t, ref, dref)
 }
@@ -73,9 +72,9 @@ func TestController_ExistingUploadDownload(t *testing.T) {
 	ref := swarm.RandAddress(t)
 	hRef, err := getHistoryFixture(ctx, ls, al, &publisher.PublicKey)
 	assert.NoError(t, err)
-	_, hRef, enryptedRef, err := c.UploadHandler(ctx, ref, &publisher.PublicKey, &hRef, false, redundancy.NONE)
+	_, hRef, encryptedRef, err := c.UploadHandler(ctx, ref, &publisher.PublicKey, &hRef)
 	assert.NoError(t, err)
-	dref, err := c.DownloadHandler(ctx, time.Now().Unix(), enryptedRef, &publisher.PublicKey, hRef, false, redundancy.NONE)
+	dref, err := c.DownloadHandler(ctx, time.Now().Unix(), encryptedRef, &publisher.PublicKey, hRef)
 	assert.NoError(t, err)
 	assert.Equal(t, ref, dref)
 }

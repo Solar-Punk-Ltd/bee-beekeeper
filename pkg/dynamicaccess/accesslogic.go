@@ -107,7 +107,6 @@ func (al *ActLogic) getAccessKey(ctx context.Context, storage kvs.KeyValueStore,
 	}
 
 	return accessKeyDecryptionCipher.Decrypt(encryptedAK)
-
 }
 
 var oneByteArray = []byte{1}

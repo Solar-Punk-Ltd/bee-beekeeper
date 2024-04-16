@@ -276,7 +276,7 @@ func (s *Service) fileUploadHandler(
 	if act {
 		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &manifestReference, historyAddress)
 		if err != nil {
-			jsonhttp.InternalServerError(w, "act upload failed")
+			jsonhttp.InternalServerError(w, errActUpload)
 			return
 		}
 	}
