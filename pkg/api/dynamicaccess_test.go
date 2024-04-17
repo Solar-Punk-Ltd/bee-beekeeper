@@ -199,6 +199,19 @@ func TestDacEachEndpointWithAct(t *testing.T) {
 				jsonhttptest.WithExpectedContentLength(len(v.expdata)),
 				jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, expcontenttype),
 			)
+
+			if v.name != "bzz-dir" && v.name != "soc" && v.name != "chunks" {
+				t.Run("head", func(t *testing.T) {
+					jsonhttptest.Request(t, client, http.MethodHead, v.downurl+"/"+v.exphash, http.StatusOK,
+						jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
+						jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, historyRef),
+						jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
+						jsonhttptest.WithRequestBody(v.data),
+						jsonhttptest.WithExpectedContentLength(len(v.expdata)),
+						jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, expcontenttype),
+					)
+				})
+			}
 		})
 	}
 }
@@ -532,41 +545,6 @@ func TestDacHistory(t *testing.T) {
 			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
 			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
 			jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, "application/json; charset=utf-8"),
-		)
-	})
-	// TODO: separately for each endpoint
-	t.Run("head", func(t *testing.T) {
-		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(),
-		})
-		var (
-			testfile     = "testfile1"
-			encryptedRef = "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
-		)
-		header := jsonhttptest.Request(t, client, http.MethodPost, fileUploadResource+"?name="+fileName, http.StatusCreated,
-			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
-			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
-			jsonhttptest.WithRequestBody(strings.NewReader(testfile)),
-			jsonhttptest.WithExpectedJSONResponse(api.BzzUploadResponse{
-				Reference: swarm.MustParseHexAddress(encryptedRef),
-			}),
-			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
-			jsonhttptest.WithNonEmptyResponseHeader(api.SwarmTagHeader),
-			jsonhttptest.WithExpectedResponseHeader(api.ETagHeader, fmt.Sprintf("%q", encryptedRef)),
-		)
-
-		historyRef := header.Get(api.SwarmActHistoryAddressHeader)
-		jsonhttptest.Request(t, client, http.MethodHead, fileDownloadResource(encryptedRef), http.StatusOK,
-			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
-			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, historyRef),
-			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
-			jsonhttptest.WithRequestBody(strings.NewReader(testfile)),
-			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
-			jsonhttptest.WithExpectedContentLength(len(testfile)),
 		)
 	})
 }
