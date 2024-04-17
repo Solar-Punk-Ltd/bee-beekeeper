@@ -266,14 +266,6 @@ func (s *Service) mountAPI() {
 		),
 	})
 
-	handle("/grantee", jsonhttp.MethodHandler{
-		"POST": web.ChainHandlers(
-			s.contentLengthMetricMiddleware(),
-			s.newTracingHandler("bzz-grantee"),
-			web.FinalHandlerFunc(s.bzzUploadHandler), //TODO: change to grantee handler
-		),
-	})
-
 	handle("/bzz/{address}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u := r.URL
 		u.Path += "/"
@@ -425,7 +417,7 @@ func (s *Service) mountBusinessDebug(restricted bool) {
 	handle("/peers/{address}", jsonhttp.MethodHandler{
 		"DELETE": http.HandlerFunc(s.peerDisconnectHandler),
 	})
-	// TODO: review if chunk has needs act
+
 	handle("/chunks/{address}", jsonhttp.MethodHandler{
 		"GET": web.ChainHandlers(
 			s.actDecryptionHandler(),

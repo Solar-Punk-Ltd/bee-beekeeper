@@ -181,6 +181,6 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
+	// TODO: replace resp. with SocPostResponse
 	jsonhttp.Created(w, chunkAddressResponse{Reference: reference})
 }

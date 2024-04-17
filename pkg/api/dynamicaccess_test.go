@@ -5,9 +5,11 @@
 package api_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -24,8 +26,10 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp/jsonhttptest"
 	"github.com/ethersphere/bee/v2/pkg/log"
 	mockpost "github.com/ethersphere/bee/v2/pkg/postage/mock"
+	testingsoc "github.com/ethersphere/bee/v2/pkg/soc/testing"
 	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
+	"gitlab.com/nolash/go-mockbytes"
 )
 
 func prepareHistoryFixture(storer api.Storer) (dynamicaccess.History, swarm.Address) {
@@ -58,14 +62,158 @@ func prepareHistoryFixture(storer api.Storer) (dynamicaccess.History, swarm.Addr
 	return h, ref
 }
 
+func TestDacEachEndpointWithAct(t *testing.T) {
+	t.Parallel()
+	var (
+		spk, _         = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
+		pk, _          = crypto.DecodeSecp256k1PrivateKey(spk)
+		publicKeyBytes = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
+		publisher      = hex.EncodeToString(publicKeyBytes)
+		testfile       = "testfile1"
+		storerMock     = mockstorer.New()
+		logger         = log.Noop
+		now            = time.Now().Unix()
+		chunk          = swarm.NewChunk(
+			swarm.MustParseHexAddress("0025737be11979e91654dffd2be817ac1e52a2dadb08c97a7cef12f937e707bc"),
+			[]byte{72, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 149, 179, 31, 244, 146, 247, 129, 123, 132, 248, 215, 77, 44, 47, 91, 248, 229, 215, 89, 156, 210, 243, 3, 110, 204, 74, 101, 119, 53, 53, 145, 188, 193, 153, 130, 197, 83, 152, 36, 140, 150, 209, 191, 214, 193, 4, 144, 121, 32, 45, 205, 220, 59, 227, 28, 43, 161, 51, 108, 14, 106, 180, 135, 2},
+		)
+		g           = mockbytes.New(0, mockbytes.MockTypeStandard).WithModulus(255)
+		bytedata, _ = g.SequentialBytes(swarm.ChunkSize * 2)
+		tag, _      = storerMock.NewSession()
+		sch         = testingsoc.GenerateMockSOCWithKey(t, []byte("foo"), pk)
+		dirdata     = []byte("Lorem ipsum dolor sit amet")
+		socResource = func(owner, id, sig string) string { return fmt.Sprintf("/soc/%s/%s?sig=%s", owner, id, sig) }
+	)
+
+	tc := []struct {
+		name        string
+		downurl     string
+		upurl       string
+		exphash     string
+		data        io.Reader
+		expdata     []byte
+		contenttype string
+		resp        struct {
+			Reference swarm.Address `json:"reference"`
+		}
+	}{
+		{
+			name:        "bzz",
+			upurl:       "/bzz?name=sample.html",
+			downurl:     "/bzz",
+			exphash:     "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade",
+			resp:        api.BzzUploadResponse{Reference: swarm.MustParseHexAddress("a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade")},
+			data:        strings.NewReader(testfile),
+			expdata:     []byte(testfile),
+			contenttype: "text/html; charset=utf-8",
+		},
+		{
+			name:    "bzz-dir",
+			upurl:   "/bzz?name=ipsum/lorem.txt",
+			downurl: "/bzz",
+			exphash: "6561b2a744d2a8f276270585da22e092c07c56624af83ac9969d52b54e87cee6/ipsum/lorem.txt",
+			resp:    api.BzzUploadResponse{Reference: swarm.MustParseHexAddress("6561b2a744d2a8f276270585da22e092c07c56624af83ac9969d52b54e87cee6")},
+			data: tarFiles(t, []f{
+				{
+					data: dirdata,
+					name: "lorem.txt",
+					dir:  "ipsum",
+					header: http.Header{
+						api.ContentTypeHeader: {"text/plain; charset=utf-8"},
+					},
+				},
+			}),
+			expdata:     dirdata,
+			contenttype: api.ContentTypeTar,
+		},
+		{
+			name:        "bytes",
+			upurl:       "/bytes",
+			downurl:     "/bytes",
+			exphash:     "e30da540bb9e1901169977fcf617f28b7f8df4537de978784f6d47491619a630",
+			resp:        api.BytesPostResponse{Reference: swarm.MustParseHexAddress("e30da540bb9e1901169977fcf617f28b7f8df4537de978784f6d47491619a630")},
+			data:        bytes.NewReader(bytedata),
+			expdata:     bytedata,
+			contenttype: "application/octet-stream",
+		},
+		{
+			name:        "chunks",
+			upurl:       "/chunks",
+			downurl:     "/chunks",
+			exphash:     "ca8d2d29466e017cba46d383e7e0794d99a141185ec525086037f25fc2093155",
+			resp:        api.ChunkAddressResponse{Reference: swarm.MustParseHexAddress("ca8d2d29466e017cba46d383e7e0794d99a141185ec525086037f25fc2093155")},
+			data:        bytes.NewReader(chunk.Data()),
+			expdata:     chunk.Data(),
+			contenttype: "binary/octet-stream",
+		},
+		{
+			name:        "soc",
+			upurl:       socResource(hex.EncodeToString(sch.Owner), hex.EncodeToString(sch.ID), hex.EncodeToString(sch.Signature)),
+			downurl:     "/chunks",
+			exphash:     "b100d7ce487426b17b98ff779fad4f2dd471d04ab1c8949dd2a1a78fe4a1524e",
+			resp:        api.ChunkAddressResponse{Reference: swarm.MustParseHexAddress("b100d7ce487426b17b98ff779fad4f2dd471d04ab1c8949dd2a1a78fe4a1524e")},
+			data:        bytes.NewReader(sch.WrappedChunk.Data()),
+			expdata:     sch.Chunk().Data(),
+			contenttype: "binary/octet-stream",
+		},
+	}
+
+	for _, v := range tc {
+		upTestOpts := []jsonhttptest.Option{
+			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestHeader(api.SwarmPinHeader, "true"),
+			jsonhttptest.WithRequestHeader(api.SwarmTagHeader, fmt.Sprintf("%d", tag.TagID)),
+			jsonhttptest.WithRequestBody(v.data),
+			jsonhttptest.WithExpectedJSONResponse(v.resp),
+			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, v.contenttype),
+		}
+		if v.name == "soc" {
+			upTestOpts = append(upTestOpts, jsonhttptest.WithRequestHeader(api.SwarmPinHeader, "true"))
+		} else {
+			upTestOpts = append(upTestOpts, jsonhttptest.WithNonEmptyResponseHeader(api.SwarmTagHeader))
+		}
+		expcontenttype := v.contenttype
+		if v.name == "bzz-dir" {
+			expcontenttype = "text/plain; charset=utf-8"
+			upTestOpts = append(upTestOpts, jsonhttptest.WithRequestHeader(api.SwarmCollectionHeader, "True"))
+		}
+		t.Run(v.name, func(t *testing.T) {
+			client, _, _, _ := newTestServer(t, testServerOptions{
+				Storer:    storerMock,
+				Logger:    logger,
+				Post:      mockpost.New(mockpost.WithAcceptAll()),
+				PublicKey: pk.PublicKey,
+				Dac:       mockdac.New(),
+			})
+			header := jsonhttptest.Request(t, client, http.MethodPost, v.upurl, http.StatusCreated,
+				upTestOpts...,
+			)
+
+			historyRef := header.Get(api.SwarmActHistoryAddressHeader)
+			jsonhttptest.Request(t, client, http.MethodGet, v.downurl+"/"+v.exphash, http.StatusOK,
+				jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
+				jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, historyRef),
+				jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
+				jsonhttptest.WithExpectedResponse(v.expdata),
+				jsonhttptest.WithExpectedContentLength(len(v.expdata)),
+				jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, expcontenttype),
+			)
+		})
+	}
+}
+
 // TODO: maybe add HEAD tests
+// TODO: maybe add a test for each endpoint
 // nolint:paralleltest,tparallel
-// TODO: TestDacWithoutActHeader doc. comment
+// TestDacWithoutActHeader [negative tests]:
+// 1. upload w/ "Swarm-Act" header then try to dowload w/o the header.
+// 2. upload w/o "Swarm-Act" header then try to dowload w/ the header.
 func TestDacWithoutAct(t *testing.T) {
 	t.Parallel()
 	var (
-		data, _              = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
-		pk, _                = crypto.DecodeSecp256k1PrivateKey(data)
+		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
+		pk, _                = crypto.DecodeSecp256k1PrivateKey(spk)
 		publicKeyBytes       = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
 		publisher            = hex.EncodeToString(publicKeyBytes)
 		fileUploadResource   = "/bzz"
@@ -158,12 +306,12 @@ func TestDacWithoutAct(t *testing.T) {
 }
 
 // nolint:paralleltest,tparallel
-// TODO: TestDacInvalidPath doc. comment
+// TestDacInvalidPath [negative test]: Expect Bad request when the path address is invalid.
 func TestDacInvalidPath(t *testing.T) {
 	t.Parallel()
 	var (
-		data, _              = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
-		pk, _                = crypto.DecodeSecp256k1PrivateKey(data)
+		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
+		pk, _                = crypto.DecodeSecp256k1PrivateKey(spk)
 		publicKeyBytes       = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
 		publisher            = hex.EncodeToString(publicKeyBytes)
 		fileDownloadResource = func(addr string) string { return "/bzz/" + addr }
@@ -204,12 +352,16 @@ func TestDacInvalidPath(t *testing.T) {
 }
 
 // nolint:paralleltest,tparallel
-// TODO: TestDacHistory doc. comment
+// TestDacHistory tests:
+// [positive tests] 1., 2.: uploading a file w/ and w/o history address then downloading it and checking the data.
+// [negative test] 3. uploading a file then downloading it with a wrong history address.
+// [negative test] 4. uploading a file to a wrong history address.
+// [negative test] 4. downloading a file to w/o history address.
 func TestDacHistory(t *testing.T) {
 	t.Parallel()
 	var (
-		data, _              = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
-		pk, _                = crypto.DecodeSecp256k1PrivateKey(data)
+		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
+		pk, _                = crypto.DecodeSecp256k1PrivateKey(spk)
 		publicKeyBytes       = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
 		publisher            = hex.EncodeToString(publicKeyBytes)
 		fileUploadResource   = "/bzz"
@@ -382,15 +534,52 @@ func TestDacHistory(t *testing.T) {
 			jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, "application/json; charset=utf-8"),
 		)
 	})
+	// TODO: separately for each endpoint
+	t.Run("head", func(t *testing.T) {
+		client, _, _, _ := newTestServer(t, testServerOptions{
+			Storer:    storerMock,
+			Logger:    logger,
+			Post:      mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey: pk.PublicKey,
+			Dac:       mockdac.New(),
+		})
+		var (
+			testfile     = "testfile1"
+			encryptedRef = "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
+		)
+		header := jsonhttptest.Request(t, client, http.MethodPost, fileUploadResource+"?name="+fileName, http.StatusCreated,
+			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestBody(strings.NewReader(testfile)),
+			jsonhttptest.WithExpectedJSONResponse(api.BzzUploadResponse{
+				Reference: swarm.MustParseHexAddress(encryptedRef),
+			}),
+			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
+			jsonhttptest.WithNonEmptyResponseHeader(api.SwarmTagHeader),
+			jsonhttptest.WithExpectedResponseHeader(api.ETagHeader, fmt.Sprintf("%q", encryptedRef)),
+		)
+
+		historyRef := header.Get(api.SwarmActHistoryAddressHeader)
+		jsonhttptest.Request(t, client, http.MethodHead, fileDownloadResource(encryptedRef), http.StatusOK,
+			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, historyRef),
+			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
+			jsonhttptest.WithRequestBody(strings.NewReader(testfile)),
+			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
+			jsonhttptest.WithExpectedContentLength(len(testfile)),
+		)
+	})
 }
 
 // nolint:paralleltest,tparallel
-// TODO: TestDacTimestamp doc. comment
+// TestDacTimestamp doc. comment
+// [positive test] 1.: uploading a file w/ ACT then download it w/ timestamp and check the data.
+// [negative test] 2.: try to download a file w/o timestamp.
 func TestDacTimestamp(t *testing.T) {
 	t.Parallel()
 	var (
-		data, _              = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
-		pk, _                = crypto.DecodeSecp256k1PrivateKey(data)
+		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
+		pk, _                = crypto.DecodeSecp256k1PrivateKey(spk)
 		publicKeyBytes       = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
 		publisher            = hex.EncodeToString(publicKeyBytes)
 		fileUploadResource   = "/bzz"
@@ -468,12 +657,16 @@ func TestDacTimestamp(t *testing.T) {
 }
 
 // nolint:paralleltest,tparallel
-// TODO: TestDacPublisher doc. comment
+// TestDacPublisher doc. comment
+// [positive test] 1.: uploading a file w/ ACT then download it w/ the publisher address and check the data.
+// [negative test] 2.: expect Bad request when the public key is invalid.
+// [negative test] 3.: try to download a file w/ an incorrect publisher address.
+// [negative test] 3.: try to download a file w/o a publisher address.
 func TestDacPublisher(t *testing.T) {
 	t.Parallel()
 	var (
-		data, _              = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
-		pk, _                = crypto.DecodeSecp256k1PrivateKey(data)
+		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
+		pk, _                = crypto.DecodeSecp256k1PrivateKey(spk)
 		publicKeyBytes       = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
 		publisher            = hex.EncodeToString(publicKeyBytes)
 		fileUploadResource   = "/bzz"
@@ -531,7 +724,7 @@ func TestDacPublisher(t *testing.T) {
 		)
 	})
 
-	t.Run("upload-then-invalid-publickey", func(t *testing.T) {
+	t.Run("upload-then-download-invalid-publickey", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
 			Storer:    storerMock,
 			Logger:    logger,

@@ -573,8 +573,8 @@ func (s *Service) downloadHandler(logger log.Logger, w http.ResponseWriter, r *h
 			jsonhttp.NotFound(w, nil)
 			return
 		}
-		logger.Info("api download: unexpected error", "address", reference, "error", err)
-		logger.Error(err, "api download: unexpected error")
+		logger.Debug("api download: unexpected error", "address", reference, "error", err)
+		logger.Error(nil, "api download: unexpected error")
 		jsonhttp.InternalServerError(w, "joiner failed")
 		return
 	}

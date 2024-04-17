@@ -80,14 +80,6 @@ func TestController_ExistingUploadDownload(t *testing.T) {
 }
 
 func TestControllerGrant(t *testing.T) {
-	// al := setupAccessLogic()
-	// ctx := context.Background()
-	// c := dynamicaccess.NewController(ctx, al, mockStorer.ChunkStore(), mockStorer.Cache())
-	// gladdr := swarm.RandAddress(t)
-	// gl := kvsmock.NewReference(gladdr)
-	// pk := getPrivKey(1)
-	// c.Grant(ctx, gladdr, &pk.PublicKey)
-	// gl.Get(ctx, []byte("key1"))
 }
 
 func TestControllerRevoke(t *testing.T) {

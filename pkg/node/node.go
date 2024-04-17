@@ -1291,10 +1291,6 @@ func (b *Bee) Shutdown() error {
 	wg.Add(7)
 	go func() {
 		defer wg.Done()
-		tryClose(b.dacCloser, "dac")
-	}()
-	go func() {
-		defer wg.Done()
 		tryClose(b.pssCloser, "pss")
 	}()
 	go func() {
@@ -1350,6 +1346,7 @@ func (b *Bee) Shutdown() error {
 		c()
 	}
 
+	tryClose(b.dacCloser, "dac")
 	tryClose(b.tracerCloser, "tracer")
 	tryClose(b.topologyCloser, "topology driver")
 	tryClose(b.storageIncetivesCloser, "storage incentives agent")

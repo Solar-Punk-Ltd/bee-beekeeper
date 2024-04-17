@@ -117,7 +117,7 @@ func (c *controller) UploadHandler(
 
 func NewController(ctx context.Context, accessLogic ActLogic, getter storage.Getter, putter storage.Putter) Controller {
 	return &controller{
-		granteeList: nil, //NewGranteeList(ls, ps, swarm.EmptyAddress),
+		granteeList: nil,
 		accessLogic: accessLogic,
 		getter:      getter,
 		putter:      putter,
@@ -136,7 +136,6 @@ func (c *controller) Revoke(ctx context.Context, granteesAddress swarm.Address, 
 }
 
 func (c *controller) Commit(ctx context.Context, granteesAddress swarm.Address, actRootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
-	//HACKreplace mock with real kvs
 	var act kvs.KeyValueStore
 	if c.isRevokeFlagged(granteesAddress) {
 		act = kvsmock.New()
@@ -150,7 +149,6 @@ func (c *controller) Commit(ctx context.Context, granteesAddress swarm.Address, 
 		c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
 	}
 
-	//HACK: Store not implemented
 	granteeref, err := c.granteeList.Save(ctx)
 	if err != nil {
 		return swarm.EmptyAddress, swarm.EmptyAddress, err
@@ -172,13 +170,10 @@ func (c *controller) HandleGrantees(ctx context.Context, granteesAddress swarm.A
 	for _, grantee := range addList {
 		c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
 	}
-	// granteeList.Store()
 	return nil
 }
 
 func (c *controller) GetGrantees(ctx context.Context, granteeRootHash swarm.Address) ([]*ecdsa.PublicKey, error) {
-	//[ ]: grantee list address deterministic or stored?
-	// grateeListAddress, _ := hash(append([]byte(topic), []byte("grantee")...))
 	return c.granteeList.Get(), nil
 }
 

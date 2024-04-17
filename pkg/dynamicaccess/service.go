@@ -14,6 +14,7 @@ type Service interface {
 	io.Closer
 }
 
+// TODO: is service needed at all? -> it is just a wrapper around controller
 type service struct {
 	controller Controller
 }
@@ -26,6 +27,7 @@ func (s *service) UploadHandler(ctx context.Context, reference swarm.Address, pu
 	return s.controller.UploadHandler(ctx, reference, publisher, historyRootHash)
 }
 
+// TODO: what to do in close ?
 func (s *service) Close() error {
 	return nil
 }
