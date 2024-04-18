@@ -100,6 +100,15 @@ func (s *Service) dirUploadHandler(
 		return
 	}
 
+	encryptedReference := reference
+	if act {
+		encryptedReference, err = s.actEncryptionHandler(r.Context(), logger, w, putter, reference, historyAddress)
+		if err != nil {
+			jsonhttp.InternalServerError(w, errActUpload)
+			return
+		}
+	}
+
 	err = putter.Done(reference)
 	if err != nil {
 		logger.Debug("store dir failed", "error", err)
@@ -109,21 +118,13 @@ func (s *Service) dirUploadHandler(
 		return
 	}
 
-	if act {
-		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &reference, historyAddress)
-		if err != nil {
-			jsonhttp.InternalServerError(w, errActUpload)
-			return
-		}
-	}
-
 	if tag != 0 {
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tag))
 		span.LogFields(olog.Bool("success", true))
 	}
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
 	jsonhttp.Created(w, bzzUploadResponse{
-		Reference: reference,
+		Reference: encryptedReference,
 	})
 }
 

@@ -62,6 +62,10 @@ func prepareHistoryFixture(storer api.Storer) (dynamicaccess.History, swarm.Addr
 	return h, ref
 }
 
+// TODO: feed test
+// nolint:paralleltest,tparallel
+// TestDacWithoutActHeader [positive tests]:
+// On each endpoint: upload w/ "Swarm-Act" header then download and check the decrypted data
 func TestDacEachEndpointWithAct(t *testing.T) {
 	t.Parallel()
 	var (
@@ -216,8 +220,6 @@ func TestDacEachEndpointWithAct(t *testing.T) {
 	}
 }
 
-// TODO: maybe add HEAD tests
-// TODO: maybe add a test for each endpoint
 // nolint:paralleltest,tparallel
 // TestDacWithoutActHeader [negative tests]:
 // 1. upload w/ "Swarm-Act" header then try to dowload w/o the header.

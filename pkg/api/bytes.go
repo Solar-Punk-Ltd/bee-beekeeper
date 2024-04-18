@@ -116,6 +116,15 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	encryptedReference := reference
+	if headers.Act {
+		encryptedReference, err = s.actEncryptionHandler(r.Context(), logger, w, putter, reference, headers.HistoryAddress)
+		if err != nil {
+			jsonhttp.InternalServerError(w, errActUpload)
+			return
+		}
+	}
+	// TODO: what should be the root_address ? (eref vs ref)
 	span.SetTag("root_address", reference)
 
 	err = putter.Done(reference)
@@ -127,14 +136,6 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if headers.Act {
-		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
-		if err != nil {
-			jsonhttp.InternalServerError(w, errActUpload)
-			return
-		}
-	}
-
 	if tag != 0 {
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tag))
 	}
@@ -143,7 +144,7 @@ func (s *Service) bytesUploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
 	jsonhttp.Created(w, bytesPostResponse{
-		Reference: reference,
+		Reference: encryptedReference,
 	})
 }
 

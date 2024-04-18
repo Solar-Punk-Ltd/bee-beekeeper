@@ -264,6 +264,15 @@ func (s *Service) fileUploadHandler(
 	}
 	logger.Debug("store", "manifest_reference", manifestReference)
 
+	encryptedReference := manifestReference
+	if act {
+		encryptedReference, err = s.actEncryptionHandler(r.Context(), logger, w, putter, manifestReference, historyAddress)
+		if err != nil {
+			jsonhttp.InternalServerError(w, errActUpload)
+			return
+		}
+	}
+
 	err = putter.Done(manifestReference)
 	if err != nil {
 		logger.Debug("done split failed", "error", err)
@@ -272,15 +281,7 @@ func (s *Service) fileUploadHandler(
 		ext.LogError(span, err, olog.String("action", "putter.Done"))
 		return
 	}
-	// TODO: what to do if act encrypt fails but the file is already stored ?
-	if act {
-		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &manifestReference, historyAddress)
-		if err != nil {
-			jsonhttp.InternalServerError(w, errActUpload)
-			return
-		}
-	}
-
+	// TODO: what should be the root_address ? (eref vs ref)
 	span.LogFields(olog.Bool("success", true))
 	span.SetTag("root_address", manifestReference)
 
@@ -288,10 +289,11 @@ func (s *Service) fileUploadHandler(
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tagID))
 		span.SetTag("tagID", tagID)
 	}
-	w.Header().Set(ETagHeader, fmt.Sprintf("%q", manifestReference.String()))
+	w.Header().Set(ETagHeader, fmt.Sprintf("%q", encryptedReference.String()))
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
+	// TODO: do we need to return reference as well ?
 	jsonhttp.Created(w, bzzUploadResponse{
-		Reference: manifestReference,
+		Reference: encryptedReference,
 	})
 }
 

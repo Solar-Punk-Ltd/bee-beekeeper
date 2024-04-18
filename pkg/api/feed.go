@@ -246,6 +246,15 @@ func (s *Service) feedPostHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	// TODO: do we want to allow feed act upload/ download?
+	encryptedReference := ref
+	if headers.Act {
+		encryptedReference, err = s.actEncryptionHandler(r.Context(), logger, w, putter, ref, headers.HistoryAddress)
+		if err != nil {
+			jsonhttp.InternalServerError(w, errActUpload)
+			return
+		}
+	}
 
 	err = putter.Done(ref)
 	if err != nil {
@@ -254,16 +263,8 @@ func (s *Service) feedPostHandler(w http.ResponseWriter, r *http.Request) {
 		jsonhttp.InternalServerError(ow, "done split failed")
 		return
 	}
-	// TODO: do we want to allow feed act upload/ download?
-	if headers.Act {
-		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &ref, headers.HistoryAddress)
-		if err != nil {
-			jsonhttp.InternalServerError(w, errActUpload)
-			return
-		}
-	}
 
-	jsonhttp.Created(w, feedReferenceResponse{Reference: ref})
+	jsonhttp.Created(w, feedReferenceResponse{Reference: encryptedReference})
 }
 
 func parseFeedUpdate(ch swarm.Chunk) (swarm.Address, int64, error) {

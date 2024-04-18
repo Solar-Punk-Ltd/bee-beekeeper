@@ -157,6 +157,15 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	encryptedReference := sch.Address()
+	if headers.Act {
+		encryptedReference, err = s.actEncryptionHandler(r.Context(), logger, w, putter, sch.Address(), headers.HistoryAddress)
+		if err != nil {
+			jsonhttp.InternalServerError(w, errActUpload)
+			return
+		}
+	}
+
 	err = putter.Put(r.Context(), sch)
 	if err != nil {
 		logger.Debug("write chunk failed", "chunk_address", sch.Address(), "error", err)
@@ -173,14 +182,5 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reference := sch.Address()
-	if headers.Act {
-		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
-		if err != nil {
-			jsonhttp.InternalServerError(w, errActUpload)
-			return
-		}
-	}
-	// TODO: replace resp. with SocPostResponse
-	jsonhttp.Created(w, chunkAddressResponse{Reference: reference})
+	jsonhttp.Created(w, socPostResponse{Reference: encryptedReference})
 }

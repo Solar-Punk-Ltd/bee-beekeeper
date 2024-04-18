@@ -141,6 +141,15 @@ func (s *Service) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	encryptedReference := chunk.Address()
+	if headers.Act {
+		encryptedReference, err = s.actEncryptionHandler(r.Context(), logger, w, putter, chunk.Address(), headers.HistoryAddress)
+		if err != nil {
+			jsonhttp.InternalServerError(w, errActUpload)
+			return
+		}
+	}
+
 	err = putter.Put(r.Context(), chunk)
 	if err != nil {
 		logger.Debug("chunk upload: write chunk failed", "chunk_address", chunk.Address(), "error", err)
@@ -162,21 +171,12 @@ func (s *Service) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reference := chunk.Address()
-	if headers.Act {
-		err = s.actEncryptionHandler(r.Context(), logger, w, putter, &reference, headers.HistoryAddress)
-		if err != nil {
-			jsonhttp.InternalServerError(w, errActUpload)
-			return
-		}
-	}
-
 	if tag != 0 {
 		w.Header().Set(SwarmTagHeader, fmt.Sprint(tag))
 	}
 
 	w.Header().Set("Access-Control-Expose-Headers", SwarmTagHeader)
-	jsonhttp.Created(w, chunkAddressResponse{Reference: reference})
+	jsonhttp.Created(w, chunkAddressResponse{Reference: encryptedReference})
 }
 
 func (s *Service) chunkGetHandler(w http.ResponseWriter, r *http.Request) {
