@@ -204,6 +204,7 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 		Pss:             o.Pss,
 		FeedFactory:     o.Feeds,
 		Post:            o.Post,
+		Dac:             o.Dac,
 		PostageContract: o.PostageContract,
 		Steward:         o.Steward,
 		SyncStatus:      o.SyncStatus,
@@ -219,8 +220,6 @@ func newTestServer(t *testing.T, o testServerOptions) (*http.Client, *websocket.
 
 	s := api.New(o.PublicKey, o.PSSPublicKey, o.EthereumAddress, []string{o.WhitelistedAddr}, o.Logger, transaction, o.BatchStore, o.BeeMode, true, true, backend, o.CORSAllowedOrigins, inmemstore.New())
 	testutil.CleanupCloser(t, s)
-
-	s.SetDac(o.Dac)
 
 	s.SetP2P(o.P2P)
 

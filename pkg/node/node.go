@@ -782,7 +782,6 @@ func NewBee(
 		return nil, fmt.Errorf("dac service: %w", err)
 	}
 	b.dacCloser = dac
-	apiService.SetDac(dac)
 
 	var (
 		syncErr    atomic.Value
@@ -1099,6 +1098,7 @@ func NewBee(
 		Pss:             pssService,
 		FeedFactory:     feedFactory,
 		Post:            post,
+		Dac:             dac,
 		PostageContract: postageStampContractService,
 		Staking:         stakingContract,
 		Steward:         steward,

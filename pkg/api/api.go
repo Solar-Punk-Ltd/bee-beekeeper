@@ -221,12 +221,6 @@ func (s *Service) SetP2P(p2p p2p.DebugService) {
 	}
 }
 
-func (s *Service) SetDac(dac dynamicaccess.Service) {
-	if s != nil {
-		s.dac = dac
-	}
-}
-
 func (s *Service) SetSwarmAddress(addr *swarm.Address) {
 	if s != nil {
 		s.overlay = addr
@@ -259,6 +253,7 @@ type ExtraOptions struct {
 	Pss             pss.Interface
 	FeedFactory     feeds.Factory
 	Post            postage.Service
+	Dac             dynamicaccess.Service
 	PostageContract postagecontract.Interface
 	Staking         staking.Contract
 	Steward         steward.Interface
@@ -342,6 +337,7 @@ func (s *Service) Configure(signer crypto.Signer, auth auth.Authenticator, trace
 	s.pss = e.Pss
 	s.feedFactory = e.FeedFactory
 	s.post = e.Post
+	s.dac = e.Dac
 	s.postageContract = e.PostageContract
 	s.steward = e.Steward
 	s.stakingContract = e.Staking

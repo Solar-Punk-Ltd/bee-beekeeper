@@ -92,7 +92,10 @@ func (c *controller) UploadHandler(
 		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 	kvs := kvs.New(ls, kvsRef)
-	historyRef := *historyRootHash
+	historyRef := swarm.ZeroAddress
+	if historyRootHash != nil {
+		historyRef = *historyRootHash
+	}
 	if kvsRef.Equal(swarm.ZeroAddress) {
 		err = c.accessLogic.AddPublisher(ctx, kvs, publisher)
 		if err != nil {

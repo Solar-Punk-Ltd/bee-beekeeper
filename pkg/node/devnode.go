@@ -394,6 +394,7 @@ func NewDevBee(logger log.Logger, o *DevOptions) (b *DevBee, err error) {
 		Pss:             pssService,
 		FeedFactory:     mockFeeds,
 		Post:            post,
+		Dac:             dac,
 		PostageContract: postageContract,
 		Staking:         mockStaking,
 		Steward:         mockSteward,
@@ -418,7 +419,6 @@ func NewDevBee(logger log.Logger, o *DevOptions) (b *DevBee, err error) {
 	}, debugOpts, 1, erc20)
 	apiService.MountAPI()
 	apiService.SetProbe(probe)
-	apiService.SetDac(dac)
 
 	if o.Restricted {
 		apiService.SetP2P(p2ps)
