@@ -15,7 +15,6 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/storage"
 	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
-	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +42,7 @@ func generateKeyListFixture() ([]*ecdsa.PublicKey, error) {
 
 func TestGranteeAddGet(t *testing.T) {
 	putter := mockStorer.DirectUpload()
-	gl := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
+	gl := dynamicaccess.NewGranteeList(createLs(), putter)
 	keys, err := generateKeyListFixture()
 	if err != nil {
 		t.Errorf("key generation error: %v", err)
@@ -101,7 +100,7 @@ func TestGranteeAddGet(t *testing.T) {
 
 func TestGranteeRemove(t *testing.T) {
 	putter := mockStorer.DirectUpload()
-	gl := dynamicaccess.NewGranteeList(createLs(), putter, swarm.ZeroAddress)
+	gl := dynamicaccess.NewGranteeList(createLs(), putter)
 	keys, err := generateKeyListFixture()
 	if err != nil {
 		t.Errorf("key generation error: %v", err)
@@ -154,12 +153,12 @@ func TestGranteeSave(t *testing.T) {
 		t.Errorf("key generation error: %v", err)
 	}
 	t.Run("Save empty grantee list return NO error", func(t *testing.T) {
-		gl := dynamicaccess.NewGranteeList(createLs(), mockStorer.DirectUpload(), swarm.ZeroAddress)
+		gl := dynamicaccess.NewGranteeList(createLs(), mockStorer.DirectUpload())
 		_, err := gl.Save(ctx)
 		assert.NoError(t, err)
 	})
 	t.Run("Save not empty grantee list return valid swarm address", func(t *testing.T) {
-		gl := dynamicaccess.NewGranteeList(createLs(), mockStorer.DirectUpload(), swarm.ZeroAddress)
+		gl := dynamicaccess.NewGranteeList(createLs(), mockStorer.DirectUpload())
 		err = gl.Add(keys)
 		ref, err := gl.Save(ctx)
 		assert.NoError(t, err)
@@ -168,7 +167,7 @@ func TestGranteeSave(t *testing.T) {
 	t.Run("Save grantee list with one item, no error, pre-save value exist", func(t *testing.T) {
 		ls := createLs()
 		putter := mockStorer.DirectUpload()
-		gl1 := dynamicaccess.NewGranteeList(ls, putter, swarm.ZeroAddress)
+		gl1 := dynamicaccess.NewGranteeList(ls, putter)
 
 		err := gl1.Add(keys)
 		assert.NoError(t, err)
@@ -176,7 +175,7 @@ func TestGranteeSave(t *testing.T) {
 		ref, err := gl1.Save(ctx)
 		assert.NoError(t, err)
 
-		gl2 := dynamicaccess.NewGranteeList(ls, putter, ref)
+		gl2 := dynamicaccess.NewGranteeListReference(ls, putter, ref)
 		val := gl2.Get()
 		assert.NoError(t, err)
 		assert.Equal(t, keys, val)
@@ -185,15 +184,14 @@ func TestGranteeSave(t *testing.T) {
 		ls := createLs()
 		putter := mockStorer.DirectUpload()
 
-		gl1 := dynamicaccess.NewGranteeList(ls, putter, swarm.ZeroAddress)
+		gl1 := dynamicaccess.NewGranteeList(ls, putter)
 
 		err := gl1.Add(keys)
 		assert.NoError(t, err)
 		ref, err := gl1.Save(ctx)
 		assert.NoError(t, err)
 
-		// New KVS
-		gl2 := dynamicaccess.NewGranteeList(ls, putter, ref)
+		gl2 := dynamicaccess.NewGranteeListReference(ls, putter, ref)
 		err = gl2.Add(keys)
 		assert.NoError(t, err)
 

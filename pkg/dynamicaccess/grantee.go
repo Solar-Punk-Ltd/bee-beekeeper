@@ -112,16 +112,16 @@ func (g *GranteeListStruct) Remove(keysToRemove []*ecdsa.PublicKey) error {
 	return nil
 }
 
-func NewGranteeList(ls file.LoadSaver, putter storer.PutterSession, reference swarm.Address) GranteeList {
-	var (
-		data []byte
-		err  error
-	)
-	if swarm.ZeroAddress.Equal(reference) || swarm.EmptyAddress.Equal(reference) {
-		data = []byte{}
-	} else {
-		data, err = ls.Load(context.Background(), reference.Bytes())
+func NewGranteeList(ls file.LoadSaver, putter storer.PutterSession) GranteeList {
+	return &GranteeListStruct{
+		grantees: []byte{},
+		loadSave: ls,
+		putter:   putter,
 	}
+}
+
+func NewGranteeListReference(ls file.LoadSaver, putter storer.PutterSession, reference swarm.Address) GranteeList {
+	data, err := ls.Load(context.Background(), reference.Bytes())
 	if err != nil {
 		return nil
 	}

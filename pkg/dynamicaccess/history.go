@@ -29,15 +29,22 @@ type history struct {
 	ls       file.LoadSaver
 }
 
-func NewHistory(ls file.LoadSaver, ref *swarm.Address) (*history, error) {
-	var err error
-	var m manifest.Interface
-
-	if ref != nil {
-		m, err = manifest.NewDefaultManifestReference(*ref, ls)
-	} else {
-		m, err = manifest.NewDefaultManifest(ls, false)
+func NewHistory(ls file.LoadSaver) (History, error) {
+	m, err := manifest.NewDefaultManifest(ls, false)
+	if err != nil {
+		return nil, err
 	}
+
+	mm, ok := m.(*manifest.MantarayManifest)
+	if !ok {
+		return nil, fmt.Errorf("expected MantarayManifest, got %T", m)
+	}
+
+	return &history{manifest: mm, ls: ls}, nil
+}
+
+func NewHistoryReference(ls file.LoadSaver, ref swarm.Address) (History, error) {
+	m, err := manifest.NewDefaultManifestReference(ref, ls)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +79,7 @@ func (h *history) Lookup(ctx context.Context, timestamp int64) (swarm.Address, e
 	}
 
 	reversedTimestamp := math.MaxInt64 - timestamp
-	node, err := h.LookupNode(ctx, reversedTimestamp)
+	node, err := h.lookupNode(ctx, reversedTimestamp)
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
@@ -84,7 +91,7 @@ func (h *history) Lookup(ctx context.Context, timestamp int64) (swarm.Address, e
 	return swarm.ZeroAddress, nil
 }
 
-func (h *history) LookupNode(ctx context.Context, searchedTimestamp int64) (*mantaray.Node, error) {
+func (h *history) lookupNode(ctx context.Context, searchedTimestamp int64) (*mantaray.Node, error) {
 	// before node's timestamp is the closest one that is less than or equal to the searched timestamp
 	// for instance: 2030, 2020, 1994 -> search for 2021 -> before is 2020
 	var beforeNode *mantaray.Node

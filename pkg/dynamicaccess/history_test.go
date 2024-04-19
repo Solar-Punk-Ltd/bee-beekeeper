@@ -16,7 +16,7 @@ import (
 )
 
 func TestHistoryAdd(t *testing.T) {
-	h, err := dynamicaccess.NewHistory(nil, nil)
+	h, err := dynamicaccess.NewHistory(nil)
 	assert.NoError(t, err)
 
 	addr := swarm.NewAddress([]byte("addr"))
@@ -32,7 +32,7 @@ func TestSingleNodeHistoryLookup(t *testing.T) {
 	ctx := context.Background()
 	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false))
 
-	h, err := dynamicaccess.NewHistory(ls, nil)
+	h, err := dynamicaccess.NewHistory(ls)
 	assert.NoError(t, err)
 
 	testActRef := swarm.RandAddress(t)
@@ -53,7 +53,7 @@ func TestMultiNodeHistoryLookup(t *testing.T) {
 	ctx := context.Background()
 	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false))
 
-	h, _ := dynamicaccess.NewHistory(ls, nil)
+	h, _ := dynamicaccess.NewHistory(ls)
 
 	testActRef1 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd891"))
 	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
@@ -105,14 +105,21 @@ func TestHistoryStore(t *testing.T) {
 	ctx := context.Background()
 	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false))
 
-	h, _ := dynamicaccess.NewHistory(ls, nil)
+	h1, _ := dynamicaccess.NewHistory(ls)
 
 	testActRef1 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd891"))
 	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	h.Add(ctx, testActRef1, &firstTime)
+	h1.Add(ctx, testActRef1, &firstTime)
 
-	_, err := h.Store(ctx)
+	href1, err := h1.Store(ctx)
 	assert.NoError(t, err)
+
+	h2, err := dynamicaccess.NewHistoryReference(ls, href1)
+	assert.NoError(t, err)
+
+	actRef1, err := h2.Lookup(ctx, firstTime)
+	assert.True(t, actRef1.Equal(testActRef1))
+
 }
 
 func pipelineFactory(s storage.Putter, encrypt bool) func() pipeline.Interface {
