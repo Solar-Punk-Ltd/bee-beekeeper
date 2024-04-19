@@ -93,7 +93,8 @@ func (m *mockDacService) DownloadHandler(ctx context.Context, encryptedRef swarm
 	if !exists {
 		return swarm.ZeroAddress, fmt.Errorf("history not found")
 	}
-	kvsRef, err := h.Lookup(ctx, timestamp)
+	entry, err := h.Lookup(ctx, timestamp)
+	kvsRef := entry.Reference()
 	if kvsRef.IsZero() || err != nil {
 		return swarm.ZeroAddress, fmt.Errorf("kvs not found")
 	}
@@ -118,13 +119,15 @@ func (m *mockDacService) UploadHandler(ctx context.Context, reference swarm.Addr
 		if !exists {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, fmt.Errorf("history not found")
 		}
-		kvsRef, _ = h.Lookup(ctx, now)
+		entry, _ := h.Lookup(ctx, now)
+		kvsRef := entry.Reference()
 		if kvsRef.IsZero() {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, fmt.Errorf("kvs not found")
 		}
 	} else {
 		h, _ = dynamicaccess.NewHistory(m.ls)
-		h.Add(ctx, kvsRef, &now)
+		// TODO: pass granteelist ref as mtdt
+		h.Add(ctx, kvsRef, &now, nil)
 		historyRef, _ = h.Store(ctx)
 		m.historyMap[historyRef.String()] = h
 	}

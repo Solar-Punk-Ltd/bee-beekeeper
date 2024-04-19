@@ -35,10 +35,13 @@ type GranteeManager interface {
 	GetGrantees(ctx context.Context, rootHash swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
-// TODO: ądd granteeList ref to history metadata to solve inconsistency
+// TODO: add granteeList ref to history metadata to solve inconsistency
 type Controller interface {
 	GranteeManager
+	// DownloadHandler decrypts the encryptedRef using the lookupkey based on the history and timestamp.
 	DownloadHandler(ctx context.Context, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error)
+	// TODO: history encryption
+	// UploadHandler encrypts the reference and stores it in the history as the latest update.
 	UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, swarm.Address, error)
 }
 
@@ -53,7 +56,6 @@ type controller struct {
 
 var _ Controller = (*controller)(nil)
 
-// TODO: doc.
 func (c *controller) DownloadHandler(
 	ctx context.Context,
 	encryptedRef swarm.Address,
@@ -66,11 +68,12 @@ func (c *controller) DownloadHandler(
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
-	kvsRef, err := history.Lookup(ctx, timestamp)
+	entry, err := history.Lookup(ctx, timestamp)
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
-	kvs, err := kvs.NewReference(ls, kvsRef)
+	// TODO: hanlde granteelist ref in mtdt
+	kvs, err := kvs.NewReference(ls, entry.Reference())
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
@@ -78,8 +81,6 @@ func (c *controller) DownloadHandler(
 	return c.accessLogic.DecryptRef(ctx, kvs, encryptedRef, publisher)
 }
 
-// TODO: doc.
-// TODO: history encryption
 func (c *controller) UploadHandler(
 	ctx context.Context,
 	refrefence swarm.Address,
@@ -110,7 +111,8 @@ func (c *controller) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		err = history.Add(ctx, storageRef, &now)
+		// TODO: pass granteelist ref as mtdt
+		err = history.Add(ctx, storageRef, &now, nil)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -123,7 +125,9 @@ func (c *controller) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		storageRef, err = history.Lookup(ctx, now)
+		// TODO: hanlde granteelist ref in mtdt
+		entry, err := history.Lookup(ctx, now)
+		storageRef = entry.Reference()
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}

@@ -23,7 +23,7 @@ func TestHistoryAdd(t *testing.T) {
 
 	ctx := context.Background()
 
-	err = h.Add(ctx, addr, nil)
+	err = h.Add(ctx, addr, nil, nil)
 	assert.NoError(t, err)
 }
 
@@ -36,14 +36,15 @@ func TestSingleNodeHistoryLookup(t *testing.T) {
 	assert.NoError(t, err)
 
 	testActRef := swarm.RandAddress(t)
-	err = h.Add(ctx, testActRef, nil)
+	err = h.Add(ctx, testActRef, nil, nil)
 	assert.NoError(t, err)
 
 	_, err = h.Store(ctx)
 	assert.NoError(t, err)
 
 	searchedTime := time.Now().Unix()
-	actRef, err := h.Lookup(ctx, searchedTime)
+	entry, err := h.Lookup(ctx, searchedTime)
+	actRef := entry.Reference()
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef))
 }
@@ -57,45 +58,49 @@ func TestMultiNodeHistoryLookup(t *testing.T) {
 
 	testActRef1 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd891"))
 	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	h.Add(ctx, testActRef1, &firstTime)
+	h.Add(ctx, testActRef1, &firstTime, nil)
 
 	testActRef2 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd892"))
 	secondTime := time.Date(2000, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	h.Add(ctx, testActRef2, &secondTime)
+	h.Add(ctx, testActRef2, &secondTime, nil)
 
 	testActRef3 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd893"))
 	thirdTime := time.Date(2015, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	h.Add(ctx, testActRef3, &thirdTime)
+	h.Add(ctx, testActRef3, &thirdTime, nil)
 
 	testActRef4 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd894"))
 	fourthTime := time.Date(2020, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	h.Add(ctx, testActRef4, &fourthTime)
+	h.Add(ctx, testActRef4, &fourthTime, nil)
 
 	testActRef5 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd895"))
 	fifthTime := time.Date(2030, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	h.Add(ctx, testActRef5, &fifthTime)
+	h.Add(ctx, testActRef5, &fifthTime, nil)
 
 	// latest
 	searchedTime := time.Date(1980, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	actRef, err := h.Lookup(ctx, searchedTime)
+	entry, err := h.Lookup(ctx, searchedTime)
+	actRef := entry.Reference()
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef1))
 
 	// before first time
 	searchedTime = time.Date(2021, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	actRef, err = h.Lookup(ctx, searchedTime)
+	entry, err = h.Lookup(ctx, searchedTime)
+	actRef = entry.Reference()
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef4))
 
 	// same time
 	searchedTime = time.Date(2000, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	actRef, err = h.Lookup(ctx, searchedTime)
+	entry, err = h.Lookup(ctx, searchedTime)
+	actRef = entry.Reference()
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef2))
 
 	// after time
 	searchedTime = time.Date(2045, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	actRef, err = h.Lookup(ctx, searchedTime)
+	entry, err = h.Lookup(ctx, searchedTime)
+	actRef = entry.Reference()
 	assert.NoError(t, err)
 	assert.True(t, actRef.Equal(testActRef5))
 }
@@ -109,7 +114,7 @@ func TestHistoryStore(t *testing.T) {
 
 	testActRef1 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd891"))
 	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
-	h1.Add(ctx, testActRef1, &firstTime)
+	h1.Add(ctx, testActRef1, &firstTime, nil)
 
 	href1, err := h1.Store(ctx)
 	assert.NoError(t, err)
@@ -117,9 +122,9 @@ func TestHistoryStore(t *testing.T) {
 	h2, err := dynamicaccess.NewHistoryReference(ls, href1)
 	assert.NoError(t, err)
 
-	actRef1, err := h2.Lookup(ctx, firstTime)
+	entry1, err := h2.Lookup(ctx, firstTime)
+	actRef1 := entry1.Reference()
 	assert.True(t, actRef1.Equal(testActRef1))
-
 }
 
 func pipelineFactory(s storage.Putter, encrypt bool) func() pipeline.Interface {

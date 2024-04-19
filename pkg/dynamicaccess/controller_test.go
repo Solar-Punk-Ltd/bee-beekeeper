@@ -41,9 +41,9 @@ func getHistoryFixture(ctx context.Context, ls file.LoadSaver, al dynamicaccess.
 	secondTime := time.Date(2000, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	thirdTime := time.Date(2015, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 
-	h.Add(ctx, kvs0Ref, &thirdTime)
-	h.Add(ctx, kvs1Ref, &firstTime)
-	h.Add(ctx, kvs2Ref, &secondTime)
+	h.Add(ctx, kvs0Ref, &thirdTime, nil)
+	h.Add(ctx, kvs1Ref, &firstTime, nil)
+	h.Add(ctx, kvs2Ref, &secondTime, nil)
 	return h.Store(ctx)
 }
 
