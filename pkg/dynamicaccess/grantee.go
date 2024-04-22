@@ -23,62 +23,28 @@ type GranteeList interface {
 }
 
 type GranteeListStruct struct {
-	grantees []byte
+	grantees []*ecdsa.PublicKey
 	loadSave file.LoadSaver
 }
 
 var _ GranteeList = (*GranteeListStruct)(nil)
 
 func (g *GranteeListStruct) Get() []*ecdsa.PublicKey {
-	return g.deserialize(g.grantees)
-}
-
-func (g *GranteeListStruct) serialize(publicKeys []*ecdsa.PublicKey) []byte {
-	b := make([]byte, 0, len(publicKeys)*publicKeyLen)
-	for _, key := range publicKeys {
-		b = append(b, g.serializePublicKey(key)...)
-	}
-	return b
-}
-
-func (g *GranteeListStruct) serializePublicKey(pub *ecdsa.PublicKey) []byte {
-	return elliptic.Marshal(pub.Curve, pub.X, pub.Y)
-}
-
-func (g *GranteeListStruct) deserialize(data []byte) []*ecdsa.PublicKey {
-	if len(data) == 0 {
-		return nil
-	}
-
-	p := make([]*ecdsa.PublicKey, 0, len(data)/publicKeyLen)
-	for i := 0; i < len(data); i += publicKeyLen {
-		pubKey := g.deserializeBytes(data[i : i+publicKeyLen])
-		if pubKey == nil {
-			return nil
-		}
-		p = append(p, pubKey)
-	}
-	return p
-}
-
-func (g *GranteeListStruct) deserializeBytes(data []byte) *ecdsa.PublicKey {
-	curve := btcec.S256()
-	x, y := elliptic.Unmarshal(curve, data)
-	return &ecdsa.PublicKey{Curve: curve, X: x, Y: y}
+	return g.grantees
 }
 
 func (g *GranteeListStruct) Add(addList []*ecdsa.PublicKey) error {
 	if len(addList) == 0 {
 		return fmt.Errorf("no public key provided")
 	}
+	g.grantees = append(g.grantees, addList...)
 
-	data := g.serialize(addList)
-	g.grantees = append(g.grantees, data...)
 	return nil
 }
 
 func (g *GranteeListStruct) Save(ctx context.Context) (swarm.Address, error) {
-	refBytes, err := g.loadSave.Save(ctx, g.grantees)
+	data := serialize(g.grantees)
+	refBytes, err := g.loadSave.Save(ctx, data)
 	if err != nil {
 		return swarm.ZeroAddress, fmt.Errorf("grantee save error: %w", err)
 	}
@@ -90,26 +56,28 @@ func (g *GranteeListStruct) Remove(keysToRemove []*ecdsa.PublicKey) error {
 	if len(keysToRemove) == 0 {
 		return fmt.Errorf("nothing to remove")
 	}
-	grantees := g.deserialize(g.grantees)
-	if grantees == nil {
+
+	if len(g.grantees) == 0 {
 		return fmt.Errorf("no grantee found")
 	}
+	grantees := g.grantees
 
 	for _, remove := range keysToRemove {
-		for i, grantee := range grantees {
-			if grantee.Equal(remove) {
+		for i := 0; i < len(grantees); i++ {
+			if grantees[i].Equal(remove) {
 				grantees[i] = grantees[len(grantees)-1]
 				grantees = grantees[:len(grantees)-1]
 			}
 		}
 	}
-	g.grantees = g.serialize(grantees)
+	g.grantees = grantees
+
 	return nil
 }
 
 func NewGranteeList(ls file.LoadSaver) GranteeList {
 	return &GranteeListStruct{
-		grantees: []byte{},
+		grantees: []*ecdsa.PublicKey{},
 		loadSave: ls,
 	}
 }
@@ -119,9 +87,46 @@ func NewGranteeListReference(ls file.LoadSaver, reference swarm.Address) Grantee
 	if err != nil {
 		return nil
 	}
+	grantees := deserialize(data)
 
 	return &GranteeListStruct{
-		grantees: data,
+		grantees: grantees,
 		loadSave: ls,
 	}
+}
+
+func serialize(publicKeys []*ecdsa.PublicKey) []byte {
+	b := make([]byte, 0, len(publicKeys)*publicKeyLen)
+	for _, key := range publicKeys {
+		b = append(b, serializePublicKey(key)...)
+	}
+	return b
+}
+
+func serializePublicKey(pub *ecdsa.PublicKey) []byte {
+	return elliptic.Marshal(pub.Curve, pub.X, pub.Y)
+}
+
+func deserialize(data []byte) []*ecdsa.PublicKey {
+	if len(data) == 0 {
+		return []*ecdsa.PublicKey{}
+	}
+
+	p := make([]*ecdsa.PublicKey, 0, len(data)/publicKeyLen)
+	for i := 0; i < len(data); i += publicKeyLen {
+		pubKey := deserializeBytes(data[i : i+publicKeyLen])
+		if pubKey == nil {
+			return []*ecdsa.PublicKey{}
+		}
+		p = append(p, pubKey)
+	}
+	return p
+}
+
+func deserializeBytes(data []byte) *ecdsa.PublicKey {
+	key, err := btcec.ParsePubKey(data)
+	if err != nil {
+		return nil
+	}
+	return key.ToECDSA()
 }

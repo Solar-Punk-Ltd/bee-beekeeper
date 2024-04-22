@@ -49,7 +49,7 @@ func TestGranteeAddGet(t *testing.T) {
 
 	t.Run("Get empty grantee list should return error", func(t *testing.T) {
 		val := gl.Get()
-		assert.Nil(t, val)
+		assert.Empty(t, val)
 	})
 
 	t.Run("Get should return value equal to put value", func(t *testing.T) {
@@ -128,19 +128,19 @@ func TestGranteeRemove(t *testing.T) {
 		err := gl.Remove(removeList2)
 		assert.NoError(t, err)
 		retVal := gl.Get()
-		assert.Nil(t, retVal)
+		assert.Empty(t, retVal)
 	})
 	t.Run("Remove from empty grantee list should return error", func(t *testing.T) {
 		err := gl.Remove(removeList1)
 		assert.Error(t, err)
 		retVal := gl.Get()
-		assert.Nil(t, retVal)
+		assert.Empty(t, retVal)
 	})
 	t.Run("Remove empty remove list should return error", func(t *testing.T) {
 		err := gl.Remove(nil)
 		assert.Error(t, err)
 		retVal := gl.Get()
-		assert.Nil(t, retVal)
+		assert.Empty(t, retVal)
 	})
 }
 

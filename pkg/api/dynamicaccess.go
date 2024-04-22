@@ -11,7 +11,6 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
-	"github.com/ethersphere/bee/v2/pkg/log"
 	storer "github.com/ethersphere/bee/v2/pkg/storer"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/gorilla/mux"
@@ -61,7 +60,7 @@ type GranteesPatch struct {
 func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := s.logger.WithName("acthandler").Build()
+			logger := s.logger.WithName("act_decryption_handler").Build()
 			paths := struct {
 				Address swarm.Address `map:"address,resolve" validate:"required"`
 			}{}
@@ -101,12 +100,12 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 // Uploads the encrypted reference, history and kvs to the store
 func (s *Service) actEncryptionHandler(
 	ctx context.Context,
-	logger log.Logger,
 	w http.ResponseWriter,
 	putter storer.PutterSession,
 	reference swarm.Address,
 	historyRootHash swarm.Address,
 ) (swarm.Address, error) {
+	logger := s.logger.WithName("act_encryption_handler").Build()
 	publisherPublicKey := &s.publicKey
 	storageReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, reference, publisherPublicKey, historyRootHash)
 	if err != nil {
@@ -143,7 +142,7 @@ func (s *Service) actEncryptionHandler(
 }
 
 func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request) {
-	logger := s.logger.WithName("acthandler").Build()
+	logger := s.logger.WithName("act_list_grantees_handler").Build()
 	paths := struct {
 		GranteesAddress swarm.Address `map:"address,resolve" validate:"required"`
 	}{}
@@ -164,7 +163,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) {
-	logger := s.logger.WithName("acthandler").Build()
+	logger := s.logger.WithName("act_grant_revoke_handler").Build()
 
 	if r.Body == http.NoBody {
 		logger.Error(nil, "request has no body")
