@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
@@ -61,7 +62,7 @@ func (g *GranteeListStruct) deserialize(data []byte) []*ecdsa.PublicKey {
 }
 
 func (g *GranteeListStruct) deserializeBytes(data []byte) *ecdsa.PublicKey {
-	curve := elliptic.P256()
+	curve := btcec.S256()
 	x, y := elliptic.Unmarshal(curve, data)
 	return &ecdsa.PublicKey{Curve: curve, X: x, Y: y}
 }

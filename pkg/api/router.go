@@ -266,6 +266,15 @@ func (s *Service) mountAPI() {
 		),
 	})
 
+	handle("/grantee/{address}", jsonhttp.MethodHandler{
+		"GET": web.ChainHandlers(
+			web.FinalHandlerFunc(s.actListGranteesHandler),
+		),
+		"PATCH": web.ChainHandlers(
+			web.FinalHandlerFunc(s.actGrantRevokeHandler),
+		),
+	})
+
 	handle("/bzz/{address}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u := r.URL
 		u.Path += "/"

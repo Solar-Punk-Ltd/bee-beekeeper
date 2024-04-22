@@ -44,7 +44,7 @@ type Option interface {
 func (f optionFunc) apply(r *mockDacService) { f(r) }
 
 // New creates a new mock dynamicaccess service.
-func New(o ...Option) dynamicaccess.Service {
+func New(o ...Option) dynamicaccess.Controller {
 	storer := mockstorer.New()
 	m := &mockDacService{
 		historyMap: make(map[string]dynamicaccess.History),
@@ -141,20 +141,32 @@ func (m *mockDacService) Close() error {
 	return nil
 }
 
-func (m *mockDacService) Grant(ctx context.Context, granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error {
-	return nil
+func (m *mockDacService) HandleGrantees(ctx context.Context, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
+	historyRef, _ := swarm.ParseHexAddress("67bdf80a9bbea8eca9c8480e43fdceb485d2d74d5708e45144b8c4adacd13d9c")
+	glRef, _ := swarm.ParseHexAddress("3339613565613837623134316665343461613630396333333237656364383934")
+	return glRef, historyRef, nil
 }
-func (m *mockDacService) Revoke(ctx context.Context, granteesAddress swarm.Address, grantee *ecdsa.PublicKey) error {
-	return nil
-}
-func (m *mockDacService) Commit(ctx context.Context, granteesAddress swarm.Address, actRootHash swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
-	return swarm.ZeroAddress, swarm.ZeroAddress, nil
-}
-func (m *mockDacService) HandleGrantees(ctx context.Context, rootHash swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) error {
-	return nil
-}
-func (m *mockDacService) GetGrantees(ctx context.Context, rootHash swarm.Address) ([]*ecdsa.PublicKey, error) {
-	return nil, nil
+func (m *mockDacService) GetGrantees(ctx context.Context, granteeref swarm.Address) ([]*ecdsa.PublicKey, error) {
+	keys := []string{
+		"a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa",
+		"b786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfb",
+		"c786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfc",
+	}
+	var pubkeys []*ecdsa.PublicKey
+	for i := range keys {
+		data, err := hex.DecodeString(keys[i])
+		if err != nil {
+			panic(err)
+		}
+
+		privKey, err := crypto.DecodeSecp256k1PrivateKey(data)
+		pubKey := privKey.PublicKey
+		if err != nil {
+			panic(err)
+		}
+		pubkeys = append(pubkeys, &pubKey)
+	}
+	return pubkeys, nil
 }
 
 func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {

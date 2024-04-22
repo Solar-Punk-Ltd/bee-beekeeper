@@ -3,8 +3,13 @@ package api
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
+	"encoding/json"
+	"io"
 	"net/http"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/ethersphere/bee/v2/pkg/crypto"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/log"
 	storer "github.com/ethersphere/bee/v2/pkg/storer"
@@ -26,6 +31,16 @@ func getAddressFromContext(ctx context.Context) swarm.Address {
 // setAddress sets the swarm address in the context
 func setAddressInContext(ctx context.Context, address swarm.Address) context.Context {
 	return context.WithValue(ctx, addressKey{}, address)
+}
+
+type GranteesPatchRequest struct {
+	Addlist    []string `json:"add"`
+	Revokelist []string `json:"revoke"`
+}
+
+type GranteesPatch struct {
+	Addlist    []ecdsa.PublicKey
+	Revokelist []ecdsa.PublicKey
 }
 
 // actDecryptionHandler is a middleware that looks up and decrypts the given address,
@@ -112,4 +127,111 @@ func (s *Service) actEncryptionHandler(
 	w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 
 	return encryptedReference, nil
+}
+
+func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request) {
+	logger := s.logger.WithName("acthandler").Build()
+	paths := struct {
+		GranteesAddress swarm.Address `map:"address,resolve" validate:"required"`
+	}{}
+	if response := s.mapStructure(r.Header, &paths); response != nil {
+		response("invalid path params", logger, w)
+		return
+	}
+	grantees, err := s.dac.GetGrantees(r.Context(), paths.GranteesAddress)
+	if err != nil {
+		jsonhttp.NotFound(w, "grantee list not found")
+		return
+	}
+	granteeSlice := make([]string, len(grantees))
+	for i, grantee := range grantees {
+		granteeSlice[i] = hex.EncodeToString(crypto.EncodeSecp256k1PublicKey(grantee))
+	}
+	jsonhttp.OK(w, granteeSlice)
+}
+
+func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) {
+	logger := s.logger.WithName("acthandler").Build()
+
+	if r.Body == http.NoBody {
+		logger.Error(nil, "request has no body")
+		jsonhttp.BadRequest(w, errInvalidRequest)
+		return
+	}
+
+	paths := struct {
+		GranteesAddress swarm.Address `map:"address,resolve" validate:"required"`
+	}{}
+	if response := s.mapStructure(r.Header, &paths); response != nil {
+		response("invalid path params", logger, w)
+		return
+	}
+
+	headers := struct {
+		BatchID        []byte           `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		Publisher      *ecdsa.PublicKey `map:"Swarm-Act-Publisher" validate:"required"`
+		HistoryAddress *swarm.Address   `map:"Swarm-Act-History-Address"`
+	}{}
+	if response := s.mapStructure(r.Header, &headers); response != nil {
+		response("invalid header params", logger, w)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		if jsonhttp.HandleBodyReadError(err, w) {
+			return
+		}
+		logger.Debug("read request body failed", "error", err)
+		logger.Error(nil, "read request body failed")
+		jsonhttp.InternalServerError(w, "cannot read request")
+		return
+	}
+
+	gpr := GranteesPatchRequest{}
+	if len(body) > 0 {
+		err = json.Unmarshal(body, &gpr)
+		if err != nil {
+			logger.Debug("unmarshal body failed", "error", err)
+			logger.Error(nil, "unmarshal body failed")
+			jsonhttp.InternalServerError(w, "error unmarshaling request body")
+			return
+		}
+	}
+
+	grantees := GranteesPatch{}
+	for _, g := range gpr.Addlist {
+		h, _ := hex.DecodeString(g)
+		k, _ := btcec.ParsePubKey(h)
+		grantees.Addlist = append(grantees.Addlist, *k.ToECDSA())
+	}
+	for _, g := range gpr.Revokelist {
+		h, _ := hex.DecodeString(g)
+		k, _ := btcec.ParsePubKey(h)
+		grantees.Revokelist = append(grantees.Revokelist, *k.ToECDSA())
+	}
+
+	tag, _ := s.getOrCreateSessionID(0)
+
+	ctx := r.Context()
+	putter, _ := s.newStamperPutter(ctx, putterOptions{
+		BatchID:  headers.BatchID,
+		TagID:    tag,
+		Pin:      false,
+		Deferred: true,
+	})
+
+	granteeref := paths.GranteesAddress
+	granteeref, historyref, _ := s.dac.HandleGrantees(ctx, granteeref, *headers.HistoryAddress, headers.Publisher, convertToPointerSlice(grantees.Addlist), convertToPointerSlice(grantees.Revokelist))
+	putter.Done(granteeref)
+	putter.Done(historyref)
+	jsonhttp.OK(w, nil)
+}
+
+func convertToPointerSlice(slice []ecdsa.PublicKey) []*ecdsa.PublicKey {
+	pointerSlice := make([]*ecdsa.PublicKey, len(slice))
+	for i, key := range slice {
+		pointerSlice[i] = &key
+	}
+	return pointerSlice
 }
