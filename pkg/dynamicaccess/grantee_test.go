@@ -3,10 +3,10 @@ package dynamicaccess_test
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
 	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
@@ -31,9 +31,9 @@ func createLs() file.LoadSaver {
 }
 
 func generateKeyListFixture() ([]*ecdsa.PublicKey, error) {
-	key1, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	key2, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	key3, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	key1, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
+	key2, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
+	key3, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -194,4 +194,16 @@ func TestGranteeSave(t *testing.T) {
 		val := gl2.Get()
 		assert.Equal(t, append(keys, keys...), val)
 	})
+}
+
+func TestGranteeRemoveTwo(t *testing.T) {
+	gl := dynamicaccess.NewGranteeList(createLs())
+	keys, err := generateKeyListFixture()
+	if err != nil {
+		t.Errorf("key generation error: %v", err)
+	}
+	err = gl.Add([]*ecdsa.PublicKey{keys[0]})
+	err = gl.Add([]*ecdsa.PublicKey{keys[0]})
+	err = gl.Remove([]*ecdsa.PublicKey{keys[0]})
+	assert.NoError(t, err)
 }

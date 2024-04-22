@@ -808,8 +808,6 @@ func TestDacGrantees(t *testing.T) {
 	var (
 		spk, _          = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
 		pk, _           = crypto.DecodeSecp256k1PrivateKey(spk)
-		publicKeyBytes  = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
-		publisher       = hex.EncodeToString(publicKeyBytes)
 		storerMock      = mockstorer.New()
 		h, fixtureHref  = prepareHistoryFixture(storerMock)
 		logger          = log.Noop
@@ -841,14 +839,20 @@ func TestDacGrantees(t *testing.T) {
 			}),
 		)
 	})
-	t.Run("get-grantees-wrong-address", func(t *testing.T) {
-	})
 	t.Run("add-revoke-grantees", func(t *testing.T) {
+		body := api.GranteesPatchRequest{
+			Addlist:    []string{"02ab7473879005929d10ce7d4f626412dad9fe56b0a6622038931d26bd79abf0a4"},
+			Revokelist: []string{"02ab7473879005929d10ce7d4f626412dad9fe56b0a6622038931d26bd79abf0a4"},
+		}
+		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusOK,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, addr.String()),
+			jsonhttptest.WithJSONRequestBody(body),
+		)
 	})
 	t.Run("add-revoke-grantees-empty-body", func(t *testing.T) {
 		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusBadRequest,
 			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
-			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
 			jsonhttptest.WithRequestBody(bytes.NewReader(nil)),
 			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
 				Message: "could not validate request",
@@ -857,23 +861,55 @@ func TestDacGrantees(t *testing.T) {
 		)
 	})
 	t.Run("add-grantee-with-history", func(t *testing.T) {
+		body := api.GranteesPatchRequest{
+			Addlist: []string{"02ab7473879005929d10ce7d4f626412dad9fe56b0a6622038931d26bd79abf0a4"},
+		}
+		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusOK,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, addr.String()),
+			jsonhttptest.WithJSONRequestBody(body),
+		)
 	})
 	t.Run("add-grantee-without-history", func(t *testing.T) {
 		body := api.GranteesPatchRequest{
 			Addlist: []string{"02ab7473879005929d10ce7d4f626412dad9fe56b0a6622038931d26bd79abf0a4"},
 		}
-		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusOK,
+		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusBadRequest,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
 			jsonhttptest.WithJSONRequestBody(body),
 		)
 
-		expected := []string{
-			"03d7660772cc3142f8a7a2dfac46ce34d12eac1718720cef0e3d94347902aa96a2",
-			"03c712a7e29bc792ac8d8ae49793d28d5bda27ed70f0d90697b2fb456c0a168bd2",
-			"032541acf966823bae26c2c16a7102e728ade3e2e29c11a8a17b29d8eb2bd19302",
-			"02ab7473879005929d10ce7d4f626412dad9fe56b0a6622038931d26bd79abf0a4",
+	})
+	t.Run("create-granteelist", func(t *testing.T) {
+		body := api.GranteesPostRequest{
+			GranteeList: []string{
+				"02ab7473879005929d10ce7d4f626412dad9fe56b0a6622038931d26bd79abf0a4",
+				"03d7660772cc3142f8a7a2dfac46ce34d12eac1718720cef0e3d94347902aa96a2",
+			},
 		}
-		jsonhttptest.Request(t, client, http.MethodGet, "/grantee/"+addr.String(), http.StatusOK,
-			jsonhttptest.WithExpectedJSONResponse(expected),
+		jsonhttptest.Request(t, client, http.MethodPost, "/grantee", http.StatusCreated,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithJSONRequestBody(body),
+		)
+	})
+	t.Run("create-granteelist-without-stamp", func(t *testing.T) {
+		body := api.GranteesPostRequest{
+			GranteeList: []string{
+				"03d7660772cc3142f8a7a2dfac46ce34d12eac1718720cef0e3d94347902aa96a2",
+			},
+		}
+		jsonhttptest.Request(t, client, http.MethodPost, "/grantee", http.StatusBadRequest,
+			jsonhttptest.WithJSONRequestBody(body),
+		)
+	})
+	t.Run("create-granteelist-empty-body", func(t *testing.T) {
+		jsonhttptest.Request(t, client, http.MethodPost, "/grantee", http.StatusBadRequest,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestBody(bytes.NewReader(nil)),
+			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
+				Message: "could not validate request",
+				Code:    http.StatusBadRequest,
+			}),
 		)
 	})
 }

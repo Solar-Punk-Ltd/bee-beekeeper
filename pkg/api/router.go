@@ -266,6 +266,12 @@ func (s *Service) mountAPI() {
 		),
 	})
 
+	handle("/grantee", jsonhttp.MethodHandler{
+		"POST": web.ChainHandlers(
+			web.FinalHandlerFunc(s.actCreateGranteesHandler),
+		),
+	})
+
 	handle("/grantee/{address}", jsonhttp.MethodHandler{
 		"GET": web.ChainHandlers(
 			web.FinalHandlerFunc(s.actListGranteesHandler),

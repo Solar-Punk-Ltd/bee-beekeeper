@@ -38,6 +38,19 @@ type GranteesPatchRequest struct {
 	Revokelist []string `json:"revoke"`
 }
 
+type GranteesPatchResponse struct {
+	Reference        swarm.Address `json:"ref"`
+	HistoryReference swarm.Address `json:"historyref"`
+}
+
+type GranteesPostRequest struct {
+	GranteeList []string `json:"grantees"`
+}
+
+type GranteesPostResponse struct {
+	Reference        swarm.Address `json:"ref"`
+	HistoryReference swarm.Address `json:"historyref"`
+}
 type GranteesPatch struct {
 	Addlist    []ecdsa.PublicKey
 	Revokelist []ecdsa.PublicKey
@@ -134,7 +147,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	paths := struct {
 		GranteesAddress swarm.Address `map:"address,resolve" validate:"required"`
 	}{}
-	if response := s.mapStructure(r.Header, &paths); response != nil {
+	if response := s.mapStructure(mux.Vars(r), &paths); response != nil {
 		response("invalid path params", logger, w)
 		return
 	}
@@ -162,15 +175,14 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	paths := struct {
 		GranteesAddress swarm.Address `map:"address,resolve" validate:"required"`
 	}{}
-	if response := s.mapStructure(r.Header, &paths); response != nil {
+	if response := s.mapStructure(mux.Vars(r), &paths); response != nil {
 		response("invalid path params", logger, w)
 		return
 	}
 
 	headers := struct {
-		BatchID        []byte           `map:"Swarm-Postage-Batch-Id" validate:"required"`
-		Publisher      *ecdsa.PublicKey `map:"Swarm-Act-Publisher" validate:"required"`
-		HistoryAddress *swarm.Address   `map:"Swarm-Act-History-Address"`
+		BatchID        []byte         `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address" validate:"required"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
@@ -222,10 +234,77 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	})
 
 	granteeref := paths.GranteesAddress
-	granteeref, historyref, _ := s.dac.HandleGrantees(ctx, granteeref, *headers.HistoryAddress, headers.Publisher, convertToPointerSlice(grantees.Addlist), convertToPointerSlice(grantees.Revokelist))
+	granteeref, historyref, _ := s.dac.HandleGrantees(ctx, granteeref, *headers.HistoryAddress, &s.publicKey, convertToPointerSlice(grantees.Addlist), convertToPointerSlice(grantees.Revokelist))
 	putter.Done(granteeref)
 	putter.Done(historyref)
-	jsonhttp.OK(w, nil)
+	jsonhttp.OK(w, GranteesPatchResponse{
+		Reference:        granteeref,
+		HistoryReference: historyref,
+	})
+}
+
+func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Request) {
+	logger := s.logger.WithName("acthandler").Build()
+
+	if r.Body == http.NoBody {
+		logger.Error(nil, "request has no body")
+		jsonhttp.BadRequest(w, errInvalidRequest)
+		return
+	}
+
+	headers := struct {
+		BatchID []byte `map:"Swarm-Postage-Batch-Id" validate:"required"`
+	}{}
+	if response := s.mapStructure(r.Header, &headers); response != nil {
+		response("invalid header params", logger, w)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		if jsonhttp.HandleBodyReadError(err, w) {
+			return
+		}
+		logger.Debug("read request body failed", "error", err)
+		logger.Error(nil, "read request body failed")
+		jsonhttp.InternalServerError(w, "cannot read request")
+		return
+	}
+
+	gpr := GranteesPostRequest{}
+	if len(body) > 0 {
+		err = json.Unmarshal(body, &gpr)
+		if err != nil {
+			logger.Debug("unmarshal body failed", "error", err)
+			logger.Error(nil, "unmarshal body failed")
+			jsonhttp.InternalServerError(w, "error unmarshaling request body")
+			return
+		}
+	}
+
+	list := make([]ecdsa.PublicKey, len(gpr.GranteeList))
+	for _, g := range gpr.GranteeList {
+		h, _ := hex.DecodeString(g)
+		k, _ := btcec.ParsePubKey(h)
+		list = append(list, *k.ToECDSA())
+	}
+	tag, _ := s.getOrCreateSessionID(0)
+
+	ctx := r.Context()
+	putter, _ := s.newStamperPutter(ctx, putterOptions{
+		BatchID:  headers.BatchID,
+		TagID:    tag,
+		Pin:      false,
+		Deferred: true,
+	})
+
+	granteeref, historyref, _ := s.dac.HandleGrantees(ctx, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, convertToPointerSlice(list), nil)
+	putter.Done(granteeref)
+	putter.Done(historyref)
+	jsonhttp.Created(w, GranteesPostResponse{
+		Reference:        granteeref,
+		HistoryReference: historyref,
+	})
 }
 
 func convertToPointerSlice(slice []ecdsa.PublicKey) []*ecdsa.PublicKey {

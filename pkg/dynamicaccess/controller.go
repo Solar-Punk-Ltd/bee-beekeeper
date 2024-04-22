@@ -18,11 +18,7 @@ import (
 const granteeListEncrypt = true
 
 type GranteeManager interface {
-	//PATCH /grantees
-	//{publisher, addList, removeList}
 	HandleGrantees(ctx context.Context, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error)
-
-	//GET /grantees/{history root hash}
 	GetGrantees(ctx context.Context, rootHash swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
@@ -181,12 +177,13 @@ func (c *controller) HandleGrantees(ctx context.Context, granteeref swarm.Addres
 	gl.Add(addList)
 	gl.Remove(removeList)
 
-	granteesToAdd := addList
-
+	var granteesToAdd []*ecdsa.PublicKey
 	// generate new access key and new act
 	if len(removeList) != 0 || granteeref.IsZero() {
 		c.accessLogic.AddPublisher(ctx, act, publisher)
 		granteesToAdd = gl.Get()
+	} else {
+		granteesToAdd = addList
 	}
 
 	for _, grantee := range granteesToAdd {
