@@ -238,7 +238,7 @@ func NewDevBee(logger log.Logger, o *DevOptions) (b *DevBee, err error) {
 
 	session := dynamicaccess.NewDefaultSession(mockKey)
 	actLogic := dynamicaccess.NewLogic(session)
-	dac := dynamicaccess.NewController(context.Background(), actLogic, localStore.ChunkStore(), localStore.Cache())
+	dac := dynamicaccess.NewController(context.Background(), actLogic)
 	b.dacCloser = dac
 
 	pssService := pss.New(mockKey, logger)

@@ -18,37 +18,36 @@ import (
 const granteeListEncrypt = true
 
 type GranteeManager interface {
-	HandleGrantees(ctx context.Context, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error)
-	GetGrantees(ctx context.Context, rootHash swarm.Address) ([]*ecdsa.PublicKey, error)
+	HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error)
+	GetGrantees(ctx context.Context, getter storage.Getter, rootHash swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
 // TODO: add granteeList ref to history metadata to solve inconsistency
 type Controller interface {
 	GranteeManager
 	// DownloadHandler decrypts the encryptedRef using the lookupkey based on the history and timestamp.
-	DownloadHandler(ctx context.Context, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error)
+	DownloadHandler(ctx context.Context, getter storage.Getter, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error)
 	// TODO: history encryption
 	// UploadHandler encrypts the reference and stores it in the history as the latest update.
-	UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, swarm.Address, error)
+	UploadHandler(ctx context.Context, getter storage.Getter, putter storage.Putter, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, swarm.Address, error)
 	io.Closer
 }
 
 type controller struct {
 	accessLogic ActLogic
-	getter      storage.Getter
-	putter      storage.Putter
 }
 
 var _ Controller = (*controller)(nil)
 
 func (c *controller) DownloadHandler(
 	ctx context.Context,
+	getter storage.Getter,
 	encryptedRef swarm.Address,
 	publisher *ecdsa.PublicKey,
 	historyRootHash swarm.Address,
 	timestamp int64,
 ) (swarm.Address, error) {
-	ls := loadsave.New(c.getter, c.putter, requestPipelineFactory(ctx, c.putter, false, redundancy.NONE))
+	ls := loadsave.NewReadonly(getter)
 	history, err := NewHistoryReference(ls, historyRootHash)
 	if err != nil {
 		return swarm.ZeroAddress, err
@@ -68,11 +67,13 @@ func (c *controller) DownloadHandler(
 
 func (c *controller) UploadHandler(
 	ctx context.Context,
+	getter storage.Getter,
+	putter storage.Putter,
 	refrefence swarm.Address,
 	publisher *ecdsa.PublicKey,
 	historyRootHash swarm.Address,
 ) (swarm.Address, swarm.Address, swarm.Address, error) {
-	ls := loadsave.New(c.getter, c.putter, requestPipelineFactory(ctx, c.putter, false, redundancy.NONE))
+	ls := loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE))
 	historyRef := historyRootHash
 	var (
 		storage kvs.KeyValueStore
@@ -126,21 +127,28 @@ func (c *controller) UploadHandler(
 	return actRef, historyRef, encryptedRef, err
 }
 
-func NewController(ctx context.Context, accessLogic ActLogic, getter storage.Getter, putter storage.Putter) Controller {
+func NewController(ctx context.Context, accessLogic ActLogic) Controller {
 	return &controller{
 		accessLogic: accessLogic,
-		getter:      getter,
-		putter:      putter,
 	}
 }
 
-func (c *controller) HandleGrantees(ctx context.Context, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
+func (c *controller) HandleGrantees(
+	ctx context.Context,
+	getter storage.Getter,
+	putter storage.Putter,
+	granteeref swarm.Address,
+	historyref swarm.Address,
+	publisher *ecdsa.PublicKey,
+	addList []*ecdsa.PublicKey,
+	removeList []*ecdsa.PublicKey,
+) (swarm.Address, swarm.Address, error) {
 	var (
 		err error
 		h   History
 		act kvs.KeyValueStore
-		ls  = loadsave.New(c.getter, c.putter, requestPipelineFactory(ctx, c.putter, false, redundancy.NONE))
-		gls = loadsave.New(c.getter, c.putter, requestPipelineFactory(ctx, c.putter, granteeListEncrypt, redundancy.NONE))
+		ls  = loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE))
+		gls = loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
 	)
 	if !historyref.IsZero() {
 		h, err = NewHistoryReference(ls, historyref)
@@ -174,20 +182,34 @@ func (c *controller) HandleGrantees(ctx context.Context, granteeref swarm.Addres
 	} else {
 		gl = NewGranteeListReference(gls, granteeref)
 	}
-	gl.Add(addList)
-	gl.Remove(removeList)
+	err = gl.Add(addList)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+	if len(removeList) != 0 {
+		err = gl.Remove(removeList)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
+	}
 
 	var granteesToAdd []*ecdsa.PublicKey
 	// generate new access key and new act
 	if len(removeList) != 0 || granteeref.IsZero() {
-		c.accessLogic.AddPublisher(ctx, act, publisher)
+		err = c.accessLogic.AddPublisher(ctx, act, publisher)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
 		granteesToAdd = gl.Get()
 	} else {
 		granteesToAdd = addList
 	}
 
 	for _, grantee := range granteesToAdd {
-		c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
+		err := c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
 	}
 
 	actref, err := act.Save(ctx)
@@ -195,7 +217,10 @@ func (c *controller) HandleGrantees(ctx context.Context, granteeref swarm.Addres
 		return swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 
-	h.Add(ctx, actref, nil, nil)
+	err = h.Add(ctx, actref, nil, nil)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
 	href, err := h.Store(ctx)
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, err
@@ -208,8 +233,8 @@ func (c *controller) HandleGrantees(ctx context.Context, granteeref swarm.Addres
 	return glref, href, nil
 }
 
-func (c *controller) GetGrantees(ctx context.Context, granteeRef swarm.Address) ([]*ecdsa.PublicKey, error) {
-	ls := loadsave.New(c.getter, c.putter, requestPipelineFactory(ctx, c.putter, granteeListEncrypt, redundancy.NONE))
+func (c *controller) GetGrantees(ctx context.Context, getter storage.Getter, granteeRef swarm.Address) ([]*ecdsa.PublicKey, error) {
+	ls := loadsave.NewReadonly(getter)
 	gl := NewGranteeListReference(ls, granteeRef)
 	return gl.Get(), nil
 }

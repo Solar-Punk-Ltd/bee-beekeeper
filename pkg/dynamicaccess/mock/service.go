@@ -78,7 +78,7 @@ func WithPublisher(ref string) Option {
 	})
 }
 
-func (m *mockDacService) DownloadHandler(ctx context.Context, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error) {
+func (m *mockDacService) DownloadHandler(ctx context.Context, getter storage.Getter, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error) {
 	if m.acceptAll {
 		return swarm.ParseHexAddress("36e6c1bbdfee6ac21485d5f970479fd1df458d36df9ef4e8179708ed46da557f")
 	}
@@ -101,7 +101,7 @@ func (m *mockDacService) DownloadHandler(ctx context.Context, encryptedRef swarm
 	return m.refMap[encryptedRef.String()], nil
 }
 
-func (m *mockDacService) UploadHandler(ctx context.Context, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, swarm.Address, error) {
+func (m *mockDacService) UploadHandler(ctx context.Context, getter storage.Getter, putter storage.Putter, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, swarm.Address, error) {
 	historyRef, _ := swarm.ParseHexAddress("67bdf80a9bbea8eca9c8480e43fdceb485d2d74d5708e45144b8c4adacd13d9c")
 	kvsRef, _ := swarm.ParseHexAddress("3339613565613837623134316665343461613630396333333237656364383934")
 	if m.acceptAll {
@@ -141,12 +141,12 @@ func (m *mockDacService) Close() error {
 	return nil
 }
 
-func (m *mockDacService) HandleGrantees(ctx context.Context, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
+func (m *mockDacService) HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
 	historyRef, _ := swarm.ParseHexAddress("67bdf80a9bbea8eca9c8480e43fdceb485d2d74d5708e45144b8c4adacd13d9c")
 	glRef, _ := swarm.ParseHexAddress("3339613565613837623134316665343461613630396333333237656364383934")
 	return glRef, historyRef, nil
 }
-func (m *mockDacService) GetGrantees(ctx context.Context, granteeref swarm.Address) ([]*ecdsa.PublicKey, error) {
+func (m *mockDacService) GetGrantees(ctx context.Context, getter storage.Getter, granteeref swarm.Address) ([]*ecdsa.PublicKey, error) {
 	keys := []string{
 		"a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa",
 		"b786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfb",

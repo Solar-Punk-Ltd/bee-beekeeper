@@ -266,7 +266,7 @@ func (s *Service) fileUploadHandler(
 
 	encryptedReference := manifestReference
 	if act {
-		encryptedReference, err = s.actEncryptionHandler(r.Context(), w, putter, manifestReference, historyAddress)
+		encryptedReference, err = s.actEncryptionHandler(r.Context(), w, s.storer.Download(true), putter, manifestReference, historyAddress)
 		if err != nil {
 			jsonhttp.InternalServerError(w, errActUpload)
 			return

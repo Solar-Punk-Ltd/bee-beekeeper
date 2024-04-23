@@ -5,12 +5,15 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
+	"github.com/ethersphere/bee/v2/pkg/postage"
+	storage "github.com/ethersphere/bee/v2/pkg/storage"
 	storer "github.com/ethersphere/bee/v2/pkg/storer"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/gorilla/mux"
@@ -85,7 +88,7 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 				return
 			}
 			ctx := r.Context()
-			reference, err := s.dac.DownloadHandler(ctx, paths.Address, headers.Publisher, *headers.HistoryAddress, *headers.Timestamp)
+			reference, err := s.dac.DownloadHandler(ctx, s.storer.Download(true), paths.Address, headers.Publisher, *headers.HistoryAddress, *headers.Timestamp)
 			if err != nil {
 				jsonhttp.InternalServerError(w, errActDownload)
 				return
@@ -101,13 +104,14 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 func (s *Service) actEncryptionHandler(
 	ctx context.Context,
 	w http.ResponseWriter,
+	getter storage.Getter,
 	putter storer.PutterSession,
 	reference swarm.Address,
 	historyRootHash swarm.Address,
 ) (swarm.Address, error) {
 	logger := s.logger.WithName("act_encryption_handler").Build()
 	publisherPublicKey := &s.publicKey
-	storageReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, reference, publisherPublicKey, historyRootHash)
+	storageReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, getter, putter, reference, publisherPublicKey, historyRootHash)
 	if err != nil {
 		logger.Debug("act failed to encrypt reference", "error", err)
 		logger.Error(nil, "act failed to encrypt reference")
@@ -137,7 +141,6 @@ func (s *Service) actEncryptionHandler(
 	}
 
 	w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
-
 	return encryptedReference, nil
 }
 
@@ -150,7 +153,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 		response("invalid path params", logger, w)
 		return
 	}
-	grantees, err := s.dac.GetGrantees(r.Context(), paths.GranteesAddress)
+	grantees, err := s.dac.GetGrantees(r.Context(), s.storer.Download(true), paths.GranteesAddress)
 	if err != nil {
 		jsonhttp.NotFound(w, "grantee list not found")
 		return
@@ -225,15 +228,32 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	tag, _ := s.getOrCreateSessionID(0)
 
 	ctx := r.Context()
-	putter, _ := s.newStamperPutter(ctx, putterOptions{
+	putter, err := s.newStamperPutter(ctx, putterOptions{
 		BatchID:  headers.BatchID,
 		TagID:    tag,
 		Pin:      false,
-		Deferred: true,
+		Deferred: false,
 	})
+	if err != nil {
+		logger.Debug("putter failed", "error", err)
+		logger.Error(nil, "putter failed")
+		switch {
+		case errors.Is(err, errBatchUnusable) || errors.Is(err, postage.ErrNotUsable):
+			jsonhttp.UnprocessableEntity(w, "batch not usable yet or does not exist")
+		case errors.Is(err, postage.ErrNotFound):
+			jsonhttp.NotFound(w, "batch with id not found")
+		case errors.Is(err, errInvalidPostageBatch):
+			jsonhttp.BadRequest(w, "invalid batch id")
+		case errors.Is(err, errUnsupportedDevNodeOperation):
+			jsonhttp.BadRequest(w, errUnsupportedDevNodeOperation)
+		default:
+			jsonhttp.BadRequest(w, nil)
+		}
+		return
+	}
 
 	granteeref := paths.GranteesAddress
-	granteeref, historyref, _ := s.dac.HandleGrantees(ctx, granteeref, *headers.HistoryAddress, &s.publicKey, convertToPointerSlice(grantees.Addlist), convertToPointerSlice(grantees.Revokelist))
+	granteeref, historyref, _ := s.dac.HandleGrantees(ctx, s.storer.Download(true), putter, granteeref, *headers.HistoryAddress, &s.publicKey, convertToPointerSlice(grantees.Addlist), convertToPointerSlice(grantees.Revokelist))
 	putter.Done(granteeref)
 	putter.Done(historyref)
 	jsonhttp.OK(w, GranteesPatchResponse{
@@ -290,16 +310,55 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	tag, _ := s.getOrCreateSessionID(0)
 
 	ctx := r.Context()
-	putter, _ := s.newStamperPutter(ctx, putterOptions{
+	// TODO: pin and deferred headers
+	putter, err := s.newStamperPutter(ctx, putterOptions{
 		BatchID:  headers.BatchID,
 		TagID:    tag,
 		Pin:      false,
-		Deferred: true,
+		Deferred: false,
 	})
+	if err != nil {
+		logger.Debug("putter failed", "error", err)
+		logger.Error(nil, "putter failed")
+		switch {
+		case errors.Is(err, errBatchUnusable) || errors.Is(err, postage.ErrNotUsable):
+			jsonhttp.UnprocessableEntity(w, "batch not usable yet or does not exist")
+		case errors.Is(err, postage.ErrNotFound):
+			jsonhttp.NotFound(w, "batch with id not found")
+		case errors.Is(err, errInvalidPostageBatch):
+			jsonhttp.BadRequest(w, "invalid batch id")
+		case errors.Is(err, errUnsupportedDevNodeOperation):
+			jsonhttp.BadRequest(w, errUnsupportedDevNodeOperation)
+		default:
+			jsonhttp.BadRequest(w, nil)
+		}
+		return
+	}
 
-	granteeref, historyref, _ := s.dac.HandleGrantees(ctx, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, convertToPointerSlice(list), nil)
-	putter.Done(granteeref)
-	putter.Done(historyref)
+	granteeref, historyref, err := s.dac.HandleGrantees(ctx, s.storer.Download(true), putter, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, convertToPointerSlice(list), nil)
+	if err != nil {
+		logger.Info("HandleGrantees error", "error", err)
+		logger.Error(nil, "HandleGrantees error")
+		jsonhttp.InternalServerError(w, "HandleGrantees error")
+		return
+	}
+
+	err = putter.Done(granteeref)
+	if err != nil {
+		logger.Info("putter granteeref error", "error", err)
+		logger.Error(nil, "putter granteeref error")
+		jsonhttp.InternalServerError(w, "putter granteeref error")
+		return
+	}
+
+	err = putter.Done(historyref)
+	if err != nil {
+		logger.Info("putter historyref error", "error", err)
+		logger.Error(nil, "putter historyref error")
+		jsonhttp.InternalServerError(w, "putter historyref error")
+		return
+	}
+
 	jsonhttp.Created(w, GranteesPostResponse{
 		Reference:        granteeref,
 		HistoryReference: historyref,
@@ -309,7 +368,8 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 func convertToPointerSlice(slice []ecdsa.PublicKey) []*ecdsa.PublicKey {
 	pointerSlice := make([]*ecdsa.PublicKey, len(slice))
 	for i, key := range slice {
-		pointerSlice[i] = &key
+		tempKey := key
+		pointerSlice[i] = &tempKey
 	}
 	return pointerSlice
 }
