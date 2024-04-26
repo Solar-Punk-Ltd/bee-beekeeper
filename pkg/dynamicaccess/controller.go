@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	encryption "github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
@@ -18,16 +19,17 @@ import (
 const granteeListEncrypt = true
 
 type GranteeManager interface {
-	HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error)
-	GetGrantees(ctx context.Context, getter storage.Getter, rootHash swarm.Address) ([]*ecdsa.PublicKey, error)
+	// TODO: doc
+	HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, error)
+	// GetGrantees returns the list of grantees for the given publisher.
+	// The list is accessible only by the publisher.
+	GetGrantees(ctx context.Context, getter storage.Getter, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
-// TODO: add granteeList ref to history metadata to solve inconsistency
 type Controller interface {
 	GranteeManager
 	// DownloadHandler decrypts the encryptedRef using the lookupkey based on the history and timestamp.
 	DownloadHandler(ctx context.Context, getter storage.Getter, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error)
-	// TODO: history encryption
 	// UploadHandler encrypts the reference and stores it in the history as the latest update.
 	UploadHandler(ctx context.Context, getter storage.Getter, putter storage.Putter, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, swarm.Address, error)
 	io.Closer
@@ -56,13 +58,12 @@ func (c *controller) DownloadHandler(
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
-	// TODO: hanlde granteelist ref in mtdt
-	kvs, err := kvs.NewReference(ls, entry.Reference())
+	act, err := kvs.NewReference(ls, entry.Reference())
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
 
-	return c.accessLogic.DecryptRef(ctx, kvs, encryptedRef, publisher)
+	return c.accessLogic.DecryptRef(ctx, act, encryptedRef, publisher)
 }
 
 func (c *controller) UploadHandler(
@@ -97,7 +98,6 @@ func (c *controller) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		// TODO: pass granteelist ref as mtdt
 		err = history.Add(ctx, actRef, &now, nil)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
@@ -111,7 +111,6 @@ func (c *controller) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		// TODO: hanlde granteelist ref in mtdt
 		entry, err := history.Lookup(ctx, now)
 		actRef = entry.Reference()
 		if err != nil {
@@ -127,69 +126,81 @@ func (c *controller) UploadHandler(
 	return actRef, historyRef, encryptedRef, err
 }
 
-func NewController(ctx context.Context, accessLogic ActLogic) Controller {
+func NewController(accessLogic ActLogic) Controller {
 	return &controller{
 		accessLogic: accessLogic,
 	}
 }
 
+// TODO: is an empty addlist && removelist check necessary ?
 func (c *controller) HandleGrantees(
 	ctx context.Context,
 	getter storage.Getter,
 	putter storage.Putter,
-	granteeref swarm.Address,
+	encryptedglref swarm.Address,
 	historyref swarm.Address,
 	publisher *ecdsa.PublicKey,
 	addList []*ecdsa.PublicKey,
 	removeList []*ecdsa.PublicKey,
-) (swarm.Address, swarm.Address, error) {
+) (swarm.Address, swarm.Address, swarm.Address, error) {
 	var (
-		err error
-		h   History
-		act kvs.KeyValueStore
-		ls  = loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE))
-		gls = loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
+		err        error
+		h          History
+		act        kvs.KeyValueStore
+		granteeref swarm.Address
+		ls         = loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE))
+		gls        = loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
 	)
 	if !historyref.IsZero() {
 		h, err = NewHistoryReference(ls, historyref)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		entry, err := h.Lookup(ctx, time.Now().Unix())
 
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		actref := entry.Reference()
 		act, err = kvs.NewReference(ls, actref)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	} else {
 		h, err = NewHistory(ls)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		act, err = kvs.New(ls)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 
 	var gl GranteeList
-	if granteeref.IsZero() {
-		gl = NewGranteeList(gls)
+	if encryptedglref.IsZero() {
+		gl, err = NewGranteeList(gls)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
 	} else {
-		gl = NewGranteeListReference(gls, granteeref)
+		granteeref, err = c.decryptRefForPublisher(publisher, encryptedglref)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
+		gl, err = NewGranteeListReference(gls, granteeref)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
 	}
 	err = gl.Add(addList)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 	if len(removeList) != 0 {
 		err = gl.Remove(removeList)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 
@@ -198,7 +209,7 @@ func (c *controller) HandleGrantees(
 	if len(removeList) != 0 || granteeref.IsZero() {
 		err = c.accessLogic.AddPublisher(ctx, act, publisher)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		granteesToAdd = gl.Get()
 	} else {
@@ -208,35 +219,76 @@ func (c *controller) HandleGrantees(
 	for _, grantee := range granteesToAdd {
 		err := c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 
 	actref, err := act.Save(ctx)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
-	}
-
-	err = h.Add(ctx, actref, nil, nil)
-	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
-	}
-	href, err := h.Store(ctx)
-	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 
 	glref, err := gl.Save(ctx)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
-	return glref, href, nil
+	eglref, err := c.encryptRefForPublisher(publisher, glref)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+
+	mtdt := map[string]string{"encryptedglref": eglref.String()}
+	err = h.Add(ctx, actref, nil, &mtdt)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+	href, err := h.Store(ctx)
+	if err != nil {
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+
+	return glref, eglref, href, nil
 }
 
-func (c *controller) GetGrantees(ctx context.Context, getter storage.Getter, granteeRef swarm.Address) ([]*ecdsa.PublicKey, error) {
+func (c *controller) GetGrantees(ctx context.Context, getter storage.Getter, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error) {
 	ls := loadsave.NewReadonly(getter)
-	gl := NewGranteeListReference(ls, granteeRef)
+	granteeRef, err := c.decryptRefForPublisher(publisher, encryptedglref)
+	if err != nil {
+		return nil, err
+	}
+	gl, err := NewGranteeListReference(ls, granteeRef)
+	if err != nil {
+		return nil, err
+	}
 	return gl.Get(), nil
+}
+
+func (c *controller) encryptRefForPublisher(publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
+	keys, err := c.accessLogic.Session.Key(publisherPubKey, [][]byte{oneByteArray})
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+	refCipher := encryption.New(keys[0], 0, uint32(0), hashFunc)
+	encryptedRef, err := refCipher.Encrypt(ref.Bytes())
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+
+	return swarm.NewAddress(encryptedRef), nil
+}
+
+func (c *controller) decryptRefForPublisher(publisherPubKey *ecdsa.PublicKey, encryptedRef swarm.Address) (swarm.Address, error) {
+	keys, err := c.accessLogic.Session.Key(publisherPubKey, [][]byte{oneByteArray})
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+	refCipher := encryption.New(keys[0], 0, uint32(0), hashFunc)
+	ref, err := refCipher.Decrypt(encryptedRef.Bytes())
+	if err != nil {
+		return swarm.ZeroAddress, err
+	}
+
+	return swarm.NewAddress(ref), nil
 }
 
 func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {

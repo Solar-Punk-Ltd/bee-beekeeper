@@ -821,22 +821,46 @@ func TestDacGrantees(t *testing.T) {
 		})
 	)
 	t.Run("get-grantees", func(t *testing.T) {
+		var (
+			publicKeyBytes = crypto.EncodeSecp256k1PublicKey(&pk.PublicKey)
+			publisher      = hex.EncodeToString(publicKeyBytes)
+		)
+		clientwihtpublisher, _, _, _ := newTestServer(t, testServerOptions{
+			Storer:    storerMock,
+			Logger:    logger,
+			Post:      mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey: pk.PublicKey,
+			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String()), mockdac.WithPublisher(publisher)),
+		})
 		expected := []string{
 			"03d7660772cc3142f8a7a2dfac46ce34d12eac1718720cef0e3d94347902aa96a2",
 			"03c712a7e29bc792ac8d8ae49793d28d5bda27ed70f0d90697b2fb456c0a168bd2",
 			"032541acf966823bae26c2c16a7102e728ade3e2e29c11a8a17b29d8eb2bd19302",
 		}
-		jsonhttptest.Request(t, client, http.MethodGet, "/grantee/"+addr.String(), http.StatusOK,
+		jsonhttptest.Request(t, clientwihtpublisher, http.MethodGet, "/grantee/"+addr.String(), http.StatusOK,
 			jsonhttptest.WithExpectedJSONResponse(expected),
 		)
 	})
 
-	t.Run("get-grantees-missing-address", func(t *testing.T) {
-		jsonhttptest.Request(t, client, http.MethodGet, "/grantee/123", http.StatusBadRequest,
+	t.Run("get-grantees-unauthorized", func(t *testing.T) {
+		jsonhttptest.Request(t, client, http.MethodGet, "/grantee/fc4e9fe978991257b897d987bc4ff13058b66ef45a53189a0b4fe84bb3346396", http.StatusUnauthorized,
 			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
-				Message: "Unauthorized",
-				Code:    http.StatusBadRequest,
+				Message: "granteelist not found",
+				Code:    http.StatusUnauthorized,
 			}),
+		)
+	})
+	t.Run("get-grantees-invalid-address", func(t *testing.T) {
+		jsonhttptest.Request(t, client, http.MethodGet, "/grantee/asd", http.StatusBadRequest,
+			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
+				Code:    http.StatusBadRequest,
+				Message: "invalid path params",
+				Reasons: []jsonhttp.Reason{
+					{
+						Field: "address",
+						Error: api.HexInvalidByteError('s').Error(),
+					},
+				}}),
 		)
 	})
 	t.Run("add-revoke-grantees", func(t *testing.T) {

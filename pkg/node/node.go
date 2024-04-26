@@ -776,7 +776,7 @@ func NewBee(
 	evictFn = func(id []byte) error { return localStore.EvictBatch(context.Background(), id) }
 
 	actLogic := dynamicaccess.NewLogic(session)
-	dac := dynamicaccess.NewController(ctx, actLogic)
+	dac := dynamicaccess.NewController(actLogic)
 	b.dacCloser = dac
 
 	var (

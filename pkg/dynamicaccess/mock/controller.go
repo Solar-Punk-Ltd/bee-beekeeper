@@ -126,7 +126,6 @@ func (m *mockDacService) UploadHandler(ctx context.Context, getter storage.Gette
 		}
 	} else {
 		h, _ = dynamicaccess.NewHistory(m.ls)
-		// TODO: pass granteelist ref as mtdt
 		h.Add(ctx, kvsRef, &now, nil)
 		historyRef, _ = h.Store(ctx)
 		m.historyMap[historyRef.String()] = h
@@ -141,18 +140,23 @@ func (m *mockDacService) Close() error {
 	return nil
 }
 
-func (m *mockDacService) HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, error) {
+func (m *mockDacService) HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, error) {
 	historyRef, _ := swarm.ParseHexAddress("67bdf80a9bbea8eca9c8480e43fdceb485d2d74d5708e45144b8c4adacd13d9c")
 	glRef, _ := swarm.ParseHexAddress("3339613565613837623134316665343461613630396333333237656364383934")
-	return glRef, historyRef, nil
+	eglRef, _ := swarm.ParseHexAddress("fc4e9fe978991257b897d987bc4ff13058b66ef45a53189a0b4fe84bb3346396")
+	return glRef, eglRef, historyRef, nil
 }
-func (m *mockDacService) GetGrantees(ctx context.Context, getter storage.Getter, granteeref swarm.Address) ([]*ecdsa.PublicKey, error) {
+
+func (m *mockDacService) GetGrantees(ctx context.Context, getter storage.Getter, publisher *ecdsa.PublicKey, granteeref swarm.Address) ([]*ecdsa.PublicKey, error) {
+	if m.publisher == "" {
+		return nil, fmt.Errorf("granteelist not found")
+	}
 	keys := []string{
 		"a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa",
 		"b786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfb",
 		"c786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfc",
 	}
-	var pubkeys []*ecdsa.PublicKey
+	pubkeys := make([]*ecdsa.PublicKey, 0, len(keys))
 	for i := range keys {
 		data, err := hex.DecodeString(keys[i])
 		if err != nil {

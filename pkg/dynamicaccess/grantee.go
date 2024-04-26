@@ -15,10 +15,15 @@ const (
 	publicKeyLen = 65
 )
 
+// GranteeList manages a list of public keys.
 type GranteeList interface {
+	// Add adds a list of public keys to the grantee list. It filters out duplicates.
 	Add(addList []*ecdsa.PublicKey) error
+	// Remove removes a list of public keys from the grantee list, if there is any.
 	Remove(removeList []*ecdsa.PublicKey) error
+	// Get simply returns the list of public keys.
 	Get() []*ecdsa.PublicKey
+	// Save saves the grantee list to the underlying storage and returns the reference.
 	Save(ctx context.Context) (swarm.Address, error)
 }
 
@@ -37,7 +42,26 @@ func (g *GranteeListStruct) Add(addList []*ecdsa.PublicKey) error {
 	if len(addList) == 0 {
 		return fmt.Errorf("no public key provided")
 	}
-	g.grantees = append(g.grantees, addList...)
+	filteredList := make([]*ecdsa.PublicKey, 0, len(addList))
+	for _, addkey := range addList {
+		add := true
+		for _, granteekey := range g.grantees {
+			if granteekey.Equal(addkey) {
+				add = false
+				break
+			}
+		}
+		for _, filteredkey := range filteredList {
+			if filteredkey.Equal(addkey) {
+				add = false
+				break
+			}
+		}
+		if add {
+			filteredList = append(filteredList, addkey)
+		}
+	}
+	g.grantees = append(g.grantees, filteredList...)
 
 	return nil
 }
@@ -75,24 +99,24 @@ func (g *GranteeListStruct) Remove(keysToRemove []*ecdsa.PublicKey) error {
 	return nil
 }
 
-func NewGranteeList(ls file.LoadSaver) GranteeList {
+func NewGranteeList(ls file.LoadSaver) (GranteeList, error) {
 	return &GranteeListStruct{
 		grantees: []*ecdsa.PublicKey{},
 		loadSave: ls,
-	}
+	}, nil
 }
 
-func NewGranteeListReference(ls file.LoadSaver, reference swarm.Address) GranteeList {
+func NewGranteeListReference(ls file.LoadSaver, reference swarm.Address) (GranteeList, error) {
 	data, err := ls.Load(context.Background(), reference.Bytes())
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	grantees := deserialize(data)
 
 	return &GranteeListStruct{
 		grantees: grantees,
 		loadSave: ls,
-	}
+	}, nil
 }
 
 func serialize(publicKeys []*ecdsa.PublicKey) []byte {

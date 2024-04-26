@@ -139,6 +139,7 @@ func (s *Service) actEncryptionHandler(
 			return swarm.ZeroAddress, err
 		}
 	}
+	// TODO: probably does not need to store the eref, just return it
 	err = putter.Done(encryptedReference)
 	if err != nil {
 		logger.Debug("done split encrypted reference failed", "error", err)
@@ -150,6 +151,8 @@ func (s *Service) actEncryptionHandler(
 	return encryptedReference, nil
 }
 
+// actListGranteesHandler is a middleware that decrypts the given address and returns the list of grantees,
+// only the publisher is authorized to access the list
 func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("act_list_grantees_handler").Build()
 	paths := struct {
@@ -171,9 +174,12 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	if headers.Cache != nil {
 		cache = *headers.Cache
 	}
-	grantees, err := s.dac.GetGrantees(r.Context(), s.storer.Download(cache), paths.GranteesAddress)
+	publisher := &s.publicKey
+	grantees, err := s.dac.GetGrantees(r.Context(), s.storer.Download(cache), publisher, paths.GranteesAddress)
 	if err != nil {
-		jsonhttp.NotFound(w, "grantee list not found")
+		logger.Debug("could not get grantees", "error", err)
+		logger.Error(nil, "could not get grantees")
+		jsonhttp.Unauthorized(w, "granteelist not found")
 		return
 	}
 	granteeSlice := make([]string, len(grantees))
@@ -183,6 +189,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	jsonhttp.OK(w, granteeSlice)
 }
 
+// TODO: actGrantRevokeHandler doc.
 func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("act_grant_revoke_handler").Build()
 
@@ -289,11 +296,19 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	granteeref := paths.GranteesAddress
-	granteeref, historyref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, granteeref, *headers.HistoryAddress, &s.publicKey, convertToPointerSlice(grantees.Addlist), convertToPointerSlice(grantees.Revokelist))
+	granteeref, encryptedglref, historyref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, granteeref, *headers.HistoryAddress, &s.publicKey, convertToPointerSlice(grantees.Addlist), convertToPointerSlice(grantees.Revokelist))
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
 		jsonhttp.InternalServerError(w, "failed to update grantee list")
+		return
+	}
+
+	err = putter.Done(historyref)
+	if err != nil {
+		logger.Debug("done split history failed", "error", err)
+		logger.Error(nil, "done split history failed")
+		jsonhttp.InternalServerError(w, "done split history failed")
 		return
 	}
 
@@ -305,19 +320,13 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = putter.Done(historyref)
-	if err != nil {
-		logger.Debug("done split history failed", "error", err)
-		logger.Error(nil, "done split history failed")
-		jsonhttp.InternalServerError(w, "done split history failed")
-		return
-	}
 	jsonhttp.OK(w, GranteesPatchResponse{
-		Reference:        granteeref,
+		Reference:        encryptedglref,
 		HistoryReference: historyref,
 	})
 }
 
+// TODO: actCreateGranteesHandler doc.
 func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("acthandler").Build()
 
@@ -402,19 +411,11 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	granteeref, historyref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, convertToPointerSlice(list), nil)
+	granteeref, encryptedglref, historyref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, convertToPointerSlice(list), nil)
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
 		jsonhttp.InternalServerError(w, "failed to update grantee list")
-		return
-	}
-
-	err = putter.Done(granteeref)
-	if err != nil {
-		logger.Debug("done split grantees failed", "error", err)
-		logger.Error(nil, "done split grantees failed")
-		jsonhttp.InternalServerError(w, "done split grantees failed")
 		return
 	}
 
@@ -426,8 +427,16 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	err = putter.Done(granteeref)
+	if err != nil {
+		logger.Debug("done split grantees failed", "error", err)
+		logger.Error(nil, "done split grantees failed")
+		jsonhttp.InternalServerError(w, "done split grantees failed")
+		return
+	}
+
 	jsonhttp.Created(w, GranteesPostResponse{
-		Reference:        granteeref,
+		Reference:        encryptedglref,
 		HistoryReference: historyref,
 	})
 }

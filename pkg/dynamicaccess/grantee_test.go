@@ -15,6 +15,7 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/storage"
 	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
+	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,7 +42,7 @@ func generateKeyListFixture() ([]*ecdsa.PublicKey, error) {
 }
 
 func TestGranteeAddGet(t *testing.T) {
-	gl := dynamicaccess.NewGranteeList(createLs())
+	gl, _ := dynamicaccess.NewGranteeList(createLs())
 	keys, err := generateKeyListFixture()
 	if err != nil {
 		t.Errorf("key generation error: %v", err)
@@ -54,9 +55,10 @@ func TestGranteeAddGet(t *testing.T) {
 
 	t.Run("Get should return value equal to put value", func(t *testing.T) {
 		var (
+			keys2, _                    = generateKeyListFixture()
 			addList1 []*ecdsa.PublicKey = []*ecdsa.PublicKey{keys[0]}
-			addList2 []*ecdsa.PublicKey = []*ecdsa.PublicKey{keys[1], keys[0]}
-			addList3 []*ecdsa.PublicKey = keys
+			addList2 []*ecdsa.PublicKey = []*ecdsa.PublicKey{keys[1], keys[2]}
+			addList3 []*ecdsa.PublicKey = keys2
 		)
 		testCases := []struct {
 			name string
@@ -64,6 +66,10 @@ func TestGranteeAddGet(t *testing.T) {
 		}{
 			{
 				name: "Test list = 1",
+				list: addList1,
+			},
+			{
+				name: "Test list = duplicate1",
 				list: addList1,
 			},
 			{
@@ -88,7 +94,9 @@ func TestGranteeAddGet(t *testing.T) {
 					assert.Error(t, err)
 				} else {
 					assert.NoError(t, err)
-					expList = append(expList, tc.list...)
+					if tc.name != "Test list = duplicate1" {
+						expList = append(expList, tc.list...)
+					}
 					retVal := gl.Get()
 					assert.Equal(t, expList, retVal)
 				}
@@ -98,7 +106,7 @@ func TestGranteeAddGet(t *testing.T) {
 }
 
 func TestGranteeRemove(t *testing.T) {
-	gl := dynamicaccess.NewGranteeList(createLs())
+	gl, _ := dynamicaccess.NewGranteeList(createLs())
 	keys, err := generateKeyListFixture()
 	if err != nil {
 		t.Errorf("key generation error: %v", err)
@@ -150,13 +158,18 @@ func TestGranteeSave(t *testing.T) {
 	if err != nil {
 		t.Errorf("key generation error: %v", err)
 	}
+	t.Run("Create grantee list with invalid reference, expect error", func(t *testing.T) {
+		gl, err := dynamicaccess.NewGranteeListReference(createLs(), swarm.RandAddress(t))
+		assert.Error(t, err)
+		assert.Nil(t, gl)
+	})
 	t.Run("Save empty grantee list return NO error", func(t *testing.T) {
-		gl := dynamicaccess.NewGranteeList(createLs())
+		gl, _ := dynamicaccess.NewGranteeList(createLs())
 		_, err := gl.Save(ctx)
 		assert.NoError(t, err)
 	})
 	t.Run("Save not empty grantee list return valid swarm address", func(t *testing.T) {
-		gl := dynamicaccess.NewGranteeList(createLs())
+		gl, _ := dynamicaccess.NewGranteeList(createLs())
 		err = gl.Add(keys)
 		ref, err := gl.Save(ctx)
 		assert.NoError(t, err)
@@ -164,7 +177,7 @@ func TestGranteeSave(t *testing.T) {
 	})
 	t.Run("Save grantee list with one item, no error, pre-save value exist", func(t *testing.T) {
 		ls := createLs()
-		gl1 := dynamicaccess.NewGranteeList(ls)
+		gl1, _ := dynamicaccess.NewGranteeList(ls)
 
 		err := gl1.Add(keys)
 		assert.NoError(t, err)
@@ -172,32 +185,33 @@ func TestGranteeSave(t *testing.T) {
 		ref, err := gl1.Save(ctx)
 		assert.NoError(t, err)
 
-		gl2 := dynamicaccess.NewGranteeListReference(ls, ref)
+		gl2, _ := dynamicaccess.NewGranteeListReference(ls, ref)
 		val := gl2.Get()
 		assert.NoError(t, err)
 		assert.Equal(t, keys, val)
 	})
 	t.Run("Save grantee list and add one item, no error, after-save value exist", func(t *testing.T) {
 		ls := createLs()
+		keys2, _ := generateKeyListFixture()
 
-		gl1 := dynamicaccess.NewGranteeList(ls)
+		gl1, _ := dynamicaccess.NewGranteeList(ls)
 
 		err := gl1.Add(keys)
 		assert.NoError(t, err)
 		ref, err := gl1.Save(ctx)
 		assert.NoError(t, err)
 
-		gl2 := dynamicaccess.NewGranteeListReference(ls, ref)
-		err = gl2.Add(keys)
+		gl2, _ := dynamicaccess.NewGranteeListReference(ls, ref)
+		err = gl2.Add(keys2)
 		assert.NoError(t, err)
 
 		val := gl2.Get()
-		assert.Equal(t, append(keys, keys...), val)
+		assert.Equal(t, append(keys, keys2...), val)
 	})
 }
 
 func TestGranteeRemoveTwo(t *testing.T) {
-	gl := dynamicaccess.NewGranteeList(createLs())
+	gl, _ := dynamicaccess.NewGranteeList(createLs())
 	keys, err := generateKeyListFixture()
 	if err != nil {
 		t.Errorf("key generation error: %v", err)
