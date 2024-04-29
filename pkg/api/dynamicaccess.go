@@ -179,7 +179,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		logger.Debug("could not get grantees", "error", err)
 		logger.Error(nil, "could not get grantees")
-		jsonhttp.Unauthorized(w, "granteelist not found")
+		jsonhttp.NotFound(w, "granteelist not found")
 		return
 	}
 	granteeSlice := make([]string, len(grantees))
@@ -366,7 +366,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	list := make([]ecdsa.PublicKey, len(gpr.GranteeList))
+	list := make([]ecdsa.PublicKey, 0, len(gpr.GranteeList))
 	for _, g := range gpr.GranteeList {
 		h, _ := hex.DecodeString(g)
 		k, _ := btcec.ParsePubKey(h)
@@ -451,7 +451,7 @@ func convertToPointerSlice(slice []ecdsa.PublicKey) []*ecdsa.PublicKey {
 }
 
 func parseKeys(list []string) ([]ecdsa.PublicKey, error) {
-	parsedList := make([]ecdsa.PublicKey, len(list))
+	parsedList := make([]ecdsa.PublicKey, 0, len(list))
 	for _, g := range list {
 		h, err := hex.DecodeString(g)
 		if err != nil {

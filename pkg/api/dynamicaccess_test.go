@@ -846,7 +846,7 @@ func TestDacGrantees(t *testing.T) {
 		jsonhttptest.Request(t, client, http.MethodGet, "/grantee/fc4e9fe978991257b897d987bc4ff13058b66ef45a53189a0b4fe84bb3346396", http.StatusUnauthorized,
 			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
 				Message: "granteelist not found",
-				Code:    http.StatusUnauthorized,
+				Code:    http.StatusNotFound,
 			}),
 		)
 	})
