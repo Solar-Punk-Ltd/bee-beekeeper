@@ -54,8 +54,8 @@ type GranteesPostResponse struct {
 	HistoryReference swarm.Address `json:"historyref"`
 }
 type GranteesPatch struct {
-	Addlist    []ecdsa.PublicKey
-	Revokelist []ecdsa.PublicKey
+	Addlist    []*ecdsa.PublicKey
+	Revokelist []*ecdsa.PublicKey
 }
 
 // actDecryptionHandler is a middleware that looks up and decrypts the given address,
@@ -139,13 +139,6 @@ func (s *Service) actEncryptionHandler(
 			return swarm.ZeroAddress, err
 		}
 	}
-	// TODO: probably does not need to store the eref, just return it
-	err = putter.Done(encryptedReference)
-	if err != nil {
-		logger.Debug("done split encrypted reference failed", "error", err)
-		logger.Error(nil, "done split encrypted reference failed")
-		return swarm.ZeroAddress, err
-	}
 
 	w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	return encryptedReference, nil
@@ -182,7 +175,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 		jsonhttp.NotFound(w, "granteelist not found")
 		return
 	}
-	granteeSlice := make([]string, len(grantees))
+	granteeSlice := make([]string, 0, len(grantees))
 	for i, grantee := range grantees {
 		granteeSlice[i] = hex.EncodeToString(crypto.EncodeSecp256k1PublicKey(grantee))
 	}
@@ -209,11 +202,35 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 
 	headers := struct {
 		BatchID        []byte         `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		SwarmTag       uint64         `map:"Swarm-Tag"`
+		Pin            bool           `map:"Swarm-Pin"`
+		Deferred       *bool          `map:"Swarm-Deferred-Upload"`
 		HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address" validate:"required"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
 		return
+	}
+
+	var (
+		tag      uint64
+		err      error
+		deferred = defaultUploadMethod(headers.Deferred)
+	)
+
+	if deferred || headers.Pin {
+		tag, err = s.getOrCreateSessionID(headers.SwarmTag)
+		if err != nil {
+			logger.Debug("get or create tag failed", "error", err)
+			logger.Error(nil, "get or create tag failed")
+			switch {
+			case errors.Is(err, storage.ErrNotFound):
+				jsonhttp.NotFound(w, "tag not found")
+			default:
+				jsonhttp.InternalServerError(w, "cannot get or create tag")
+			}
+			return
+		}
 	}
 
 	body, err := io.ReadAll(r.Body)
@@ -257,19 +274,6 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	grantees.Revokelist = append(grantees.Revokelist, paresRevokelist...)
 
-	tag, err := s.getOrCreateSessionID(0)
-	if err != nil {
-		logger.Debug("get or create tag failed", "error", err)
-		logger.Error(nil, "get or create tag failed")
-		switch {
-		case errors.Is(err, storage.ErrNotFound):
-			jsonhttp.NotFound(w, "tag not found")
-		default:
-			jsonhttp.InternalServerError(w, "cannot get or create tag")
-		}
-		return
-	}
-
 	ctx := r.Context()
 	putter, err := s.newStamperPutter(ctx, putterOptions{
 		BatchID:  headers.BatchID,
@@ -296,11 +300,19 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	granteeref := paths.GranteesAddress
-	granteeref, encryptedglref, historyref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, granteeref, *headers.HistoryAddress, &s.publicKey, convertToPointerSlice(grantees.Addlist), convertToPointerSlice(grantees.Revokelist))
+	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, granteeref, *headers.HistoryAddress, &s.publicKey, grantees.Addlist, grantees.Revokelist)
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
 		jsonhttp.InternalServerError(w, "failed to update grantee list")
+		return
+	}
+
+	err = putter.Done(actref)
+	if err != nil {
+		logger.Debug("done split act failed", "error", err)
+		logger.Error(nil, "done split act failed")
+		jsonhttp.InternalServerError(w, "done split act failed")
 		return
 	}
 
@@ -337,11 +349,35 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	headers := struct {
-		BatchID []byte `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		BatchID  []byte `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		SwarmTag uint64 `map:"Swarm-Tag"`
+		Pin      bool   `map:"Swarm-Pin"`
+		Deferred *bool  `map:"Swarm-Deferred-Upload"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
 		return
+	}
+
+	var (
+		tag      uint64
+		err      error
+		deferred = defaultUploadMethod(headers.Deferred)
+	)
+
+	if deferred || headers.Pin {
+		tag, err = s.getOrCreateSessionID(headers.SwarmTag)
+		if err != nil {
+			logger.Debug("get or create tag failed", "error", err)
+			logger.Error(nil, "get or create tag failed")
+			switch {
+			case errors.Is(err, storage.ErrNotFound):
+				jsonhttp.NotFound(w, "tag not found")
+			default:
+				jsonhttp.InternalServerError(w, "cannot get or create tag")
+			}
+			return
+		}
 	}
 
 	body, err := io.ReadAll(r.Body)
@@ -366,27 +402,15 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	list := make([]ecdsa.PublicKey, 0, len(gpr.GranteeList))
-	for _, g := range gpr.GranteeList {
-		h, _ := hex.DecodeString(g)
-		k, _ := btcec.ParsePubKey(h)
-		list = append(list, *k.ToECDSA())
-	}
-	tag, err := s.getOrCreateSessionID(0)
+	list, err := parseKeys(gpr.GranteeList)
 	if err != nil {
-		logger.Debug("get or create tag failed", "error", err)
-		logger.Error(nil, "get or create tag failed")
-		switch {
-		case errors.Is(err, storage.ErrNotFound):
-			jsonhttp.NotFound(w, "tag not found")
-		default:
-			jsonhttp.InternalServerError(w, "cannot get or create tag")
-		}
+		logger.Debug("create list key parse failed", "error", err)
+		logger.Error(nil, "create list key parse failed")
+		jsonhttp.InternalServerError(w, "error create list key parsing")
 		return
 	}
 
 	ctx := r.Context()
-	// TODO: pin and deferred headers
 	putter, err := s.newStamperPutter(ctx, putterOptions{
 		BatchID:  headers.BatchID,
 		TagID:    tag,
@@ -411,11 +435,19 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	granteeref, encryptedglref, historyref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, convertToPointerSlice(list), nil)
+	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, list, nil)
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
 		jsonhttp.InternalServerError(w, "failed to update grantee list")
+		return
+	}
+
+	err = putter.Done(actref)
+	if err != nil {
+		logger.Debug("done split act failed", "error", err)
+		logger.Error(nil, "done split act failed")
+		jsonhttp.InternalServerError(w, "done split act failed")
 		return
 	}
 
@@ -441,27 +473,18 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func convertToPointerSlice(slice []ecdsa.PublicKey) []*ecdsa.PublicKey {
-	pointerSlice := make([]*ecdsa.PublicKey, len(slice))
-	for i, key := range slice {
-		tempKey := key
-		pointerSlice[i] = &tempKey
-	}
-	return pointerSlice
-}
-
-func parseKeys(list []string) ([]ecdsa.PublicKey, error) {
-	parsedList := make([]ecdsa.PublicKey, 0, len(list))
+func parseKeys(list []string) ([]*ecdsa.PublicKey, error) {
+	parsedList := make([]*ecdsa.PublicKey, 0, len(list))
 	for _, g := range list {
 		h, err := hex.DecodeString(g)
 		if err != nil {
-			return []ecdsa.PublicKey{}, err
+			return []*ecdsa.PublicKey{}, err
 		}
 		k, err := btcec.ParsePubKey(h)
 		if err != nil {
-			return []ecdsa.PublicKey{}, err
+			return []*ecdsa.PublicKey{}, err
 		}
-		parsedList = append(parsedList, *k.ToECDSA())
+		parsedList = append(parsedList, k.ToECDSA())
 	}
 
 	return parsedList, nil

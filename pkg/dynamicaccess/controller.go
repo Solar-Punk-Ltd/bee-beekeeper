@@ -20,7 +20,7 @@ const granteeListEncrypt = true
 
 type GranteeManager interface {
 	// TODO: doc
-	HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, error)
+	HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, swarm.Address, error)
 	// GetGrantees returns the list of grantees for the given publisher.
 	// The list is accessible only by the publisher.
 	GetGrantees(ctx context.Context, getter storage.Getter, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error)
@@ -132,7 +132,6 @@ func NewController(accessLogic ActLogic) Controller {
 	}
 }
 
-// TODO: is an empty addlist && removelist check necessary ?
 func (c *controller) HandleGrantees(
 	ctx context.Context,
 	getter storage.Getter,
@@ -142,7 +141,7 @@ func (c *controller) HandleGrantees(
 	publisher *ecdsa.PublicKey,
 	addList []*ecdsa.PublicKey,
 	removeList []*ecdsa.PublicKey,
-) (swarm.Address, swarm.Address, swarm.Address, error) {
+) (swarm.Address, swarm.Address, swarm.Address, swarm.Address, error) {
 	var (
 		err        error
 		h          History
@@ -154,26 +153,25 @@ func (c *controller) HandleGrantees(
 	if !historyref.IsZero() {
 		h, err = NewHistoryReference(ls, historyref)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		entry, err := h.Lookup(ctx, time.Now().Unix())
-
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		actref := entry.Reference()
 		act, err = kvs.NewReference(ls, actref)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	} else {
 		h, err = NewHistory(ls)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		act, err = kvs.New(ls)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 
@@ -181,35 +179,36 @@ func (c *controller) HandleGrantees(
 	if encryptedglref.IsZero() {
 		gl, err = NewGranteeList(gls)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	} else {
 		granteeref, err = c.decryptRefForPublisher(publisher, encryptedglref)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+
 		gl, err = NewGranteeListReference(gls, granteeref)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 	err = gl.Add(addList)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 	if len(removeList) != 0 {
 		err = gl.Remove(removeList)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 
 	var granteesToAdd []*ecdsa.PublicKey
 	// generate new access key and new act
-	if len(removeList) != 0 || granteeref.IsZero() {
+	if len(removeList) != 0 || encryptedglref.IsZero() {
 		err = c.accessLogic.AddPublisher(ctx, act, publisher)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		granteesToAdd = gl.Get()
 	} else {
@@ -219,35 +218,36 @@ func (c *controller) HandleGrantees(
 	for _, grantee := range granteesToAdd {
 		err := c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
 		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 
 	actref, err := act.Save(ctx)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 
 	glref, err := gl.Save(ctx)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
+
 	eglref, err := c.encryptRefForPublisher(publisher, glref)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 
 	mtdt := map[string]string{"encryptedglref": eglref.String()}
 	err = h.Add(ctx, actref, nil, &mtdt)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 	href, err := h.Store(ctx)
 	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
 
-	return glref, eglref, href, nil
+	return glref, eglref, href, actref, nil
 }
 
 func (c *controller) GetGrantees(ctx context.Context, getter storage.Getter, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error) {

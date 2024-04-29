@@ -62,6 +62,7 @@ func prepareHistoryFixture(storer api.Storer) (dynamicaccess.History, swarm.Addr
 	return h, ref
 }
 
+// TODO: test tag, pin, deferred, stamp
 // TODO: feed test
 // nolint:paralleltest,tparallel
 // TestDacWithoutActHeader [positive tests]:
@@ -387,6 +388,7 @@ func TestDacHistory(t *testing.T) {
 		fileName             = "sample.html"
 		now                  = time.Now().Unix()
 	)
+	fmt.Printf("bagoy now: %d\n", now)
 
 	t.Run("empty-history-upload-then-download-and-check-data", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
