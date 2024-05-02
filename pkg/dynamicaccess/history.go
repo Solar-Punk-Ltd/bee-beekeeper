@@ -2,6 +2,7 @@ package dynamicaccess
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -16,7 +17,7 @@ import (
 
 type History interface {
 	Add(ctx context.Context, ref swarm.Address, timestamp *int64, metadata *map[string]string) error
-	Lookup(ctx context.Context, timestamp int64) (manifest.Entry, error)
+	Lookup(ctx context.Context, timestamp int64) (*mantaray.Node, error)
 	Store(ctx context.Context) (swarm.Address, error)
 }
 
@@ -71,26 +72,34 @@ func (h *history) Add(ctx context.Context, ref swarm.Address, timestamp *int64, 
 	}
 
 	key := strconv.FormatInt(math.MaxInt64-unixTime, 10)
+	// fmt.Printf("bagoy Add key: %s\n", key)
+	fmt.Printf("bagoy Add entry ref: %v\n", ref)
 	return h.manifest.Add(ctx, key, manifest.NewEntry(ref, mtdt))
 }
 
 // Lookup finds the entry for a path or returns error if not found
-func (h *history) Lookup(ctx context.Context, timestamp int64) (manifest.Entry, error) {
+// func (h *history) Lookup(ctx context.Context, timestamp int64) (manifest.Entry, error) {
+func (h *history) Lookup(ctx context.Context, timestamp int64) (*mantaray.Node, error) {
 	if timestamp <= 0 {
-		return manifest.NewEntry(swarm.ZeroAddress, map[string]string{}), errors.New("invalid timestamp")
+		// return manifest.NewEntry(swarm.ZeroAddress, map[string]string{}), errors.New("invalid timestamp")
+		return nil, errors.New("invalid timestamp")
 	}
 
 	reversedTimestamp := math.MaxInt64 - timestamp
+	// fmt.Printf("bagoy Lookup reversedTimestamp: %d\n", reversedTimestamp)
 	node, err := h.lookupNode(ctx, reversedTimestamp)
 	if err != nil {
-		return manifest.NewEntry(swarm.ZeroAddress, map[string]string{}), err
+		return nil, err
 	}
 
 	if node != nil {
-		return manifest.NewEntry(swarm.NewAddress(node.Entry()), node.Metadata()), nil
+		fmt.Printf("bagoy return node.Entry(): %v\n", hex.EncodeToString(node.Entry()))
+		fmt.Printf("bagoy return node.Reference(): %v\n", hex.EncodeToString(node.Reference()))
+		// return manifest.NewEntry(swarm.NewAddress(node.Entry()), node.Metadata()), nil
+		return node, nil
 	}
 
-	return manifest.NewEntry(swarm.ZeroAddress, map[string]string{}), nil
+	return nil, nil
 }
 
 func (h *history) lookupNode(ctx context.Context, searchedTimestamp int64) (*mantaray.Node, error) {
@@ -108,9 +117,12 @@ func (h *history) lookupNode(ctx context.Context, searchedTimestamp int64) (*man
 
 		if currNode.IsValueType() && len(currNode.Entry()) > 0 {
 			afterNode = currNode
+			fmt.Printf("bagoy lookupNode currNode.Entry(): %s\n", hex.EncodeToString(currNode.Entry()))
+			fmt.Printf("bagoy lookupNode currNode.Reference(): %v\n", hex.EncodeToString(currNode.Reference()))
 
 			match, err := isBeforeMatch(pathTimestamp, searchedTimestamp)
 			if match {
+				fmt.Printf("bagoy lookupNode match: %t\n", match)
 				beforeNode = currNode
 				// return error to stop the walk, this is how WalkNode works...
 				return ErrEndIteration
@@ -123,6 +135,8 @@ func (h *history) lookupNode(ctx context.Context, searchedTimestamp int64) (*man
 	}
 
 	rootNode := h.manifest.Root()
+	fmt.Printf("bagoy lookupNode rootNode.Entry(): %s\n", hex.EncodeToString(rootNode.Entry()))
+	fmt.Printf("bagoy lookupNode rootNode.Reference(): %v\n", hex.EncodeToString(rootNode.Reference()))
 	err := rootNode.WalkNode(ctx, []byte{}, h.ls, walker)
 
 	if err != nil && !errors.Is(err, ErrEndIteration) {

@@ -3,9 +3,12 @@ package dynamicaccess
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"time"
 
+	"github.com/ethersphere/bee/v2/pkg/crypto"
 	encryption "github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
@@ -50,20 +53,39 @@ func (c *controller) DownloadHandler(
 	timestamp int64,
 ) (swarm.Address, error) {
 	ls := loadsave.NewReadonly(getter)
+	fmt.Printf("bagoy DownloadHandler\n")
 	history, err := NewHistoryReference(ls, historyRootHash)
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
+	fmt.Printf("bagoy historyRootHash: %v\n", historyRootHash)
+
+	// ts := time.Now().Unix()
+	// ts := time.Date(2024, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	entry, err := history.Lookup(ctx, timestamp)
 	if err != nil {
+		fmt.Printf("bagoy Lookup err: %v\n", err)
 		return swarm.ZeroAddress, err
 	}
-	act, err := kvs.NewReference(ls, entry.Reference())
+	fmt.Printf("bagoy act ref: %v\n", swarm.NewAddress(entry.Reference()))
+	fmt.Printf("bagoy act entry: %v\n", swarm.NewAddress(entry.Entry()))
+	// mockRefS := "497b4f4a07dd11ba1903b1fb1f975e8dab5c8e84b5570c2da807d073ae8580be"
+	// mockRefB, _ := hex.DecodeString(mockRefS)
+	// mockRef := swarm.NewAddress(mockRefB)
+	// fmt.Printf("bagoy mockRef: %v\n", mockRef)
+	act, err := kvs.NewReference(ls, swarm.NewAddress(entry.Entry()))
 	if err != nil {
+		fmt.Printf("bagoy kvs.newref err: %v\n", err)
 		return swarm.ZeroAddress, err
 	}
 
-	return c.accessLogic.DecryptRef(ctx, act, encryptedRef, publisher)
+	dref, err := c.accessLogic.DecryptRef(ctx, act, encryptedRef, publisher)
+	if err != nil {
+		fmt.Printf("bagoy DecryptRef err: %v\n", err)
+	} else {
+		fmt.Printf("bagoy dref: %v\n", dref)
+	}
+	return dref, err
 }
 
 func (c *controller) UploadHandler(
@@ -77,8 +99,8 @@ func (c *controller) UploadHandler(
 	ls := loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE))
 	historyRef := historyRootHash
 	var (
-		storage kvs.KeyValueStore
-		actRef  swarm.Address
+		act    kvs.KeyValueStore
+		actRef swarm.Address
 	)
 	now := time.Now().Unix()
 	if historyRef.IsZero() {
@@ -86,18 +108,19 @@ func (c *controller) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		storage, err = kvs.New(ls)
+		act, err = kvs.New(ls)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		err = c.accessLogic.AddPublisher(ctx, storage, publisher)
+		err = c.accessLogic.AddPublisher(ctx, act, publisher)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		actRef, err = storage.Save(ctx)
+		actRef, err = act.Save(ctx)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy new actRef: %v\n", actRef)
 		err = history.Add(ctx, actRef, &now, nil)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
@@ -106,23 +129,32 @@ func (c *controller) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy new historyRef: %v\n", historyRef)
 	} else {
 		history, err := NewHistoryReference(ls, historyRef)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy historyRef: %v\n", historyRef)
 		entry, err := history.Lookup(ctx, now)
-		actRef = entry.Reference()
+		actRef = swarm.NewAddress(entry.Entry())
+		fmt.Printf("bagoy actRef: %v\n", actRef)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		storage, err = kvs.NewReference(ls, actRef)
+		act, err = kvs.NewReference(ls, actRef)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		// actRefe := swarm.NewAddress(entry.Entry())
+		// fmt.Printf("bagoy actRefe: %v\n", actRefe)
+		// _, err = kvs.NewReference(ls, actRefe)
+		// if err != nil {
+		// 	return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		// }
 	}
 
-	encryptedRef, err := c.accessLogic.EncryptRef(ctx, storage, publisher, refrefence)
+	encryptedRef, err := c.accessLogic.EncryptRef(ctx, act, publisher, refrefence)
 	return actRef, historyRef, encryptedRef, err
 }
 
@@ -155,24 +187,31 @@ func (c *controller) HandleGrantees(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy href: %v\n", historyref)
 		entry, err := h.Lookup(ctx, time.Now().Unix())
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		actref := entry.Reference()
-		act, err = kvs.NewReference(ls, actref)
+		// actref := entry.Reference()
+		actref := entry.Entry()
+		// fmt.Printf("bagoy lookup actref: %v\n", actref)
+		fmt.Printf("bagoy lookup actref: %s\n", swarm.NewAddress(actref))
+		act, err = kvs.NewReference(ls, swarm.NewAddress(actref))
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy after kvs.NewReference\n")
 	} else {
 		h, err = NewHistory(ls)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy after NewHistory\n")
 		act, err = kvs.New(ls)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy after kvs.New\n")
 	}
 
 	var gl GranteeList
@@ -182,20 +221,24 @@ func (c *controller) HandleGrantees(
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	} else {
+		fmt.Printf("bagoy before decryptRefForPublisher\n")
 		granteeref, err = c.decryptRefForPublisher(publisher, encryptedglref)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy granteeref: %v\n", granteeref)
 
 		gl, err = NewGranteeListReference(gls, granteeref)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy before NewGranteeListReference\n")
 	}
 	err = gl.Add(addList)
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
+	fmt.Printf("bagoy after gl.Add\n")
 	if len(removeList) != 0 {
 		err = gl.Remove(removeList)
 		if err != nil {
@@ -206,39 +249,49 @@ func (c *controller) HandleGrantees(
 	var granteesToAdd []*ecdsa.PublicKey
 	// generate new access key and new act
 	if len(removeList) != 0 || encryptedglref.IsZero() {
-		err = c.accessLogic.AddPublisher(ctx, act, publisher)
-		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		if historyref.IsZero() {
+			err = c.accessLogic.AddPublisher(ctx, act, publisher)
+			if err != nil {
+				return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			}
+			fmt.Printf("bagoy after AddPublisher\n")
 		}
 		granteesToAdd = gl.Get()
 	} else {
 		granteesToAdd = addList
 	}
 
-	for _, grantee := range granteesToAdd {
+	for i, grantee := range granteesToAdd {
+		fmt.Printf("bagoy before AddGrantee\n")
 		err := c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
+		fmt.Printf("bagoy granteeref: %s\n", hex.EncodeToString(crypto.EncodeSecp256k1PublicKey(grantee)))
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
+		fmt.Printf("bagoy after AddGrantee ix: %d\n", i)
 	}
 
 	actref, err := act.Save(ctx)
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
+	fmt.Printf("bagoy saved actref: %v\n", actref)
 
 	glref, err := gl.Save(ctx)
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
+	fmt.Printf("bagoy saved glref: %v\n", glref)
 
 	eglref, err := c.encryptRefForPublisher(publisher, glref)
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
+	fmt.Printf("bagoy saved eglref: %v\n", eglref)
 
-	mtdt := map[string]string{"encryptedglref": eglref.String()}
-	err = h.Add(ctx, actref, nil, &mtdt)
+	// mtdt := map[string]string{"encryptedglref": eglref.String()}
+	// err = h.Add(ctx, actref, nil, &mtdt)
+	err = h.Add(ctx, actref, nil, nil)
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
@@ -246,6 +299,7 @@ func (c *controller) HandleGrantees(
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 	}
+	fmt.Printf("bagoy saved href: %v\n", href)
 
 	return glref, eglref, href, actref, nil
 }

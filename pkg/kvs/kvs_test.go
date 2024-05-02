@@ -37,20 +37,21 @@ func keyValuePair(t *testing.T) ([]byte, []byte) {
 }
 
 func TestKvs(t *testing.T) {
-
-	s, err := kvs.New(createLs())
-	assert.NoError(t, err)
-
 	key, val := keyValuePair(t)
 	ctx := context.Background()
+	ls := createLs()
 
 	t.Run("Get non-existent key should return error", func(t *testing.T) {
-		_, err := s.Get(ctx, []byte{1})
+		s, err := kvs.New(ls)
+		assert.NoError(t, err)
+		_, err = s.Get(ctx, []byte{1})
 		assert.Error(t, err)
 	})
 
 	t.Run("Multiple Get with same key, no error", func(t *testing.T) {
-		err := s.Put(ctx, key, val)
+		s, err := kvs.New(ls)
+		assert.NoError(t, err)
+		err = s.Put(ctx, key, val)
 		assert.NoError(t, err)
 
 		// get #1
@@ -64,6 +65,8 @@ func TestKvs(t *testing.T) {
 	})
 
 	t.Run("Get should return value equal to put value", func(t *testing.T) {
+		s, err := kvs.New(ls)
+		assert.NoError(t, err)
 		var (
 			key1 []byte = []byte{1}
 			key2 []byte = []byte{2}
@@ -120,16 +123,16 @@ func TestKvs(t *testing.T) {
 
 func TestKvs_Save(t *testing.T) {
 	ctx := context.Background()
-
+	ls := createLs()
 	key1, val1 := keyValuePair(t)
 	key2, val2 := keyValuePair(t)
 	t.Run("Save empty KVS return error", func(t *testing.T) {
-		s, _ := kvs.New(createLs())
+		s, _ := kvs.New(ls)
 		_, err := s.Save(ctx)
 		assert.Error(t, err)
 	})
 	t.Run("Save not empty KVS return valid swarm address", func(t *testing.T) {
-		s, _ := kvs.New(createLs())
+		s, _ := kvs.New(ls)
 		s.Put(ctx, key1, val1)
 		ref, err := s.Save(ctx)
 		assert.NoError(t, err)

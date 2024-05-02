@@ -152,6 +152,7 @@ func (n *Node) Metadata() map[string]string {
 
 // LookupNode finds the node for a path or returns error if not found
 func (n *Node) LookupNode(ctx context.Context, path []byte, l Loader) (*Node, error) {
+	// fmt.Printf("bagoy node.LookupNode path: %s\n", hex.EncodeToString(path))
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -169,7 +170,15 @@ func (n *Node) LookupNode(ctx context.Context, path []byte, l Loader) (*Node, er
 	if f == nil {
 		return nil, notFound(path)
 	}
+	// for k, v := range n.forks {
+	// 	if v != nil {
+	// 		fmt.Printf("bagoy n.forks k: %s, v:  %s\n", hex.EncodeToString([]byte{k}), hex.EncodeToString(v.prefix))
+
+	// 	}
+	// }
 	c := common(f.prefix, path)
+	// fmt.Printf("bagoy f.prefix: %s\n", hex.EncodeToString(f.prefix))
+	// fmt.Printf("bagoy common c: %s\n", hex.EncodeToString(c))
 	if len(c) == len(f.prefix) {
 		return f.Node.LookupNode(ctx, path[len(c):], l)
 	}

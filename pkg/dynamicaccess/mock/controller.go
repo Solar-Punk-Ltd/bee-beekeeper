@@ -94,8 +94,8 @@ func (m *mockDacService) DownloadHandler(ctx context.Context, getter storage.Get
 		return swarm.ZeroAddress, fmt.Errorf("history not found")
 	}
 	entry, err := h.Lookup(ctx, timestamp)
-	kvsRef := entry.Reference()
-	if kvsRef.IsZero() || err != nil {
+	kvsRef := entry.Entry()
+	if swarm.NewAddress(kvsRef).IsZero() || err != nil {
 		return swarm.ZeroAddress, fmt.Errorf("kvs not found")
 	}
 	return m.refMap[encryptedRef.String()], nil
@@ -120,8 +120,8 @@ func (m *mockDacService) UploadHandler(ctx context.Context, getter storage.Gette
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, fmt.Errorf("history not found")
 		}
 		entry, _ := h.Lookup(ctx, now)
-		kvsRef := entry.Reference()
-		if kvsRef.IsZero() {
+		kvsRef := entry.Entry()
+		if swarm.NewAddress(kvsRef).IsZero() {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, fmt.Errorf("kvs not found")
 		}
 	} else {

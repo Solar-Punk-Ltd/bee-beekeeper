@@ -3,6 +3,7 @@ package dynamicaccess_test
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -39,6 +40,10 @@ func getHistoryFixture(ctx context.Context, ls file.LoadSaver, al dynamicaccess.
 	secondTime := time.Date(2000, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	thirdTime := time.Date(2015, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 
+	fmt.Printf("bagoy kvs0Ref: %v\n", kvs0Ref)
+	fmt.Printf("bagoy kvs1Ref: %v\n", kvs1Ref)
+	fmt.Printf("bagoy kvs2Ref: %v\n", kvs2Ref)
+
 	h.Add(ctx, kvs0Ref, &thirdTime, nil)
 	h.Add(ctx, kvs1Ref, &firstTime, nil)
 	h.Add(ctx, kvs2Ref, &secondTime, nil)
@@ -52,18 +57,77 @@ func TestController_NewUpload(t *testing.T) {
 	al := dynamicaccess.NewLogic(diffieHellman)
 	c := dynamicaccess.NewController(al)
 	ref := swarm.RandAddress(t)
-	_, hRef, encRef, err := c.UploadHandler(ctx, mockStorer.ChunkStore(), mockStorer.Cache(), ref, &publisher.PublicKey, swarm.ZeroAddress)
+	actRef, hRef, encRef, err := c.UploadHandler(ctx, mockStorer.ChunkStore(), mockStorer.Cache(), ref, &publisher.PublicKey, swarm.ZeroAddress)
+	assert.NoError(t, err)
 
 	ls := createLs()
 	h, err := dynamicaccess.NewHistoryReference(ls, hRef)
+	assert.NoError(t, err)
 	entry, err := h.Lookup(ctx, time.Now().Unix())
-	actRef := entry.Reference()
-	act, err := kvs.NewReference(ls, actRef)
+	assert.NoError(t, err)
+	assert.True(t, actRef.Equal(swarm.NewAddress(entry.Entry())))
+	act, err := kvs.NewReference(ls, swarm.NewAddress(entry.Entry()))
+	assert.NoError(t, err)
 	expRef, err := al.EncryptRef(ctx, act, &publisher.PublicKey, ref)
 
 	assert.NoError(t, err)
-	assert.Equal(t, encRef, expRef)
+	assert.Equal(t, expRef, encRef)
 	assert.NotEqual(t, hRef, swarm.ZeroAddress)
+}
+
+// TODO: same test suite with different test runs
+func TestController_ConsecutiveUploads(t *testing.T) {
+	ctx := context.Background()
+	ls := createLs()
+	publisher := getPrivKey(0)
+	diffieHellman := dynamicaccess.NewDefaultSession(publisher)
+	al := dynamicaccess.NewLogic(diffieHellman)
+	c := dynamicaccess.NewController(al)
+	ref1 := swarm.RandAddress(t)
+
+	actRef1, hRef1, encRef1, err := c.UploadHandler(ctx, mockStorer.ChunkStore(), mockStorer.Cache(), ref1, &publisher.PublicKey, swarm.ZeroAddress)
+	assert.NoError(t, err)
+	h1, err := dynamicaccess.NewHistoryReference(ls, hRef1)
+	assert.NoError(t, err)
+	entry1, err := h1.Lookup(ctx, time.Now().Unix())
+	assert.NoError(t, err)
+	assert.True(t, actRef1.Equal(swarm.NewAddress(entry1.Entry())))
+
+	act1, err := kvs.NewReference(ls, swarm.NewAddress(entry1.Entry()))
+	assert.NoError(t, err)
+	expRef1, err := al.EncryptRef(ctx, act1, &publisher.PublicKey, ref1)
+	assert.NoError(t, err)
+	assert.Equal(t, expRef1, encRef1)
+	hRef1Stored, err := h1.Store(ctx)
+	assert.NoError(t, err)
+	assert.True(t, hRef1.Equal((hRef1Stored)))
+	actRef1Stored, err := act1.Save(ctx)
+	assert.NoError(t, err)
+	assert.True(t, actRef1.Equal((actRef1Stored)))
+
+	// second upload to the same act and history but with different reference
+	ref2 := swarm.RandAddress(t)
+	actRef2, hRef2, encRef2, err := c.UploadHandler(ctx, mockStorer.ChunkStore(), mockStorer.Cache(), ref2, &publisher.PublicKey, hRef1)
+	assert.NoError(t, err)
+	h2, err := dynamicaccess.NewHistoryReference(ls, hRef2)
+	assert.NoError(t, err)
+	entry2, err := h2.Lookup(ctx, time.Now().Unix())
+	assert.NoError(t, err)
+	act2, err := kvs.NewReference(ls, swarm.NewAddress(entry2.Entry()))
+	assert.NoError(t, err)
+	assert.True(t, actRef2.Equal(swarm.NewAddress(entry2.Entry())))
+
+	hRef2Stored, err := h2.Store(ctx)
+	assert.NoError(t, err)
+	assert.True(t, hRef2.Equal((hRef2Stored)))
+	actRef2Stored, err := act2.Save(ctx)
+	assert.NoError(t, err)
+	t.Logf("actRef2Stored: %v\n", actRef2Stored)
+	assert.True(t, swarm.NewAddress(entry2.Entry()).Equal(actRef2Stored))
+
+	expRef2, err := al.EncryptRef(ctx, act2, &publisher.PublicKey, ref2)
+	assert.NoError(t, err)
+	assert.Equal(t, expRef2, encRef2)
 }
 
 func TestController_PublisherDownload(t *testing.T) {
@@ -75,12 +139,19 @@ func TestController_PublisherDownload(t *testing.T) {
 	ls := createLs()
 	ref := swarm.RandAddress(t)
 	href, err := getHistoryFixture(ctx, ls, al, &publisher.PublicKey)
+	assert.NoError(t, err)
 	h, err := dynamicaccess.NewHistoryReference(ls, href)
+	assert.NoError(t, err)
 	entry, err := h.Lookup(ctx, time.Now().Unix())
+	assert.NoError(t, err)
 	actRef := entry.Reference()
-	act, err := kvs.NewReference(ls, actRef)
+	t.Logf("actRef: %v\n", swarm.NewAddress(actRef))
+	// act, err := kvs.NewReference(ls, swarm.NewAddress(actRef))
+	actRefe := entry.Entry()
+	t.Logf("actRefe: %v\n", swarm.NewAddress(actRefe))
+	act, err := kvs.NewReference(ls, swarm.NewAddress(actRefe))
+	assert.NoError(t, err)
 	encRef, err := al.EncryptRef(ctx, act, &publisher.PublicKey, ref)
-
 	assert.NoError(t, err)
 	dref, err := c.DownloadHandler(ctx, mockStorer.ChunkStore(), encRef, &publisher.PublicKey, href, time.Now().Unix())
 	assert.NoError(t, err)
@@ -103,8 +174,9 @@ func TestController_GranteeDownload(t *testing.T) {
 	h, err := dynamicaccess.NewHistoryReference(ls, href)
 	ts := time.Date(2001, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	entry, err := h.Lookup(ctx, ts)
-	actRef := entry.Reference()
-	act, err := kvs.NewReference(ls, actRef)
+	// actRef := entry.Reference()
+	actRefe := entry.Entry()
+	act, err := kvs.NewReference(ls, swarm.NewAddress(actRefe))
 	encRef, err := publisherAL.EncryptRef(ctx, act, &publisher.PublicKey, ref)
 
 	assert.NoError(t, err)

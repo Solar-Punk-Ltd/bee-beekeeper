@@ -70,7 +70,7 @@ func (g *GranteeListStruct) Save(ctx context.Context) (swarm.Address, error) {
 	data := serialize(g.grantees)
 	refBytes, err := g.loadSave.Save(ctx, data)
 	if err != nil {
-		return swarm.ZeroAddress, fmt.Errorf("grantee save error: %w", err)
+		return swarm.ZeroAddress, err
 	}
 
 	return swarm.NewAddress(refBytes), nil

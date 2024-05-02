@@ -119,7 +119,7 @@ func (s *Service) actEncryptionHandler(
 	publisherPublicKey := &s.publicKey
 	storageReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, getter, putter, reference, publisherPublicKey, historyRootHash)
 	if err != nil {
-		logger.Debug("act failed to encrypt reference", "error", err)
+		logger.Info("act failed to encrypt reference", "error", err)
 		logger.Error(nil, "act failed to encrypt reference")
 		return swarm.ZeroAddress, err
 	}
@@ -128,17 +128,24 @@ func (s *Service) actEncryptionHandler(
 	if !historyReference.Equal(historyRootHash) {
 		err = putter.Done(storageReference)
 		if err != nil {
-			logger.Debug("done split keyvaluestore failed", "error", err)
+			logger.Info("done split keyvaluestore failed", "error", err)
 			logger.Error(nil, "done split keyvaluestore failed")
 			return swarm.ZeroAddress, err
 		}
 		err = putter.Done(historyReference)
 		if err != nil {
-			logger.Debug("done split history failed", "error", err)
+			logger.Info("done split history failed", "error", err)
 			logger.Error(nil, "done split history failed")
 			return swarm.ZeroAddress, err
 		}
 	}
+	publicKeyBytes := crypto.EncodeSecp256k1PublicKey(&s.publicKey)
+	logger.Info("bagoy",
+		"history_reference", historyReference.String(),
+		"encrypted_reference", encryptedReference.String(),
+		"reference", reference.String(),
+		"act_reference", storageReference.String(),
+		"publisher_public_key", hex.EncodeToString(publicKeyBytes))
 
 	w.Header().Set(SwarmActHistoryAddressHeader, historyReference.String())
 	return encryptedReference, nil
@@ -170,12 +177,12 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	publisher := &s.publicKey
 	grantees, err := s.dac.GetGrantees(r.Context(), s.storer.Download(cache), publisher, paths.GranteesAddress)
 	if err != nil {
-		logger.Debug("could not get grantees", "error", err)
+		logger.Info("could not get grantees", "error", err)
 		logger.Error(nil, "could not get grantees")
 		jsonhttp.NotFound(w, "granteelist not found")
 		return
 	}
-	granteeSlice := make([]string, 0, len(grantees))
+	granteeSlice := make([]string, len(grantees))
 	for i, grantee := range grantees {
 		granteeSlice[i] = hex.EncodeToString(crypto.EncodeSecp256k1PublicKey(grantee))
 	}
@@ -221,7 +228,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	if deferred || headers.Pin {
 		tag, err = s.getOrCreateSessionID(headers.SwarmTag)
 		if err != nil {
-			logger.Debug("get or create tag failed", "error", err)
+			logger.Info("get or create tag failed", "error", err)
 			logger.Error(nil, "get or create tag failed")
 			switch {
 			case errors.Is(err, storage.ErrNotFound):
@@ -238,7 +245,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 		if jsonhttp.HandleBodyReadError(err, w) {
 			return
 		}
-		logger.Debug("read request body failed", "error", err)
+		logger.Info("read request body failed", "error", err)
 		logger.Error(nil, "read request body failed")
 		jsonhttp.InternalServerError(w, "cannot read request")
 		return
@@ -248,7 +255,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	if len(body) > 0 {
 		err = json.Unmarshal(body, &gpr)
 		if err != nil {
-			logger.Debug("unmarshal body failed", "error", err)
+			logger.Info("unmarshal body failed", "error", err)
 			logger.Error(nil, "unmarshal body failed")
 			jsonhttp.InternalServerError(w, "error unmarshaling request body")
 			return
@@ -258,7 +265,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	grantees := GranteesPatch{}
 	paresAddlist, err := parseKeys(gpr.Addlist)
 	if err != nil {
-		logger.Debug("add list key parse failed", "error", err)
+		logger.Info("add list key parse failed", "error", err)
 		logger.Error(nil, "add list key parse failed")
 		jsonhttp.InternalServerError(w, "error add list key parsing")
 		return
@@ -267,7 +274,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 
 	paresRevokelist, err := parseKeys(gpr.Revokelist)
 	if err != nil {
-		logger.Debug("revoke list key parse failed", "error", err)
+		logger.Info("revoke list key parse failed", "error", err)
 		logger.Error(nil, "revoke list key parse failed")
 		jsonhttp.InternalServerError(w, "error revoke list key parsing")
 		return
@@ -278,11 +285,11 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	putter, err := s.newStamperPutter(ctx, putterOptions{
 		BatchID:  headers.BatchID,
 		TagID:    tag,
-		Pin:      false,
-		Deferred: false,
+		Pin:      headers.Pin,
+		Deferred: deferred,
 	})
 	if err != nil {
-		logger.Debug("putter failed", "error", err)
+		logger.Info("putter failed", "error", err)
 		logger.Error(nil, "putter failed")
 		switch {
 		case errors.Is(err, errBatchUnusable) || errors.Is(err, postage.ErrNotUsable):
@@ -302,7 +309,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	granteeref := paths.GranteesAddress
 	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, granteeref, *headers.HistoryAddress, &s.publicKey, grantees.Addlist, grantees.Revokelist)
 	if err != nil {
-		logger.Debug("failed to update grantee list", "error", err)
+		logger.Info("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
 		jsonhttp.InternalServerError(w, "failed to update grantee list")
 		return
@@ -310,7 +317,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 
 	err = putter.Done(actref)
 	if err != nil {
-		logger.Debug("done split act failed", "error", err)
+		logger.Info("done split act failed", "error", err)
 		logger.Error(nil, "done split act failed")
 		jsonhttp.InternalServerError(w, "done split act failed")
 		return
@@ -318,7 +325,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 
 	err = putter.Done(historyref)
 	if err != nil {
-		logger.Debug("done split history failed", "error", err)
+		logger.Info("done split history failed", "error", err)
 		logger.Error(nil, "done split history failed")
 		jsonhttp.InternalServerError(w, "done split history failed")
 		return
@@ -326,7 +333,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 
 	err = putter.Done(granteeref)
 	if err != nil {
-		logger.Debug("done split grantees failed", "error", err)
+		logger.Info("done split grantees failed", "error", err)
 		logger.Error(nil, "done split grantees failed")
 		jsonhttp.InternalServerError(w, "done split grantees failed")
 		return
@@ -349,14 +356,20 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	headers := struct {
-		BatchID  []byte `map:"Swarm-Postage-Batch-Id" validate:"required"`
-		SwarmTag uint64 `map:"Swarm-Tag"`
-		Pin      bool   `map:"Swarm-Pin"`
-		Deferred *bool  `map:"Swarm-Deferred-Upload"`
+		BatchID        []byte         `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address"`
+		SwarmTag       uint64         `map:"Swarm-Tag"`
+		Pin            bool           `map:"Swarm-Pin"`
+		Deferred       *bool          `map:"Swarm-Deferred-Upload"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
 		return
+	}
+
+	historyAddress := swarm.ZeroAddress
+	if headers.HistoryAddress != nil {
+		historyAddress = *headers.HistoryAddress
 	}
 
 	var (
@@ -368,7 +381,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	if deferred || headers.Pin {
 		tag, err = s.getOrCreateSessionID(headers.SwarmTag)
 		if err != nil {
-			logger.Debug("get or create tag failed", "error", err)
+			logger.Info("get or create tag failed", "error", err)
 			logger.Error(nil, "get or create tag failed")
 			switch {
 			case errors.Is(err, storage.ErrNotFound):
@@ -385,7 +398,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 		if jsonhttp.HandleBodyReadError(err, w) {
 			return
 		}
-		logger.Debug("read request body failed", "error", err)
+		logger.Info("read request body failed", "error", err)
 		logger.Error(nil, "read request body failed")
 		jsonhttp.InternalServerError(w, "cannot read request")
 		return
@@ -395,7 +408,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	if len(body) > 0 {
 		err = json.Unmarshal(body, &gpr)
 		if err != nil {
-			logger.Debug("unmarshal body failed", "error", err)
+			logger.Info("unmarshal body failed", "error", err)
 			logger.Error(nil, "unmarshal body failed")
 			jsonhttp.InternalServerError(w, "error unmarshaling request body")
 			return
@@ -404,7 +417,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 
 	list, err := parseKeys(gpr.GranteeList)
 	if err != nil {
-		logger.Debug("create list key parse failed", "error", err)
+		logger.Info("create list key parse failed", "error", err)
 		logger.Error(nil, "create list key parse failed")
 		jsonhttp.InternalServerError(w, "error create list key parsing")
 		return
@@ -414,11 +427,11 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	putter, err := s.newStamperPutter(ctx, putterOptions{
 		BatchID:  headers.BatchID,
 		TagID:    tag,
-		Pin:      false,
-		Deferred: false,
+		Pin:      headers.Pin,
+		Deferred: deferred,
 	})
 	if err != nil {
-		logger.Debug("putter failed", "error", err)
+		logger.Info("putter failed", "error", err)
 		logger.Error(nil, "putter failed")
 		switch {
 		case errors.Is(err, errBatchUnusable) || errors.Is(err, postage.ErrNotUsable):
@@ -435,9 +448,9 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, list, nil)
+	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, swarm.ZeroAddress, historyAddress, &s.publicKey, list, nil)
 	if err != nil {
-		logger.Debug("failed to update grantee list", "error", err)
+		logger.Info("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
 		jsonhttp.InternalServerError(w, "failed to update grantee list")
 		return
@@ -445,7 +458,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 
 	err = putter.Done(actref)
 	if err != nil {
-		logger.Debug("done split act failed", "error", err)
+		logger.Info("done split act failed", "error", err)
 		logger.Error(nil, "done split act failed")
 		jsonhttp.InternalServerError(w, "done split act failed")
 		return
@@ -453,7 +466,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 
 	err = putter.Done(historyref)
 	if err != nil {
-		logger.Debug("done split history failed", "error", err)
+		logger.Info("done split history failed", "error", err)
 		logger.Error(nil, "done split history failed")
 		jsonhttp.InternalServerError(w, "done split history failed")
 		return
@@ -461,7 +474,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 
 	err = putter.Done(granteeref)
 	if err != nil {
-		logger.Debug("done split grantees failed", "error", err)
+		logger.Info("done split grantees failed", "error", err)
 		logger.Error(nil, "done split grantees failed")
 		jsonhttp.InternalServerError(w, "done split grantees failed")
 		return
