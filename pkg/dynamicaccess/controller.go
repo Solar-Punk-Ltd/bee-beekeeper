@@ -7,7 +7,7 @@ import (
 	"time"
 
 	encryption "github.com/ethersphere/bee/v2/pkg/encryption"
-	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
+	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
@@ -16,22 +16,20 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
-const granteeListEncrypt = true
-
 type GranteeManager interface {
 	// TODO: doc
-	HandleGrantees(ctx context.Context, getter storage.Getter, putter storage.Putter, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, swarm.Address, error)
+	HandleGrantees(ctx context.Context, ls file.LoadSaver, gls file.LoadSaver, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, swarm.Address, error)
 	// GetGrantees returns the list of grantees for the given publisher.
 	// The list is accessible only by the publisher.
-	GetGrantees(ctx context.Context, getter storage.Getter, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error)
+	GetGrantees(ctx context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
 type Controller interface {
 	GranteeManager
 	// DownloadHandler decrypts the encryptedRef using the lookupkey based on the history and timestamp.
-	DownloadHandler(ctx context.Context, getter storage.Getter, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error)
+	DownloadHandler(ctx context.Context, ls file.LoadSaver, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error)
 	// UploadHandler encrypts the reference and stores it in the history as the latest update.
-	UploadHandler(ctx context.Context, getter storage.Getter, putter storage.Putter, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, swarm.Address, error)
+	UploadHandler(ctx context.Context, ls file.LoadSaver, reference swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address) (swarm.Address, swarm.Address, swarm.Address, error)
 	io.Closer
 }
 
@@ -43,13 +41,12 @@ var _ Controller = (*controller)(nil)
 
 func (c *controller) DownloadHandler(
 	ctx context.Context,
-	getter storage.Getter,
+	ls file.LoadSaver,
 	encryptedRef swarm.Address,
 	publisher *ecdsa.PublicKey,
 	historyRootHash swarm.Address,
 	timestamp int64,
 ) (swarm.Address, error) {
-	ls := loadsave.NewReadonly(getter)
 	history, err := NewHistoryReference(ls, historyRootHash)
 	if err != nil {
 		return swarm.ZeroAddress, err
@@ -68,13 +65,11 @@ func (c *controller) DownloadHandler(
 
 func (c *controller) UploadHandler(
 	ctx context.Context,
-	getter storage.Getter,
-	putter storage.Putter,
+	ls file.LoadSaver,
 	refrefence swarm.Address,
 	publisher *ecdsa.PublicKey,
 	historyRootHash swarm.Address,
 ) (swarm.Address, swarm.Address, swarm.Address, error) {
-	ls := loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE))
 	historyRef := historyRootHash
 	var (
 		storage kvs.KeyValueStore
@@ -134,8 +129,8 @@ func NewController(accessLogic ActLogic) Controller {
 
 func (c *controller) HandleGrantees(
 	ctx context.Context,
-	getter storage.Getter,
-	putter storage.Putter,
+	ls file.LoadSaver,
+	gls file.LoadSaver,
 	encryptedglref swarm.Address,
 	historyref swarm.Address,
 	publisher *ecdsa.PublicKey,
@@ -147,8 +142,6 @@ func (c *controller) HandleGrantees(
 		h          History
 		act        kvs.KeyValueStore
 		granteeref swarm.Address
-		ls         = loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, false, redundancy.NONE))
-		gls        = loadsave.New(getter, putter, requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
 	)
 	if !historyref.IsZero() {
 		h, err = NewHistoryReference(ls, historyref)
@@ -250,8 +243,7 @@ func (c *controller) HandleGrantees(
 	return glref, eglref, href, actref, nil
 }
 
-func (c *controller) GetGrantees(ctx context.Context, getter storage.Getter, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error) {
-	ls := loadsave.NewReadonly(getter)
+func (c *controller) GetGrantees(ctx context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error) {
 	granteeRef, err := c.decryptRefForPublisher(publisher, encryptedglref)
 	if err != nil {
 		return nil, err

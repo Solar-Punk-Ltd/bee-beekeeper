@@ -11,6 +11,8 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
+	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
+	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/postage"
 	storage "github.com/ethersphere/bee/v2/pkg/storage"
@@ -20,6 +22,8 @@ import (
 )
 
 type addressKey struct{}
+
+const granteeListEncrypt = true
 
 // getAddressFromContext is a helper function to extract the address from the context
 func getAddressFromContext(ctx context.Context) swarm.Address {
@@ -53,6 +57,7 @@ type GranteesPostResponse struct {
 	Reference        swarm.Address `json:"ref"`
 	HistoryReference swarm.Address `json:"historyref"`
 }
+
 type GranteesPatch struct {
 	Addlist    []*ecdsa.PublicKey
 	Revokelist []*ecdsa.PublicKey
@@ -94,7 +99,8 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 				cache = *headers.Cache
 			}
 			ctx := r.Context()
-			reference, err := s.dac.DownloadHandler(ctx, s.storer.Download(cache), paths.Address, headers.Publisher, *headers.HistoryAddress, *headers.Timestamp)
+			ls := loadsave.NewReadonly(s.storer.Download(cache))
+			reference, err := s.dac.DownloadHandler(ctx, ls, paths.Address, headers.Publisher, *headers.HistoryAddress, *headers.Timestamp)
 			if err != nil {
 				jsonhttp.InternalServerError(w, errActDownload)
 				return
@@ -110,14 +116,14 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 func (s *Service) actEncryptionHandler(
 	ctx context.Context,
 	w http.ResponseWriter,
-	getter storage.Getter,
 	putter storer.PutterSession,
 	reference swarm.Address,
 	historyRootHash swarm.Address,
 ) (swarm.Address, error) {
 	logger := s.logger.WithName("act_encryption_handler").Build()
 	publisherPublicKey := &s.publicKey
-	storageReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, getter, putter, reference, publisherPublicKey, historyRootHash)
+	ls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
+	storageReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, ls, reference, publisherPublicKey, historyRootHash)
 	if err != nil {
 		logger.Debug("act failed to encrypt reference", "error", err)
 		logger.Error(nil, "act failed to encrypt reference")
@@ -168,14 +174,15 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 		cache = *headers.Cache
 	}
 	publisher := &s.publicKey
-	grantees, err := s.dac.GetGrantees(r.Context(), s.storer.Download(cache), publisher, paths.GranteesAddress)
+	ls := loadsave.NewReadonly(s.storer.Download(cache))
+	grantees, err := s.dac.GetGrantees(r.Context(), ls, publisher, paths.GranteesAddress)
 	if err != nil {
 		logger.Debug("could not get grantees", "error", err)
 		logger.Error(nil, "could not get grantees")
 		jsonhttp.NotFound(w, "granteelist not found")
 		return
 	}
-	granteeSlice := make([]string, 0, len(grantees))
+	granteeSlice := make([]string, len(grantees))
 	for i, grantee := range grantees {
 		granteeSlice[i] = hex.EncodeToString(crypto.EncodeSecp256k1PublicKey(grantee))
 	}
@@ -210,6 +217,11 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
 		return
+	}
+
+	historyAddress := swarm.ZeroAddress
+	if headers.HistoryAddress != nil {
+		historyAddress = *headers.HistoryAddress
 	}
 
 	var (
@@ -278,8 +290,8 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	putter, err := s.newStamperPutter(ctx, putterOptions{
 		BatchID:  headers.BatchID,
 		TagID:    tag,
-		Pin:      false,
-		Deferred: false,
+		Pin:      headers.Pin,
+		Deferred: deferred,
 	})
 	if err != nil {
 		logger.Debug("putter failed", "error", err)
@@ -300,7 +312,10 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	granteeref := paths.GranteesAddress
-	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, granteeref, *headers.HistoryAddress, &s.publicKey, grantees.Addlist, grantees.Revokelist)
+	publisher := &s.publicKey
+	ls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
+	gls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
+	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, ls, gls, granteeref, historyAddress, publisher, grantees.Addlist, grantees.Revokelist)
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
@@ -349,14 +364,20 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	headers := struct {
-		BatchID  []byte `map:"Swarm-Postage-Batch-Id" validate:"required"`
-		SwarmTag uint64 `map:"Swarm-Tag"`
-		Pin      bool   `map:"Swarm-Pin"`
-		Deferred *bool  `map:"Swarm-Deferred-Upload"`
+		BatchID        []byte         `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		SwarmTag       uint64         `map:"Swarm-Tag"`
+		Pin            bool           `map:"Swarm-Pin"`
+		Deferred       *bool          `map:"Swarm-Deferred-Upload"`
+		HistoryAddress *swarm.Address `map:"Swarm-Act-History-Address"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
 		return
+	}
+
+	historyAddress := swarm.ZeroAddress
+	if headers.HistoryAddress != nil {
+		historyAddress = *headers.HistoryAddress
 	}
 
 	var (
@@ -414,8 +435,8 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	putter, err := s.newStamperPutter(ctx, putterOptions{
 		BatchID:  headers.BatchID,
 		TagID:    tag,
-		Pin:      false,
-		Deferred: false,
+		Pin:      headers.Pin,
+		Deferred: deferred,
 	})
 	if err != nil {
 		logger.Debug("putter failed", "error", err)
@@ -435,7 +456,10 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, s.storer.ChunkStore(), putter, swarm.ZeroAddress, swarm.ZeroAddress, &s.publicKey, list, nil)
+	publisher := &s.publicKey
+	ls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
+	gls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
+	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, ls, gls, swarm.ZeroAddress, historyAddress, publisher, list, nil)
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
