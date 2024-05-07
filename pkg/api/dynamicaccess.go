@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
@@ -89,9 +90,14 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 			}
 
 			// Try to download the file wihtout decryption, if the act headers are not present
-			if headers.Publisher == nil || headers.Timestamp == nil || headers.HistoryAddress == nil {
+			if headers.Publisher == nil || headers.HistoryAddress == nil {
 				h.ServeHTTP(w, r)
 				return
+			}
+
+			timestamp := time.Now().Unix()
+			if headers.Timestamp == nil {
+				timestamp = *headers.Timestamp
 			}
 
 			cache := true
@@ -100,7 +106,7 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 			}
 			ctx := r.Context()
 			ls := loadsave.NewReadonly(s.storer.Download(cache))
-			reference, err := s.dac.DownloadHandler(ctx, ls, paths.Address, headers.Publisher, *headers.HistoryAddress, *headers.Timestamp)
+			reference, err := s.dac.DownloadHandler(ctx, ls, paths.Address, headers.Publisher, *headers.HistoryAddress, timestamp)
 			if err != nil {
 				jsonhttp.InternalServerError(w, errActDownload)
 				return
