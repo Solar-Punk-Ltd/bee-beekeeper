@@ -199,9 +199,11 @@ func (c *controller) HandleGrantees(
 	var granteesToAdd []*ecdsa.PublicKey
 	// generate new access key and new act
 	if len(removeList) != 0 || encryptedglref.IsZero() {
-		err = c.accessLogic.AddPublisher(ctx, act, publisher)
-		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		if historyref.IsZero() {
+			err = c.accessLogic.AddPublisher(ctx, act, publisher)
+			if err != nil {
+				return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			}
 		}
 		granteesToAdd = gl.Get()
 	} else {
@@ -228,6 +230,13 @@ func (c *controller) HandleGrantees(
 	eglref, err := c.encryptRefForPublisher(publisher, glref)
 	if err != nil {
 		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+	}
+	// need to re-initialize history, because Lookup loads the forks causing the manifest save to skip the root node
+	if !historyref.IsZero() {
+		h, err = NewHistoryReference(ls, historyref)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
 	}
 
 	mtdt := map[string]string{"encryptedglref": eglref.String()}
