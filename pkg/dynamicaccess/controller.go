@@ -162,10 +162,6 @@ func (c *controller) HandleGrantees(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		act, err = kvs.New(ls)
-		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
-		}
 	}
 
 	var gl GranteeList
@@ -185,9 +181,11 @@ func (c *controller) HandleGrantees(
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
-	err = gl.Add(addList)
-	if err != nil {
-		return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+	if len(addList) != 0 {
+		err = gl.Add(addList)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
 	}
 	if len(removeList) != 0 {
 		err = gl.Remove(removeList)
@@ -199,11 +197,13 @@ func (c *controller) HandleGrantees(
 	var granteesToAdd []*ecdsa.PublicKey
 	// generate new access key and new act
 	if len(removeList) != 0 || encryptedglref.IsZero() {
-		if historyref.IsZero() {
-			err = c.accessLogic.AddPublisher(ctx, act, publisher)
-			if err != nil {
-				return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
-			}
+		act, err = kvs.New(ls)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		}
+		err = c.accessLogic.AddPublisher(ctx, act, publisher)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		granteesToAdd = gl.Get()
 	} else {
