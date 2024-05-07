@@ -201,9 +201,11 @@ func (c *controller) HandleGrantees(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		err = c.accessLogic.AddPublisher(ctx, act, publisher)
-		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		if historyref.IsZero() {
+			err = c.accessLogic.AddPublisher(ctx, act, publisher)
+			if err != nil {
+				return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			}
 		}
 		granteesToAdd = gl.Get()
 	} else {

@@ -96,7 +96,7 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 			}
 
 			timestamp := time.Now().Unix()
-			if headers.Timestamp == nil {
+			if headers.Timestamp != nil {
 				timestamp = *headers.Timestamp
 			}
 
