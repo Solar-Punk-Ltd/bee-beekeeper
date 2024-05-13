@@ -101,6 +101,7 @@ func TestAccountingInfo(t *testing.T) {
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("got accounting: %v, expected: %v", got, expected)
 	}
+
 }
 
 func TestAccountingInfoError(t *testing.T) {

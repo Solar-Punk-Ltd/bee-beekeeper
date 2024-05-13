@@ -136,6 +136,7 @@ func TestPinHandlers(t *testing.T) {
 		rootHash = strings.Trim(header.Get(api.ETagHeader), "\"")
 		checkPinHandlers(t, client, rootHash, false)
 	})
+
 }
 
 func TestPinHandlersInvalidInputs(t *testing.T) {
@@ -193,6 +194,7 @@ func TestPinHandlersInvalidInputs(t *testing.T) {
 const pinRef = "620fcd78c7ce54da2d1b7cc2274a02e190cbe8fecbc3bd244690ab6517ce8f39"
 
 func TestIntegrityHandler(t *testing.T) {
+
 	t.Parallel()
 
 	t.Run("ok", func(t *testing.T) {

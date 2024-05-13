@@ -21,6 +21,7 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/settlement/swap/chequebook"
 	"github.com/ethersphere/bee/v2/pkg/settlement/swap/chequebook/mock"
 	swapmock "github.com/ethersphere/bee/v2/pkg/settlement/swap/mock"
+
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
@@ -426,6 +427,7 @@ func TestChequebookLastCheques(t *testing.T) {
 	if !LastChequesEqual(got, expected) {
 		t.Fatalf("Got: \n %+v \n\n Expected: \n %+v \n\n", got, expected)
 	}
+
 }
 
 func TestChequebookLastChequesPeer(t *testing.T) {
@@ -440,6 +442,7 @@ func TestChequebookLastChequesPeer(t *testing.T) {
 	sig := make([]byte, 65)
 
 	lastSentChequeFunc := func(swarm.Address) (*chequebook.SignedCheque, error) {
+
 		sig := make([]byte, 65)
 
 		lastSentCheque := &chequebook.SignedCheque{
@@ -455,6 +458,7 @@ func TestChequebookLastChequesPeer(t *testing.T) {
 	}
 
 	lastReceivedChequeFunc := func(swarm.Address) (*chequebook.SignedCheque, error) {
+
 		lastReceivedCheque := &chequebook.SignedCheque{
 			Cheque: chequebook.Cheque{
 				Beneficiary:      beneficiary0,
@@ -494,6 +498,7 @@ func TestChequebookLastChequesPeer(t *testing.T) {
 	if !reflect.DeepEqual(got, expected) {
 		t.Fatalf("Got: \n %+v \n\n Expected: \n %+v \n\n", got, expected)
 	}
+
 }
 
 func TestChequebookCashout(t *testing.T) {
@@ -775,6 +780,7 @@ func Test_chequebookLastPeerHandler_invalidInputs(t *testing.T) {
 }
 
 func LastChequesEqual(a, b *api.ChequebookLastChequesResponse) bool {
+
 	var state bool
 
 	for akeys := range a.LastCheques {

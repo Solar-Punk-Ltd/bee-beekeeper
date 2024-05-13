@@ -79,6 +79,7 @@ func TestSettlements(t *testing.T) {
 	if !equalSettlements(got, expected) {
 		t.Errorf("got settlements: %+v, expected: %+v", got, expected)
 	}
+
 }
 
 func TestSettlementsError(t *testing.T) {

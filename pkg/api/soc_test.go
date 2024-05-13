@@ -122,6 +122,7 @@ func TestSOC(t *testing.T) {
 		})
 
 		t.Run("ok batch", func(t *testing.T) {
+
 			s := testingsoc.GenerateMockSOC(t, testData)
 			hexbatch := hex.EncodeToString(batchOk)
 			client, _, _, chanStorer := newTestServer(t, testServerOptions{

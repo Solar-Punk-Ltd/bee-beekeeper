@@ -29,7 +29,9 @@ var (
 	EmptyDir            = errEmptyDir
 )
 
-var ContentTypeTar = contentTypeTar
+var (
+	ContentTypeTar = contentTypeTar
+)
 
 var (
 	ErrNoResolver                       = errNoResolver
@@ -137,7 +139,6 @@ type HexInvalidByteError = hexInvalidByteError
 func MapStructure(input, output interface{}, hooks map[string]func(v string) (string, error)) error {
 	return mapStructure(input, output, hooks)
 }
-
 func NewParseError(entry, value string, cause error) error {
 	return newParseError(entry, value, cause)
 }

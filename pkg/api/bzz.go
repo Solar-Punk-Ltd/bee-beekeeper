@@ -16,6 +16,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	olog "github.com/opentracing/opentracing-go/log"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethersphere/bee/v2/pkg/feeds"
 	"github.com/ethersphere/bee/v2/pkg/file/joiner"
@@ -33,9 +37,6 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/tracing"
 	"github.com/ethersphere/langos"
 	"github.com/gorilla/mux"
-	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/ext"
-	olog "github.com/opentracing/opentracing-go/log"
 )
 
 // The size of buffer used for prefetching content with Langos when not using erasure coding
@@ -393,7 +394,7 @@ FETCH:
 	// go on normally.
 	if !feedDereferenced {
 		if l, err := s.manifestFeed(ctx, m); err == nil {
-			// we have a feed manifest here
+			//we have a feed manifest here
 			ch, cur, _, err := l.At(ctx, time.Now().Unix(), 0)
 			if err != nil {
 				logger.Debug("bzz download: feed lookup failed", "error", err)
