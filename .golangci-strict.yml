@@ -20,7 +20,7 @@ linters:
     - errchkjson
     - errname
     - errorlint
-    - execinquery
+    # - execinquery # deprecated since v1.58.0
     - exhaustive
     # - exhaustruct # anoying
     - exportloopref
@@ -39,12 +39,12 @@ linters:
     - gocyclo
     - godot
     # - godox # "TODO" is allowed
-    - goerr113
+    - err113
     - gofmt
     - gofumpt
     - goheader
     - goimports
-    - gomnd
+    # - gomnd # deprecated since v1.58.0
     - gomoddirectives
     - gomodguard
     - goprintffuncname
@@ -65,6 +65,7 @@ linters:
     - makezero
     - mirror
     - misspell
+    - mnd
     - musttag
     - nakedret
     - nestif
@@ -132,6 +133,9 @@ issues:
       linters:
         - funlen
         - dupl
+    - path: version\.go
+      linters:
+        - gochecknoglobals
     - linters:
         - goheader
       text: "go-ethereum Authors" ## disable check for other authors
@@ -171,6 +175,9 @@ issues:
   exclude-use-default: false
   max-issues-per-linter: 0
 output:
+  formats:
+    - format: colored-line-number
+      path: stdout
   print-issued-lines: false
   show-stats: true
   uniq-by-line: false
@@ -179,3 +186,12 @@ output:
     - file # filepath, line, and column.
     - linter
     - severity
+severity:
+  default-severity: error
+  rules:
+    - linters:
+        - revive
+      severity: warning
+    - linters:
+        - lll
+      severity: info
