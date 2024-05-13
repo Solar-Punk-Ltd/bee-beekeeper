@@ -11,7 +11,7 @@ linters:
     # - copyloopvar # requires Go 1.22
     - cyclop
     - decorder
-    # - depguard disable temporary until this issue is resolved: https://github.com/golangci/golangci-lint/issues/3906
+    # - depguard # a list of acceptable packages is necessary to use this
     - dogsled
     - dupl
     - dupword
@@ -128,6 +128,10 @@ linters-settings:
     ignore-missing: true
 issues:
   exclude-rules:
+    - path: _test\.go
+      linters:
+        - funlen
+        - dupl
     - linters:
         - goheader
       text: "go-ethereum Authors" ## disable check for other authors
@@ -165,6 +169,7 @@ issues:
     - ".*\\.pb\\.go"
     - "asdf.*"
   exclude-use-default: false
+  max-issues-per-linter: 0
 output:
   print-issued-lines: false
   show-stats: true
