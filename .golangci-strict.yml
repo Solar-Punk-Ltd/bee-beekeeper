@@ -133,6 +133,10 @@ issues:
       linters:
         - funlen
         - dupl
+        - errcheck
+    - path: mock/*
+      linters:
+        - errcheck
     - path: version\.go
       linters:
         - gochecknoglobals
