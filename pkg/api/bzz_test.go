@@ -934,7 +934,6 @@ func TestInvalidBzzParams(t *testing.T) {
 			jsonhttptest.WithRequestBody(tr),
 			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, api.ContentTypeTar),
 		)
-
 	})
 
 	t.Run("batch exists", func(t *testing.T) {
@@ -962,7 +961,6 @@ func TestInvalidBzzParams(t *testing.T) {
 			jsonhttptest.WithRequestBody(tr),
 			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, api.ContentTypeTar),
 		)
-
 	})
 
 	t.Run("batch not found", func(t *testing.T) {
@@ -1057,7 +1055,6 @@ func TestInvalidBzzParams(t *testing.T) {
 		address := "f30c0aa7e9e2a0ef4c9b1b750ebfeaeb7c7c24da700bb089da19a46e3677824b"
 		jsonhttptest.Request(t, client, http.MethodGet, fmt.Sprintf("/bzz/%s/", address), http.StatusNotFound)
 	})
-
 }
 
 // TestDirectUploadBzz tests that the direct upload endpoint give correct error message in dev mode

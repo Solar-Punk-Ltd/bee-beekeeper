@@ -102,6 +102,7 @@ func (m *topologyPeersIterNoopMock) EachConnectedPeer(_ topology.EachPeerFunc, _
 func (m *topologyPeersIterNoopMock) EachConnectedPeerRev(_ topology.EachPeerFunc, _ topology.Select) error {
 	return nil
 }
+
 func (m *topologyPeersIterNoopMock) IsReachable() bool {
 	return true
 }

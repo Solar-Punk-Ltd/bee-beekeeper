@@ -271,7 +271,6 @@ func TestBytesInvalidStamp(t *testing.T) {
 			jsonhttptest.WithRequestBody(bytes.NewReader(content)),
 		)
 	})
-
 }
 
 func TestBytesUploadHandlerInvalidInputs(t *testing.T) {

@@ -216,7 +216,6 @@ func TestConsumedBalances(t *testing.T) {
 	if !equalBalances(got, expected) {
 		t.Errorf("got balances: %v, expected: %v", got, expected)
 	}
-
 }
 
 func TestConsumedError(t *testing.T) {

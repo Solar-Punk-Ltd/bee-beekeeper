@@ -17,7 +17,6 @@ func (s *SessionMock) Key(publicKey *ecdsa.PublicKey, nonces [][]byte) ([][]byte
 		return nil, nil
 	}
 	return s.KeyFunc(publicKey, nonces)
-
 }
 
 func NewSessionMock(key *ecdsa.PrivateKey) *SessionMock {

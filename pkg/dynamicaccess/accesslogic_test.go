@@ -79,7 +79,6 @@ func TestDecryptRef_Success(t *testing.T) {
 	}
 
 	if expectedRef.Compare(acutalRef) != 0 {
-
 		t.Errorf("Get gave back wrong Swarm reference!")
 	}
 }
@@ -123,7 +122,6 @@ func TestDecryptRefWithGrantee_Success(t *testing.T) {
 	}
 
 	if expectedRef.Compare(acutalRef) != 0 {
-
 		t.Errorf("Get gave back wrong Swarm reference!")
 	}
 }
@@ -184,7 +182,6 @@ func TestAddPublisher(t *testing.T) {
 }
 
 func TestAddNewGranteeToContent(t *testing.T) {
-
 	id0 := getPrivKey(0)
 	id1 := getPrivKey(1)
 	id2 := getPrivKey(2)

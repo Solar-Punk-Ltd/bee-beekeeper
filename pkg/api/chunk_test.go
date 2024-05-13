@@ -13,16 +13,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethersphere/bee/v2/pkg/api"
+	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
+	"github.com/ethersphere/bee/v2/pkg/jsonhttp/jsonhttptest"
 	"github.com/ethersphere/bee/v2/pkg/log"
 	mockbatchstore "github.com/ethersphere/bee/v2/pkg/postage/batchstore/mock"
 	mockpost "github.com/ethersphere/bee/v2/pkg/postage/mock"
 	"github.com/ethersphere/bee/v2/pkg/spinlock"
-	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
-
-	"github.com/ethersphere/bee/v2/pkg/api"
-	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
-	"github.com/ethersphere/bee/v2/pkg/jsonhttp/jsonhttptest"
 	testingc "github.com/ethersphere/bee/v2/pkg/storage/testing"
+	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 

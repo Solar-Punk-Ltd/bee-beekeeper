@@ -221,10 +221,11 @@ func TestDacEachEndpointWithAct(t *testing.T) {
 	}
 }
 
-// nolint:paralleltest,tparallel
 // TestDacWithoutActHeader [negative tests]:
 // 1. upload w/ "Swarm-Act" header then try to dowload w/o the header.
 // 2. upload w/o "Swarm-Act" header then try to dowload w/ the header.
+//
+//nolint:paralleltest,tparallel
 func TestDacWithoutAct(t *testing.T) {
 	t.Parallel()
 	var (
@@ -321,8 +322,9 @@ func TestDacWithoutAct(t *testing.T) {
 	})
 }
 
-// nolint:paralleltest,tparallel
 // TestDacInvalidPath [negative test]: Expect Bad request when the path address is invalid.
+//
+//nolint:paralleltest,tparallel
 func TestDacInvalidPath(t *testing.T) {
 	t.Parallel()
 	var (
@@ -345,9 +347,7 @@ func TestDacInvalidPath(t *testing.T) {
 			PublicKey: pk.PublicKey,
 			Dac:       mockdac.New(),
 		})
-		var (
-			encryptedRef = "asd"
-		)
+		encryptedRef := "asd"
 
 		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusBadRequest,
 			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
@@ -361,7 +361,8 @@ func TestDacInvalidPath(t *testing.T) {
 						Field: "address",
 						Error: api.HexInvalidByteError('s').Error(),
 					},
-				}}),
+				},
+			}),
 			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
 		)
 	})
@@ -516,9 +517,7 @@ func TestDacHistory(t *testing.T) {
 			PublicKey: pk.PublicKey,
 			Dac:       mockdac.New(),
 		})
-		var (
-			testfile = "testfile1"
-		)
+		testfile := "testfile1"
 
 		jsonhttptest.Request(t, client, http.MethodPost, fileUploadResource+"?name="+fileName, http.StatusInternalServerError,
 			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
@@ -541,9 +540,7 @@ func TestDacHistory(t *testing.T) {
 			PublicKey: pk.PublicKey,
 			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String())),
 		})
-		var (
-			encryptedRef = "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
-		)
+		encryptedRef := "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
 
 		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusNotFound,
 			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
@@ -619,9 +616,7 @@ func TestDacTimestamp(t *testing.T) {
 	})
 
 	t.Run("download-w/o-timestamp", func(t *testing.T) {
-		var (
-			encryptedRef = "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
-		)
+		encryptedRef := "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
 		client, _, _, _ := newTestServer(t, testServerOptions{
 			Storer:    storerMock,
 			Logger:    logger,
@@ -754,7 +749,8 @@ func TestDacPublisher(t *testing.T) {
 						Field: "Swarm-Act-Publisher",
 						Error: "malformed public key: invalid length: 32",
 					},
-				}}),
+				},
+			}),
 			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
 		)
 	})
@@ -785,9 +781,7 @@ func TestDacPublisher(t *testing.T) {
 	})
 
 	t.Run("download-w/o-publisher", func(t *testing.T) {
-		var (
-			encryptedRef = "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
-		)
+		encryptedRef := "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
 		client, _, _, _ := newTestServer(t, testServerOptions{
 			Storer:    storerMock,
 			Logger:    logger,
@@ -862,7 +856,8 @@ func TestDacGrantees(t *testing.T) {
 						Field: "address",
 						Error: api.HexInvalidByteError('s').Error(),
 					},
-				}}),
+				},
+			}),
 		)
 	})
 	t.Run("add-revoke-grantees", func(t *testing.T) {
@@ -904,8 +899,8 @@ func TestDacGrantees(t *testing.T) {
 			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
 			jsonhttptest.WithJSONRequestBody(body),
 		)
-
 	})
+
 	t.Run("create-granteelist", func(t *testing.T) {
 		body := api.GranteesPostRequest{
 			GranteeList: []string{

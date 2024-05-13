@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	"github.com/ethersphere/bee/v2/pkg/bigint"
-
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/storageincentives/staking"
 	"github.com/gorilla/mux"
@@ -33,6 +32,7 @@ func (s *Service) stakingAccessHandler(h http.Handler) http.Handler {
 type getStakeResponse struct {
 	StakedAmount *bigint.BigInt `json:"stakedAmount"`
 }
+
 type stakeDepositResponse struct {
 	TxHash string `json:"txhash"`
 }

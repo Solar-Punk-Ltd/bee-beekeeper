@@ -37,7 +37,6 @@ func keyValuePair(t *testing.T) ([]byte, []byte) {
 }
 
 func TestKvs(t *testing.T) {
-
 	s, err := kvs.New(createLs())
 	assert.NoError(t, err)
 

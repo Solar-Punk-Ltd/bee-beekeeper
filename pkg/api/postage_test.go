@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/ethersphere/bee/v2/pkg/api"
 	"github.com/ethersphere/bee/v2/pkg/bigint"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
@@ -373,7 +372,6 @@ func TestPostageGetBuckets(t *testing.T) {
 
 		jsonhttptest.Request(t, tsNotFound, http.MethodGet, "/stamps/"+batchOkStr+"/buckets", http.StatusNotFound)
 	})
-
 }
 
 func TestReserveState(t *testing.T) {
@@ -406,6 +404,7 @@ func TestReserveState(t *testing.T) {
 		)
 	})
 }
+
 func TestChainState(t *testing.T) {
 	t.Parallel()
 
@@ -433,7 +432,6 @@ func TestChainState(t *testing.T) {
 			}),
 		)
 	})
-
 }
 
 func TestPostageTopUpStamp(t *testing.T) {
@@ -703,7 +701,6 @@ func TestPostageDiluteStamp(t *testing.T) {
 				TxHash:  txHash.String(),
 			}),
 		)
-
 	})
 }
 

@@ -43,5 +43,4 @@ func TestDebugStorage(t *testing.T) {
 			jsonhttptest.WithExpectedJSONResponse(want),
 		)
 	})
-
 }

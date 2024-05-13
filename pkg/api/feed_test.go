@@ -161,7 +161,6 @@ func TestFeed_Post(t *testing.T) {
 			)
 		})
 	})
-
 }
 
 // TestDirectUploadFeed tests that the direct upload endpoint give correct error message in dev mode

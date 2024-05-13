@@ -116,7 +116,6 @@ func TestCORSHeaders(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // TestCors tests whether CORs work correctly with OPTIONS method
@@ -135,7 +134,8 @@ func TestCors(t *testing.T) {
 		{
 			endpoint:        "bzz",
 			expectedMethods: "POST",
-		}, {
+		},
+		{
 			endpoint:        "bzz/0101011",
 			expectedMethods: "GET, HEAD",
 		},

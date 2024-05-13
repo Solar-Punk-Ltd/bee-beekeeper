@@ -24,7 +24,8 @@ func getInMemorySwarm() *single {
 		defer lock.Unlock()
 		if singleInMemorySwarm == nil {
 			singleInMemorySwarm = &single{
-				memoryMock: make(map[string]map[string][]byte)}
+				memoryMock: make(map[string]map[string][]byte),
+			}
 		}
 	}
 	return singleInMemorySwarm

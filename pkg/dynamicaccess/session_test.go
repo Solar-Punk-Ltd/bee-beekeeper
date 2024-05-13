@@ -14,7 +14,7 @@ import (
 	memkeystore "github.com/ethersphere/bee/v2/pkg/keystore/mem"
 )
 
-func mockKeyFunc(publicKey *ecdsa.PublicKey, nonces [][]byte) ([][]byte, error) {
+func mockKeyFunc(*ecdsa.PublicKey, [][]byte) ([][]byte, error) {
 	return [][]byte{{1}}, nil
 }
 

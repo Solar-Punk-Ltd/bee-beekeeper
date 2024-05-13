@@ -141,7 +141,6 @@ func storeDir(
 	errorFilename string,
 	rLevel redundancy.Level,
 ) (swarm.Address, error) {
-
 	logger := tracing.NewLoggerWithTraceID(ctx, log)
 	loggerV1 := logger.V(1).Build()
 
