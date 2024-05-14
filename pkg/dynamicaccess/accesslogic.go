@@ -83,13 +83,10 @@ func (al ActLogic) AddGrantee(ctx context.Context, storage kvs.KeyValueStore, pu
 	}
 
 	// Encrypt the access key for the new Grantee
-	keys, err := al.getKeys(granteePubKey)
+	lookupKey, accessKeyDecryptionKey, err := al.getKeys(granteePubKey)
 	if err != nil {
 		return err
 	}
-	lookupKey := keys[0]
-	// accessKeyDecryptionKey is used for encryption of the access key
-	accessKeyDecryptionKey := keys[1]
 
 	// Encrypt the access key for the new Grantee
 	cipher := encryption.New(encryption.Key(accessKeyDecryptionKey), 0, uint32(0), hashFunc)
@@ -98,20 +95,17 @@ func (al ActLogic) AddGrantee(ctx context.Context, storage kvs.KeyValueStore, pu
 		return fmt.Errorf("failed to encrypt access key: %w", err)
 	}
 
-	// Add the new encrypted access key for the Act
-	//nolint:wrapcheck
+	// Add the new encrypted access key to the Act
 	return storage.Put(ctx, lookupKey, granteeEncryptedAccessKey)
 }
 
 // Will return the access key for a publisher (public key).
 func (al *ActLogic) getAccessKey(ctx context.Context, storage kvs.KeyValueStore, publisherPubKey *ecdsa.PublicKey) ([]byte, error) {
-	keys, err := al.getKeys(publisherPubKey)
+	publisherLookupKey, publisherAKDecryptionKey, err := al.getKeys(publisherPubKey)
 	if err != nil {
 		return nil, err
 	}
-	publisherLookupKey := keys[0]
-	publisherAKDecryptionKey := keys[1]
-	// no need to constructor call if value not found in act
+	// no need for constructor call if value not found in act
 	accessKeyDecryptionCipher := encryption.New(encryption.Key(publisherAKDecryptionKey), 0, uint32(0), hashFunc)
 	encryptedAK, err := storage.Get(ctx, publisherLookupKey)
 	if err != nil {
@@ -122,18 +116,22 @@ func (al *ActLogic) getAccessKey(ctx context.Context, storage kvs.KeyValueStore,
 }
 
 // Generate lookup key and access key decryption key for a given public key
-func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([][]byte, error) {
-	return al.Session.Key(publicKey, [][]byte{zeroByteArray, oneByteArray})
+func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([]byte, []byte, error) {
+	nonces := [][]byte{zeroByteArray, oneByteArray}
+	// keys := make([][]byte, 0, len(nonces))
+	keys, err := al.Session.Key(publicKey, nonces)
+	if keys == nil {
+		return nil, nil, err
+	}
+	return keys[0], keys[1], err
 }
 
 // DecryptRef will return a decrypted reference, for given encrypted reference and publisher
 func (al ActLogic) DecryptRef(ctx context.Context, storage kvs.KeyValueStore, encryptedRef swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error) {
-	keys, err := al.getKeys(publisher)
+	lookupKey, accessKeyDecryptionKey, err := al.getKeys(publisher)
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
-	lookupKey := keys[0]
-	accessKeyDecryptionKey := keys[1]
 
 	// Lookup encrypted access key from the ACT manifest
 	encryptedAccessKey, err := storage.Get(ctx, lookupKey)
