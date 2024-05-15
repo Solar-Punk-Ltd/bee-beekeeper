@@ -33,6 +33,7 @@ func createLs() file.LoadSaver {
 }
 
 func keyValuePair(t *testing.T) ([]byte, []byte) {
+	t.Helper()
 	return swarm.RandAddress(t).Bytes(), swarm.RandAddress(t).Bytes()
 }
 
@@ -129,7 +130,7 @@ func TestKvs_Save(t *testing.T) {
 	})
 	t.Run("Save not empty KVS return valid swarm address", func(t *testing.T) {
 		s, _ := kvs.New(createLs())
-		s.Put(ctx, key1, val1)
+		_ = s.Put(ctx, key1, val1)
 		ref, err := s.Save(ctx)
 		assert.NoError(t, err)
 		assert.True(t, ref.IsValidNonEmpty())

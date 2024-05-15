@@ -33,7 +33,13 @@ func createLs() file.LoadSaver {
 
 func generateKeyListFixture() ([]*ecdsa.PublicKey, error) {
 	key1, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
 	key2, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
 	key3, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -216,8 +222,8 @@ func TestGranteeRemoveTwo(t *testing.T) {
 	if err != nil {
 		t.Errorf("key generation error: %v", err)
 	}
-	err = gl.Add([]*ecdsa.PublicKey{keys[0]})
-	err = gl.Add([]*ecdsa.PublicKey{keys[0]})
+	_ = gl.Add([]*ecdsa.PublicKey{keys[0]})
+	_ = gl.Add([]*ecdsa.PublicKey{keys[0]})
 	err = gl.Remove([]*ecdsa.PublicKey{keys[0]})
 	assert.NoError(t, err)
 }
