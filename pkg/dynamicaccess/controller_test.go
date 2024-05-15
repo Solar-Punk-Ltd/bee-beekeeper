@@ -15,7 +15,6 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -69,14 +68,14 @@ func TestController_UploadHandler(t *testing.T) {
 		expRef, err := al.EncryptRef(ctx, act, &publisher.PublicKey, ref)
 
 		assert.NoError(t, err)
-		assert.Equal(t, expRef, encRef)
+		assert.Equal(t, encRef, expRef)
 		assert.NotEqual(t, hRef, swarm.ZeroAddress)
 	})
 
 	t.Run("Upload to same history", func(t *testing.T) {
 		ref := swarm.RandAddress(t)
 		_, hRef1, _, err := c.UploadHandler(ctx, ls, ref, &publisher.PublicKey, swarm.ZeroAddress)
-		require.NoError(t, err) // If assert fails, the test continues, if require fails, the test stops we need to consider which to use
+		assert.NoError(t, err)
 		_, hRef2, encRef, err := c.UploadHandler(ctx, ls, ref, &publisher.PublicKey, hRef1)
 		assert.NoError(t, err)
 		h, err := dynamicaccess.NewHistoryReference(ls, hRef2)
