@@ -186,7 +186,7 @@ func (c *ControllerStruct) UpdateHandler(
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 
-		gl, err = NewGranteeListReference(gls, granteeref)
+		gl, err = NewGranteeListReference(ctx, gls, granteeref)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -262,12 +262,12 @@ func (c *ControllerStruct) UpdateHandler(
 	return glref, eglref, href, actref, nil
 }
 
-func (c *ControllerStruct) Get(_ context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error) {
+func (c *ControllerStruct) Get(ctx context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error) {
 	granteeRef, err := c.decryptRefForPublisher(publisher, encryptedglref)
 	if err != nil {
 		return nil, err
 	}
-	gl, err := NewGranteeListReference(ls, granteeRef)
+	gl, err := NewGranteeListReference(ctx, ls, granteeRef)
 	if err != nil {
 		return nil, err
 	}
