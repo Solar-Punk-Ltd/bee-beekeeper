@@ -77,14 +77,14 @@ func TestDecryptRef_Success(t *testing.T) {
 		t.Error(err)
 	}
 
-	acutalRef, err := al.DecryptRef(ctx, s, encryptedRef, &id0.PublicKey)
+	actualRef, err := al.DecryptRef(ctx, s, encryptedRef, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("There was an error while calling Get: ")
 		t.Error(err)
 	}
 
-	if expectedRef.Compare(acutalRef) != 0 {
-		t.Errorf("Get gave back wrong Swarm reference!")
+	if expectedRef.Compare(actualRef) != 0 {
+		t.Errorf("Get returned a wrong Swarm reference!")
 	}
 }
 
@@ -120,14 +120,14 @@ func TestDecryptRefWithGrantee_Success(t *testing.T) {
 
 	diffieHellman2 := dynamicaccess.NewDefaultSession(id1)
 	granteeAccessLogic := dynamicaccess.NewLogic(diffieHellman2)
-	acutalRef, err := granteeAccessLogic.DecryptRef(ctx, s, encryptedRef, &id0.PublicKey)
+	actualRef, err := granteeAccessLogic.DecryptRef(ctx, s, encryptedRef, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("There was an error while calling Get: ")
 		t.Error(err)
 	}
 
-	if expectedRef.Compare(acutalRef) != 0 {
-		t.Errorf("Get gave back wrong Swarm reference!")
+	if expectedRef.Compare(actualRef) != 0 {
+		t.Errorf("Get returned a wrong Swarm reference!")
 	}
 }
 

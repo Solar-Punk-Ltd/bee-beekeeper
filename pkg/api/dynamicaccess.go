@@ -21,8 +21,8 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/postage"
-	storage "github.com/ethersphere/bee/v2/pkg/storage"
-	storer "github.com/ethersphere/bee/v2/pkg/storer"
+	"github.com/ethersphere/bee/v2/pkg/storage"
+	"github.com/ethersphere/bee/v2/pkg/storer"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/gorilla/mux"
 )
@@ -40,7 +40,7 @@ func getAddressFromContext(ctx context.Context) swarm.Address {
 	return swarm.ZeroAddress
 }
 
-// setAddress sets the swarm address in the context
+// setAddressInContext sets the swarm address in the context
 func setAddressInContext(ctx context.Context, address swarm.Address) context.Context {
 	return context.WithValue(ctx, addressKey{}, address)
 }
@@ -121,8 +121,8 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 	}
 }
 
-// actEncryptionHandler is a middleware that encrypts the given address using the publisher's public key
-// Uploads the encrypted reference, history and kvs to the store
+// actEncryptionHandler is a middleware that encrypts the given address using the publisher's public key,
+// uploads the encrypted reference, history and kvs to the store
 func (s *Service) actEncryptionHandler(
 	ctx context.Context,
 	w http.ResponseWriter,
@@ -140,7 +140,7 @@ func (s *Service) actEncryptionHandler(
 		return swarm.ZeroAddress, fmt.Errorf("act failed to encrypt reference: %w", err)
 	}
 	// only need to upload history and kvs if a new history is created,
-	// meaning that the publsher uploaded to the history for the first time
+	// meaning that the publisher uploaded to the history for the first time
 	if !historyReference.Equal(historyRootHash) {
 		err = putter.Done(storageReference)
 		if err != nil {
