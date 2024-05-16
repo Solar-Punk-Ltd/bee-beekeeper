@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package kvs_test
+package manifest_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
-	"github.com/ethersphere/bee/v2/pkg/kvs"
+	"github.com/ethersphere/bee/v2/pkg/kvs/manifest"
 	"github.com/ethersphere/bee/v2/pkg/storage"
 	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
@@ -38,19 +38,23 @@ func keyValuePair(t *testing.T) ([]byte, []byte) {
 }
 
 func TestKvs(t *testing.T) {
-	s, err := kvs.New(createLs())
-	assert.NoError(t, err)
-
+	t.Parallel()
+	ls := createLs()
 	key, val := keyValuePair(t)
 	ctx := context.Background()
 
 	t.Run("Get non-existent key should return error", func(t *testing.T) {
-		_, err := s.Get(ctx, []byte{1})
+		s, err := manifest.New(ls)
+		assert.NoError(t, err)
+		value, err := s.Get(ctx, []byte{1})
 		assert.Error(t, err)
+		assert.Nil(t, value)
 	})
 
 	t.Run("Multiple Get with same key, no error", func(t *testing.T) {
-		err := s.Put(ctx, key, val)
+		s, err := manifest.New(ls)
+		assert.NoError(t, err)
+		err = s.Put(ctx, key, val)
 		assert.NoError(t, err)
 
 		// get #1
@@ -64,6 +68,8 @@ func TestKvs(t *testing.T) {
 	})
 
 	t.Run("Get should return value equal to put value", func(t *testing.T) {
+		s, err := manifest.New(ls)
+		assert.NoError(t, err)
 		var (
 			key1 []byte = []byte{1}
 			key2 []byte = []byte{2}
@@ -119,25 +125,26 @@ func TestKvs(t *testing.T) {
 }
 
 func TestKvs_Save(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
-
+	ls := createLs()
 	key1, val1 := keyValuePair(t)
 	key2, val2 := keyValuePair(t)
 	t.Run("Save empty KVS return error", func(t *testing.T) {
-		s, _ := kvs.New(createLs())
-		_, err := s.Save(ctx)
+		s, _ := manifest.New(ls)
+		ref, err := s.Save(ctx)
 		assert.Error(t, err)
+		assert.True(t, ref.IsZero())
 	})
 	t.Run("Save not empty KVS return valid swarm address", func(t *testing.T) {
-		s, _ := kvs.New(createLs())
-		_ = s.Put(ctx, key1, val1)
+		s, _ := manifest.New(ls)
+		s.Put(ctx, key1, val1)
 		ref, err := s.Save(ctx)
 		assert.NoError(t, err)
 		assert.True(t, ref.IsValidNonEmpty())
 	})
 	t.Run("Save KVS with one item, no error, pre-save value exist", func(t *testing.T) {
-		ls := createLs()
-		s1, _ := kvs.New(ls)
+		s1, _ := manifest.New(ls)
 
 		err := s1.Put(ctx, key1, val1)
 		assert.NoError(t, err)
@@ -145,7 +152,7 @@ func TestKvs_Save(t *testing.T) {
 		ref, err := s1.Save(ctx)
 		assert.NoError(t, err)
 
-		s2, err := kvs.NewReference(ls, ref)
+		s2, err := manifest.NewReference(ls, ref)
 		assert.NoError(t, err)
 
 		val, err := s2.Get(ctx, key1)
@@ -153,9 +160,7 @@ func TestKvs_Save(t *testing.T) {
 		assert.Equal(t, val1, val)
 	})
 	t.Run("Save KVS and add one item, no error, after-save value exist", func(t *testing.T) {
-		ls := createLs()
-
-		kvs1, _ := kvs.New(ls)
+		kvs1, _ := manifest.New(ls)
 
 		err := kvs1.Put(ctx, key1, val1)
 		assert.NoError(t, err)
@@ -163,7 +168,7 @@ func TestKvs_Save(t *testing.T) {
 		assert.NoError(t, err)
 
 		// New KVS
-		kvs2, err := kvs.NewReference(ls, ref)
+		kvs2, err := manifest.NewReference(ls, ref)
 		assert.NoError(t, err)
 		err = kvs2.Put(ctx, key2, val2)
 		assert.NoError(t, err)

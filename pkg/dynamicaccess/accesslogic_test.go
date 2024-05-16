@@ -14,7 +14,9 @@ import (
 
 	"github.com/ethersphere/bee/v2/pkg/crypto"
 	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
-	kvsmock "github.com/ethersphere/bee/v2/pkg/kvs/mock"
+
+	// kvsmock "github.com/ethersphere/bee/v2/pkg/kvs/mock"
+	kvs "github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
 )
@@ -56,11 +58,13 @@ func getPrivKey(keyNumber int) *ecdsa.PrivateKey {
 }
 
 func TestDecryptRef_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
+	ls := createLs()
 	id0 := getPrivKey(0)
-	s := kvsmock.New()
+	s, err := kvs.NewDefault(ls)
 	al := setupAccessLogic()
-	err := al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddPublisher(ctx, s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
 	}
@@ -89,13 +93,15 @@ func TestDecryptRef_Success(t *testing.T) {
 }
 
 func TestDecryptRefWithGrantee_Success(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	id0, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	diffieHellman := dynamicaccess.NewDefaultSession(id0)
 	al := dynamicaccess.NewLogic(diffieHellman)
 
-	s := kvsmock.New()
-	err := al.AddPublisher(ctx, s, &id0.PublicKey)
+	ls := createLs()
+	s, err := kvs.NewDefault(ls)
+	err = al.AddPublisher(ctx, s, &id0.PublicKey)
 	if err != nil {
 		t.Errorf("AddPublisher: expected no error, got %v", err)
 	}
@@ -132,12 +138,14 @@ func TestDecryptRefWithGrantee_Success(t *testing.T) {
 }
 
 func TestDecryptRef_Error(t *testing.T) {
+	t.Parallel()
 	id0 := getPrivKey(0)
 
 	ctx := context.Background()
-	s := kvsmock.New()
+	ls := createLs()
+	s, err := kvs.NewDefault(ls)
 	al := setupAccessLogic()
-	err := al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddPublisher(ctx, s, &id0.PublicKey)
 	assert.NoError(t, err)
 
 	expectedRef := "39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559"
@@ -152,13 +160,15 @@ func TestDecryptRef_Error(t *testing.T) {
 }
 
 func TestAddPublisher(t *testing.T) {
+	t.Parallel()
 	id0 := getPrivKey(0)
 	savedLookupKey := "b6ee086390c280eeb9824c331a4427596f0c8510d5564bc1b6168d0059a46e2b"
-	s := kvsmock.New()
+	ls := createLs()
+	s, err := kvs.NewDefault(ls)
 	ctx := context.Background()
 
 	al := setupAccessLogic()
-	err := al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddPublisher(ctx, s, &id0.PublicKey)
 	assert.NoError(t, err)
 
 	decodedSavedLookupKey, err := hex.DecodeString(savedLookupKey)
@@ -188,10 +198,11 @@ func TestAddNewGranteeToContent(t *testing.T) {
 	publisherLookupKey := "b6ee086390c280eeb9824c331a4427596f0c8510d5564bc1b6168d0059a46e2b"
 	firstAddedGranteeLookupKey := "a13678e81f9d939b9401a3ad7e548d2ceb81c50f8c76424296e83a1ad79c0df0"
 	secondAddedGranteeLookupKey := "d5e9a6499ca74f5b8b958a4b89b7338045b2baa9420e115443a8050e26986564"
+	ls := createLs()
 
-	s := kvsmock.New()
+	s, err := kvs.NewDefault(ls)
 	al := setupAccessLogic()
-	err := al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddPublisher(ctx, s, &id0.PublicKey)
 	assert.NoError(t, err)
 
 	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id1.PublicKey, nil)

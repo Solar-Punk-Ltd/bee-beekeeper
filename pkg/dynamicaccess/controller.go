@@ -12,11 +12,7 @@ import (
 
 	encryption "github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/file"
-	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
-	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
-	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/kvs"
-	"github.com/ethersphere/bee/v2/pkg/storage"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
@@ -37,6 +33,7 @@ type Controller interface {
 	io.Closer
 }
 
+// TODO: option the chose beewteen pot vs manifest storage
 type ControllerStruct struct {
 	accessLogic ActLogic
 }
@@ -59,7 +56,8 @@ func (c *ControllerStruct) DownloadHandler(
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
-	act, err := kvs.NewReference(ls, entry.Reference())
+	// act, err := kvs.NewManifestReference(ls, entry.Reference())
+	act, err := kvs.NewDefaultReference(ls, entry.Reference())
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
@@ -85,7 +83,8 @@ func (c *ControllerStruct) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		storage, err = kvs.New(ls)
+		// storage, err = kvs.NewManifest(ls)
+		storage, err = kvs.NewDefault(ls)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -115,7 +114,8 @@ func (c *ControllerStruct) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		storage, err = kvs.NewReference(ls, actRef)
+		// storage, err = kvs.NewManifestReference(ls, actRef)
+		storage, err = kvs.NewDefaultReference(ls, actRef)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -157,7 +157,8 @@ func (c *ControllerStruct) HandleGrantees(
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		actref := entry.Reference()
-		act, err = kvs.NewReference(ls, actref)
+		// act, err = kvs.NewManifestReference(ls, actref)
+		act, err = kvs.NewDefaultReference(ls, actref)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -167,7 +168,8 @@ func (c *ControllerStruct) HandleGrantees(
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		// generate new access key and new act
-		act, err = kvs.New(ls)
+		// act, err = kvs.NewManifest(ls)
+		act, err = kvs.NewDefault(ls)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -209,14 +211,16 @@ func (c *ControllerStruct) HandleGrantees(
 
 	var granteesToAdd []*ecdsa.PublicKey
 	if len(removeList) != 0 || encryptedglref.IsZero() {
-		// generate new access key and new act
-		act, err = kvs.New(ls)
+		// act, err = kvs.NewManifest(ls)
+		act, err = kvs.NewDefault(ls)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		err = c.accessLogic.AddPublisher(ctx, act, publisher)
-		if err != nil {
-			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+		if historyref.IsZero() {
+			err = c.accessLogic.AddPublisher(ctx, act, publisher)
+			if err != nil {
+				return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
+			}
 		}
 		granteesToAdd = gl.Get()
 	} else {
@@ -303,12 +307,6 @@ func (c *ControllerStruct) decryptRefForPublisher(publisherPubKey *ecdsa.PublicK
 	}
 
 	return swarm.NewAddress(ref), nil
-}
-
-func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {
-	return func() pipeline.Interface {
-		return builder.NewPipelineBuilder(ctx, s, encrypt, rLevel)
-	}
 }
 
 // TODO: what to do in close ?

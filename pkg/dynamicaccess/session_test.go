@@ -23,6 +23,7 @@ func mockKeyFunc(*ecdsa.PublicKey, [][]byte) ([][]byte, error) {
 }
 
 func TestSessionNewDefaultSession(t *testing.T) {
+	t.Parallel()
 	pk, err := crypto.GenerateSecp256k1Key()
 	if err != nil {
 		t.Fatalf("Error generating private key: %v", err)
@@ -34,6 +35,7 @@ func TestSessionNewDefaultSession(t *testing.T) {
 }
 
 func TestSessionNewFromKeystore(t *testing.T) {
+	t.Parallel()
 	ks := memkeystore.New()
 	si := mock.NewFromKeystore(ks, "tag", "password", mockKeyFunc)
 	if si == nil {

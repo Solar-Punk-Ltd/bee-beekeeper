@@ -19,6 +19,7 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -31,14 +32,14 @@ func getHistoryFixture(ctx context.Context, ls file.LoadSaver, al dynamicaccess.
 	pk1 := getPrivKey(1)
 	pk2 := getPrivKey(2)
 
-	kvs0, _ := kvs.New(ls)
+	kvs0, _ := kvs.NewDefault(ls)
 	al.AddPublisher(ctx, kvs0, publisher)
 	kvs0Ref, _ := kvs0.Save(ctx)
-	kvs1, _ := kvs.New(ls)
+	kvs1, _ := kvs.NewDefault(ls)
 	al.AddPublisher(ctx, kvs1, publisher)
 	al.AddGrantee(ctx, kvs1, publisher, &pk1.PublicKey, nil)
 	kvs1Ref, _ := kvs1.Save(ctx)
-	kvs2, _ := kvs.New(ls)
+	kvs2, _ := kvs.NewDefault(ls)
 	al.AddPublisher(ctx, kvs2, publisher)
 	al.AddGrantee(ctx, kvs2, publisher, &pk2.PublicKey, nil)
 	kvs2Ref, _ := kvs2.Save(ctx)
@@ -53,6 +54,7 @@ func getHistoryFixture(ctx context.Context, ls file.LoadSaver, al dynamicaccess.
 }
 
 func TestController_UploadHandler(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	publisher := getPrivKey(0)
 	diffieHellman := dynamicaccess.NewDefaultSession(publisher)
@@ -68,7 +70,7 @@ func TestController_UploadHandler(t *testing.T) {
 		h, _ := dynamicaccess.NewHistoryReference(ls, hRef)
 		entry, _ := h.Lookup(ctx, time.Now().Unix())
 		actRef := entry.Reference()
-		act, _ := kvs.NewReference(ls, actRef)
+		act, _ := kvs.NewDefaultReference(ls, actRef)
 		expRef, err := al.EncryptRef(ctx, act, &publisher.PublicKey, ref)
 
 		assert.NoError(t, err)
@@ -91,7 +93,7 @@ func TestController_UploadHandler(t *testing.T) {
 		h, _ = dynamicaccess.NewHistoryReference(ls, hRef2)
 		entry, _ := h.Lookup(ctx, time.Now().Unix())
 		actRef := entry.Reference()
-		act, _ := kvs.NewReference(ls, actRef)
+		act, _ := kvs.NewDefaultReference(ls, actRef)
 		expRef, err := al.EncryptRef(ctx, act, &publisher.PublicKey, ref)
 
 		assert.NoError(t, err)
@@ -101,6 +103,7 @@ func TestController_UploadHandler(t *testing.T) {
 }
 
 func TestController_PublisherDownload(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	publisher := getPrivKey(0)
 	diffieHellman := dynamicaccess.NewDefaultSession(publisher)
@@ -112,7 +115,7 @@ func TestController_PublisherDownload(t *testing.T) {
 	h, _ := dynamicaccess.NewHistoryReference(ls, href)
 	entry, _ := h.Lookup(ctx, time.Now().Unix())
 	actRef := entry.Reference()
-	act, _ := kvs.NewReference(ls, actRef)
+	act, _ := kvs.NewDefaultReference(ls, actRef)
 	encRef, err := al.EncryptRef(ctx, act, &publisher.PublicKey, ref)
 
 	assert.NoError(t, err)
@@ -121,7 +124,9 @@ func TestController_PublisherDownload(t *testing.T) {
 	assert.Equal(t, ref, dref)
 }
 
+// TODO: fails because somehow the wrong lookupkey is fetched from the correct kvsref..
 func TestController_GranteeDownload(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	publisher := getPrivKey(0)
 	grantee := getPrivKey(2)
@@ -138,16 +143,20 @@ func TestController_GranteeDownload(t *testing.T) {
 	ts := time.Date(2001, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	entry, _ := h.Lookup(ctx, ts)
 	actRef := entry.Reference()
-	act, _ := kvs.NewReference(ls, actRef)
+	act, _ := kvs.NewDefaultReference(ls, actRef)
 	encRef, err := publisherAL.EncryptRef(ctx, act, &publisher.PublicKey, ref)
+	t.Logf("encRef: %v", encRef)
 
 	assert.NoError(t, err)
 	dref, err := c.DownloadHandler(ctx, ls, encRef, &publisher.PublicKey, href, ts)
+	t.Logf("dref: %v", dref)
 	assert.NoError(t, err)
 	assert.Equal(t, ref, dref)
 }
 
+// TODO: fails because granteeref is not found and cannot be loaded
 func TestController_HandleGrantees(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	publisher := getPrivKey(1)
 	diffieHellman := dynamicaccess.NewDefaultSession(publisher)
@@ -168,6 +177,7 @@ func TestController_HandleGrantees(t *testing.T) {
 		assert.NoError(t, err)
 
 		gl, err := dynamicaccess.NewGranteeListReference(ls, granteeRef)
+		require.NoError(t, err)
 
 		assert.NoError(t, err)
 		assert.Len(t, gl.Get(), 1)
@@ -175,9 +185,10 @@ func TestController_HandleGrantees(t *testing.T) {
 	t.Run("add to existing list", func(t *testing.T) {
 		addList := []*ecdsa.PublicKey{&grantee.PublicKey}
 		granteeRef, eglref, _, _, err := c.HandleGrantees(ctx, ls, gls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		gl, err := dynamicaccess.NewGranteeListReference(ls, granteeRef)
+		require.NoError(t, err)
 
 		assert.NoError(t, err)
 		assert.Len(t, gl.Get(), 1)
@@ -209,6 +220,7 @@ func TestController_HandleGrantees(t *testing.T) {
 		granteeRef, eglref, _, _, err := c.HandleGrantees(ctx, ls, gls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
 		granteeRef, _, _, _, _ = c.HandleGrantees(ctx, ls, ls, eglref, href, &publisher.PublicKey, addList, nil)
 		gl, err := dynamicaccess.NewGranteeListReference(createLs(), granteeRef)
+		require.NoError(t, err)
 
 		assert.NoError(t, err)
 		assert.Len(t, gl.Get(), 1)
@@ -217,6 +229,7 @@ func TestController_HandleGrantees(t *testing.T) {
 		addList := []*ecdsa.PublicKey{&grantee.PublicKey}
 		granteeRef, _, _, _, _ := c.HandleGrantees(ctx, ls, ls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
 		gl, err := dynamicaccess.NewGranteeListReference(createLs(), granteeRef)
+		require.NoError(t, err)
 
 		assert.NoError(t, err)
 		assert.Len(t, gl.Get(), 1)
@@ -224,6 +237,7 @@ func TestController_HandleGrantees(t *testing.T) {
 }
 
 func TestController_GetGrantees(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	publisher := getPrivKey(1)
 	caller := getPrivKey(0)

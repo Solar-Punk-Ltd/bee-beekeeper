@@ -137,7 +137,7 @@ func (al ActLogic) DecryptRef(ctx context.Context, storage kvs.KeyValueStore, en
 		return swarm.ZeroAddress, err
 	}
 
-	// Lookup encrypted access key from the ACT manifest
+	// Lookup encrypted access key from the ACT
 	encryptedAccessKey, err := storage.Get(ctx, lookupKey)
 	if err != nil {
 		return swarm.ZeroAddress, fmt.Errorf("failed to get access key from KVS: %w", err)
