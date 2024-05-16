@@ -199,7 +199,8 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	jsonhttp.OK(w, granteeSlice)
 }
 
-// TODO: actGrantRevokeHandler doc.
+// actGrantRevokeHandler is a middleware that makes updates to the list of grantees,
+// only the publisher is authorized to perform this action
 func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("act_grant_revoke_handler").Build()
 
@@ -363,7 +364,8 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// TODO: actCreateGranteesHandler doc.
+// actCreateGranteesHandler is a middleware that creates a new list of grantees,
+// only the publisher is authorized to perform this action
 func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("acthandler").Build()
 

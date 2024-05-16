@@ -169,7 +169,7 @@ func TestAddPublisher(t *testing.T) {
 
 	decodedEncryptedAccessKey := hex.EncodeToString(encryptedAccessKey)
 
-	// A random value is returned so it is only possibly to check the length of the returned value
+	// A random value is returned, so it is only possible to check the length of the returned value
 	// We know the lookup key because the generated private key is fixed
 	if len(decodedEncryptedAccessKey) != 64 {
 		t.Errorf("AddPublisher: expected encrypted access key length 64, got %d", len(decodedEncryptedAccessKey))

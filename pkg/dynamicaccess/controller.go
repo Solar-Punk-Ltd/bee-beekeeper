@@ -17,7 +17,8 @@ import (
 )
 
 type GranteeManager interface {
-	// TODO: doc
+	// HandleGrantees manages the grantees for the given publisher, updating the list based on provided public keys to add or remove.
+	// Only the publisher can make changes to the grantee list.
 	HandleGrantees(ctx context.Context, ls file.LoadSaver, gls file.LoadSaver, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, swarm.Address, error)
 	// GetGrantees returns the list of grantees for the given publisher.
 	// The list is accessible only by the publisher.
@@ -66,7 +67,7 @@ func (c *ControllerStruct) DownloadHandler(
 func (c *ControllerStruct) UploadHandler(
 	ctx context.Context,
 	ls file.LoadSaver,
-	refrefence swarm.Address,
+	reference swarm.Address,
 	publisher *ecdsa.PublicKey,
 	historyRootHash swarm.Address,
 ) (swarm.Address, swarm.Address, swarm.Address, error) {
@@ -117,7 +118,7 @@ func (c *ControllerStruct) UploadHandler(
 		}
 	}
 
-	encryptedRef, err := c.accessLogic.EncryptRef(ctx, storage, publisher, refrefence)
+	encryptedRef, err := c.accessLogic.EncryptRef(ctx, storage, publisher, reference)
 	return actRef, historyRef, encryptedRef, err
 }
 
