@@ -87,6 +87,36 @@ components:
         ghostBalance:
           $ref: "#/components/schemas/BigInt"
 
+    ActGranteesCreateRequest:
+      type: object
+      properties:
+        grantees:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicKey"
+
+    ActGranteesPatchRequest:
+      type: object
+      properties:
+        add:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicKey"
+          description: List of grantees to add
+        revoke:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicKey"
+          description: List of grantees to revoke future access from
+
+    ActGranteesOperationResponse:
+      type: object
+      properties:
+        ref:
+          $ref: "#/components/schemas/SwarmEncryptedReference"
+        historyref:
+          $ref: "#/components/schemas/SwarmEncryptedReference"
+
     Balance:
       type: object
       properties:
