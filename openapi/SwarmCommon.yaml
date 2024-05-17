@@ -977,6 +977,12 @@ components:
       schema:
         $ref: "#/components/schemas/HexString"
 
+    SwarmActHistoryAddress:
+      description: "Swarm address reference to the new ACT history entry"
+      schema:
+        $ref: "#/components/schemas/SwarmAddress"
+      required: false
+
     ETag:
       description: |
         The RFC7232 ETag header field in a response provides the current entity-

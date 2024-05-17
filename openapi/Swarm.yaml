@@ -231,6 +231,8 @@ paths:
               description: Tag UID if it was passed to the request `swarm-tag` header.
               schema:
                 $ref: "SwarmCommon.yaml#/components/schemas/Uid"
+            "swarm-act-history-address":
+              $ref: "SwarmCommon.yaml#/components/headers/SwarmActHistoryAddress"
           content:
             application/json:
               schema:
@@ -315,6 +317,8 @@ paths:
               $ref: "SwarmCommon.yaml#/components/headers/SwarmTag"
             "etag":
               $ref: "SwarmCommon.yaml#/components/headers/ETag"
+            "swarm-act-history-address":
+              $ref: "SwarmCommon.yaml#/components/headers/SwarmActHistoryAddress"
           content:
             application/json:
               schema:
@@ -782,6 +786,9 @@ paths:
             application/json:
               schema:
                 $ref: "SwarmCommon.yaml#/components/schemas/ReferenceResponse"
+          headers:
+            "swarm-act-history-address":
+              $ref: "SwarmCommon.yaml#/components/headers/SwarmActHistoryAddress"
         "400":
           $ref: "SwarmCommon.yaml#/components/responses/400"
         "401":
@@ -828,6 +835,9 @@ paths:
             application/json:
               schema:
                 $ref: "SwarmCommon.yaml#/components/schemas/ReferenceResponse"
+          headers:
+            "swarm-act-history-address":
+              $ref: "SwarmCommon.yaml#/components/headers/SwarmActHistoryAddress"
         "400":
           $ref: "SwarmCommon.yaml#/components/responses/400"
         "401":
