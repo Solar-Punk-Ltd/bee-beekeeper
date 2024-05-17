@@ -1137,6 +1137,15 @@ components:
       required: false
       description: "Determines if the download data should be cached on the node. By default the download will be cached"
 
+    SwarmAct:
+      in: header
+      name: swarm-act
+      schema:
+        type: boolean
+        default: "false"
+      required: false
+      description: "Determines if the uploaded data should be treated as ACT content"
+
     SwarmActPublisher:
       in: header
       name: swarm-act-publisher

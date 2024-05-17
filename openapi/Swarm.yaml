@@ -214,6 +214,8 @@ paths:
       parameters:
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmTagParameter"
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
       requestBody:
         description: Chunk binary data that has to have at least 8 bytes.
         content:
@@ -285,6 +287,8 @@ paths:
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmDeferredUpload"
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmRedundancyLevelParameter"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
       requestBody:
         content:
           multipart/form-data:
@@ -761,6 +765,8 @@ paths:
             $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
           name: swarm-postage-batch-id
           required: true
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
       requestBody:
         required: true
         description: The SOC binary data is composed of the span (8 bytes) and the at most 4KB payload.
@@ -813,6 +819,8 @@ paths:
           description: "Feed indexing scheme (default: sequence)"
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPinParameter"
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
       responses:
         "201":
           description: Created
