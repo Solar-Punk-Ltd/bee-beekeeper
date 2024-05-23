@@ -124,6 +124,7 @@ func TestMultiNodeHistoryLookup(t *testing.T) {
 }
 
 func TestHistoryStore(t *testing.T) {
+	t.Parallel()
 	storer := mockstorer.New()
 	ctx := context.Background()
 	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false))

@@ -64,9 +64,9 @@ func TestDecryptRef_Success(t *testing.T) {
 	id0 := getPrivKey(0)
 	s, err := kvs.NewDefault(ls)
 	al := setupAccessLogic()
-	err = al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id0.PublicKey)
 	if err != nil {
-		t.Errorf("AddPublisher: expected no error, got %v", err)
+		t.Errorf("AddGrantee: expected no error, got %v", err)
 	}
 
 	byteRef, _ := hex.DecodeString("39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559")
@@ -101,13 +101,13 @@ func TestDecryptRefWithGrantee_Success(t *testing.T) {
 
 	ls := createLs()
 	s, err := kvs.NewDefault(ls)
-	err = al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id0.PublicKey)
 	if err != nil {
-		t.Errorf("AddPublisher: expected no error, got %v", err)
+		t.Errorf("AddGrantee: expected no error, got %v", err)
 	}
 
 	id1, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id1.PublicKey, nil)
+	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id1.PublicKey)
 	if err != nil {
 		t.Errorf("AddNewGrantee: expected no error, got %v", err)
 	}
@@ -145,7 +145,7 @@ func TestDecryptRef_Error(t *testing.T) {
 	ls := createLs()
 	s, err := kvs.NewDefault(ls)
 	al := setupAccessLogic()
-	err = al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id0.PublicKey)
 	assert.NoError(t, err)
 
 	expectedRef := "39a5ea87b141fe44aa609c3327ecd896c0e2122897f5f4bbacf74db1033c5559"
@@ -168,7 +168,7 @@ func TestAddPublisher(t *testing.T) {
 	ctx := context.Background()
 
 	al := setupAccessLogic()
-	err = al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id0.PublicKey)
 	assert.NoError(t, err)
 
 	decodedSavedLookupKey, err := hex.DecodeString(savedLookupKey)
@@ -182,14 +182,15 @@ func TestAddPublisher(t *testing.T) {
 	// A random value is returned so it is only possibly to check the length of the returned value
 	// We know the lookup key because the generated private key is fixed
 	if len(decodedEncryptedAccessKey) != 64 {
-		t.Errorf("AddPublisher: expected encrypted access key length 64, got %d", len(decodedEncryptedAccessKey))
+		t.Errorf("AddGrantee: expected encrypted access key length 64, got %d", len(decodedEncryptedAccessKey))
 	}
 	if s == nil {
-		t.Errorf("AddPublisher: expected act, got nil")
+		t.Errorf("AddGrantee: expected act, got nil")
 	}
 }
 
 func TestAddNewGranteeToContent(t *testing.T) {
+	t.Parallel()
 	id0 := getPrivKey(0)
 	id1 := getPrivKey(1)
 	id2 := getPrivKey(2)
@@ -202,13 +203,13 @@ func TestAddNewGranteeToContent(t *testing.T) {
 
 	s, err := kvs.NewDefault(ls)
 	al := setupAccessLogic()
-	err = al.AddPublisher(ctx, s, &id0.PublicKey)
+	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id0.PublicKey)
 	assert.NoError(t, err)
 
-	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id1.PublicKey, nil)
+	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id1.PublicKey)
 	assert.NoError(t, err)
 
-	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id2.PublicKey, nil)
+	err = al.AddGrantee(ctx, s, &id0.PublicKey, &id2.PublicKey)
 	assert.NoError(t, err)
 
 	lookupKeyAsByte, err := hex.DecodeString(publisherLookupKey)
@@ -217,7 +218,7 @@ func TestAddNewGranteeToContent(t *testing.T) {
 	result, _ := s.Get(ctx, lookupKeyAsByte)
 	hexEncodedEncryptedAK := hex.EncodeToString(result)
 	if len(hexEncodedEncryptedAK) != 64 {
-		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
+		t.Fatalf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
 	}
 
 	lookupKeyAsByte, err = hex.DecodeString(firstAddedGranteeLookupKey)
@@ -226,7 +227,7 @@ func TestAddNewGranteeToContent(t *testing.T) {
 	result, _ = s.Get(ctx, lookupKeyAsByte)
 	hexEncodedEncryptedAK = hex.EncodeToString(result)
 	if len(hexEncodedEncryptedAK) != 64 {
-		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
+		t.Fatalf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
 	}
 
 	lookupKeyAsByte, err = hex.DecodeString(secondAddedGranteeLookupKey)
@@ -235,6 +236,6 @@ func TestAddNewGranteeToContent(t *testing.T) {
 	result, _ = s.Get(ctx, lookupKeyAsByte)
 	hexEncodedEncryptedAK = hex.EncodeToString(result)
 	if len(hexEncodedEncryptedAK) != 64 {
-		t.Errorf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
+		t.Fatalf("AddNewGrantee: expected encrypted access key length 64, got %d", len(hexEncodedEncryptedAK))
 	}
 }

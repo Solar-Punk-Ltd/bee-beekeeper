@@ -9,7 +9,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	encryption "github.com/ethersphere/bee/v2/pkg/encryption"
+	"github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"golang.org/x/crypto/sha3"
@@ -26,16 +26,14 @@ var (
 type Decryptor interface {
 	// DecryptRef will return a decrypted reference, for given encrypted reference and grantee
 	DecryptRef(ctx context.Context, storage kvs.KeyValueStore, encryptedRef swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error)
-	// Embedding the Session interface
 	Session
 }
 
 // Control interface for the ACT (does write operations).
 type Control interface {
-	// Embedding the Decryptor interface
 	Decryptor
 	// AddGrantee adds a new grantee to the ACT
-	AddGrantee(ctx context.Context, storage kvs.KeyValueStore, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKey *encryption.Key) error
+	AddGrantee(ctx context.Context, storage kvs.KeyValueStore, publisherPubKey, granteePubKey *ecdsa.PublicKey) error
 	// EncryptRef encrypts a Swarm reference for a given grantee
 	EncryptRef(ctx context.Context, storage kvs.KeyValueStore, grantee *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error)
 }
@@ -45,13 +43,6 @@ type ActLogic struct {
 }
 
 var _ Control = (*ActLogic)(nil)
-
-// AddPublisher adds a new publisher to an empty act.
-func (al ActLogic) AddPublisher(ctx context.Context, storage kvs.KeyValueStore, publisher *ecdsa.PublicKey) error {
-	accessKey := encryption.GenerateRandomKey(encryption.KeyLength)
-
-	return al.AddGrantee(ctx, storage, publisher, publisher, &accessKey)
-}
 
 // EncryptRef encrypts a SWARM reference for a publisher.
 func (al ActLogic) EncryptRef(ctx context.Context, storage kvs.KeyValueStore, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
@@ -69,21 +60,21 @@ func (al ActLogic) EncryptRef(ctx context.Context, storage kvs.KeyValueStore, pu
 }
 
 // AddGrantee adds a new grantee to the ACT.
-func (al ActLogic) AddGrantee(ctx context.Context, storage kvs.KeyValueStore, publisherPubKey, granteePubKey *ecdsa.PublicKey, accessKeyPointer *encryption.Key) error {
+func (al ActLogic) AddGrantee(ctx context.Context, storage kvs.KeyValueStore, publisherPubKey, granteePubKey *ecdsa.PublicKey) error {
 	var (
 		accessKey encryption.Key
 		err       error
 	)
 
-	if accessKeyPointer == nil {
+	// Create new access key because grantee is the publisher
+	if publisherPubKey.Equal(granteePubKey) {
+		accessKey = encryption.GenerateRandomKey(encryption.KeyLength)
+	} else {
 		// Get previously generated access key
 		accessKey, err = al.getAccessKey(ctx, storage, publisherPubKey)
 		if err != nil {
 			return err
 		}
-	} else {
-		// This is a newly created access key, because grantee is publisher (they are the same)
-		accessKey = *accessKeyPointer
 	}
 
 	// Encrypt the access key for the new Grantee
@@ -122,7 +113,6 @@ func (al *ActLogic) getAccessKey(ctx context.Context, storage kvs.KeyValueStore,
 // Generate lookup key and access key decryption key for a given public key
 func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([]byte, []byte, error) {
 	nonces := [][]byte{zeroByteArray, oneByteArray}
-	// keys := make([][]byte, 0, len(nonces))
 	keys, err := al.Session.Key(publicKey, nonces)
 	if keys == nil {
 		return nil, nil, err

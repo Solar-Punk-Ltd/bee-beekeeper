@@ -33,15 +33,15 @@ func getHistoryFixture(ctx context.Context, ls file.LoadSaver, al dynamicaccess.
 	pk2 := getPrivKey(2)
 
 	kvs0, _ := kvs.NewDefault(ls)
-	al.AddPublisher(ctx, kvs0, publisher)
+	al.AddGrantee(ctx, kvs0, publisher, publisher)
 	kvs0Ref, _ := kvs0.Save(ctx)
 	kvs1, _ := kvs.NewDefault(ls)
-	al.AddPublisher(ctx, kvs1, publisher)
-	al.AddGrantee(ctx, kvs1, publisher, &pk1.PublicKey, nil)
+	al.AddGrantee(ctx, kvs1, publisher, publisher)
+	al.AddGrantee(ctx, kvs1, publisher, &pk1.PublicKey)
 	kvs1Ref, _ := kvs1.Save(ctx)
 	kvs2, _ := kvs.NewDefault(ls)
-	al.AddPublisher(ctx, kvs2, publisher)
-	al.AddGrantee(ctx, kvs2, publisher, &pk2.PublicKey, nil)
+	al.AddGrantee(ctx, kvs2, publisher, publisher)
+	al.AddGrantee(ctx, kvs2, publisher, &pk2.PublicKey)
 	kvs2Ref, _ := kvs2.Save(ctx)
 	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
 	secondTime := time.Date(2000, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
@@ -155,7 +155,7 @@ func TestController_GranteeDownload(t *testing.T) {
 }
 
 // TODO: fails because granteeref is not found and cannot be loaded
-func TestController_HandleGrantees(t *testing.T) {
+func TestController_UpdateHandler(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	publisher := getPrivKey(1)
@@ -173,10 +173,10 @@ func TestController_HandleGrantees(t *testing.T) {
 
 	t.Run("add to new list", func(t *testing.T) {
 		addList := []*ecdsa.PublicKey{&grantee.PublicKey}
-		granteeRef, _, _, _, err := c.HandleGrantees(ctx, ls, ls, swarm.ZeroAddress, swarm.ZeroAddress, &publisher.PublicKey, addList, nil)
+		granteeRef, _, _, _, err := c.UpdateHandler(ctx, ls, ls, swarm.ZeroAddress, swarm.ZeroAddress, &publisher.PublicKey, addList, nil)
 		assert.NoError(t, err)
 
-		gl, err := dynamicaccess.NewGranteeListReference(ls, granteeRef)
+		gl, err := dynamicaccess.NewGranteeListReference(ctx, ls, granteeRef)
 		require.NoError(t, err)
 
 		assert.NoError(t, err)
@@ -184,18 +184,18 @@ func TestController_HandleGrantees(t *testing.T) {
 	})
 	t.Run("add to existing list", func(t *testing.T) {
 		addList := []*ecdsa.PublicKey{&grantee.PublicKey}
-		granteeRef, eglref, _, _, err := c.HandleGrantees(ctx, ls, gls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
+		granteeRef, eglref, _, _, err := c.UpdateHandler(ctx, ls, gls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
 		require.NoError(t, err)
 
-		gl, err := dynamicaccess.NewGranteeListReference(ls, granteeRef)
+		gl, err := dynamicaccess.NewGranteeListReference(ctx, ls, granteeRef)
 		require.NoError(t, err)
 
 		assert.NoError(t, err)
 		assert.Len(t, gl.Get(), 1)
 
 		addList = []*ecdsa.PublicKey{&getPrivKey(0).PublicKey}
-		granteeRef, _, _, _, _ = c.HandleGrantees(ctx, ls, ls, eglref, href, &publisher.PublicKey, addList, nil)
-		gl, err = dynamicaccess.NewGranteeListReference(ls, granteeRef)
+		granteeRef, _, _, _, _ = c.UpdateHandler(ctx, ls, ls, eglref, href, &publisher.PublicKey, addList, nil)
+		gl, err = dynamicaccess.NewGranteeListReference(ctx, ls, granteeRef)
 		assert.NoError(t, err)
 		assert.Len(t, gl.Get(), 2)
 	})
@@ -207,8 +207,8 @@ func TestController_HandleGrantees(t *testing.T) {
 		granteeRef, _ := gl.Save(ctx)
 		eglref, _ := refCipher.Encrypt(granteeRef.Bytes())
 
-		granteeRef, _, _, _, _ = c.HandleGrantees(ctx, ls, gls, swarm.NewAddress(eglref), href, &publisher.PublicKey, addList, revokeList)
-		gl, err := dynamicaccess.NewGranteeListReference(ls, granteeRef)
+		granteeRef, _, _, _, _ = c.UpdateHandler(ctx, ls, gls, swarm.NewAddress(eglref), href, &publisher.PublicKey, addList, revokeList)
+		gl, err := dynamicaccess.NewGranteeListReference(ctx, ls, granteeRef)
 
 		assert.NoError(t, err)
 		assert.Len(t, gl.Get(), 2)
@@ -217,9 +217,9 @@ func TestController_HandleGrantees(t *testing.T) {
 	t.Run("add twice", func(t *testing.T) {
 		addList := []*ecdsa.PublicKey{&grantee.PublicKey, &grantee.PublicKey}
 		//nolint:ineffassign,staticcheck,wastedassign
-		granteeRef, eglref, _, _, err := c.HandleGrantees(ctx, ls, gls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
-		granteeRef, _, _, _, _ = c.HandleGrantees(ctx, ls, ls, eglref, href, &publisher.PublicKey, addList, nil)
-		gl, err := dynamicaccess.NewGranteeListReference(createLs(), granteeRef)
+		granteeRef, eglref, _, _, err := c.UpdateHandler(ctx, ls, gls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
+		granteeRef, _, _, _, _ = c.UpdateHandler(ctx, ls, ls, eglref, href, &publisher.PublicKey, addList, nil)
+		gl, err := dynamicaccess.NewGranteeListReference(ctx, createLs(), granteeRef)
 		require.NoError(t, err)
 
 		assert.NoError(t, err)
@@ -227,8 +227,8 @@ func TestController_HandleGrantees(t *testing.T) {
 	})
 	t.Run("revoke non-existing", func(t *testing.T) {
 		addList := []*ecdsa.PublicKey{&grantee.PublicKey}
-		granteeRef, _, _, _, _ := c.HandleGrantees(ctx, ls, ls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
-		gl, err := dynamicaccess.NewGranteeListReference(createLs(), granteeRef)
+		granteeRef, _, _, _, _ := c.UpdateHandler(ctx, ls, ls, swarm.ZeroAddress, href, &publisher.PublicKey, addList, nil)
+		gl, err := dynamicaccess.NewGranteeListReference(ctx, createLs(), granteeRef)
 		require.NoError(t, err)
 
 		assert.NoError(t, err)
@@ -253,19 +253,19 @@ func TestController_GetGrantees(t *testing.T) {
 
 	t.Run("get by publisher", func(t *testing.T) {
 		addList := []*ecdsa.PublicKey{&grantee.PublicKey}
-		granteeRef, eglRef, _, _, _ := c1.HandleGrantees(ctx, ls, gls, swarm.ZeroAddress, swarm.ZeroAddress, &publisher.PublicKey, addList, nil)
+		granteeRef, eglRef, _, _, _ := c1.UpdateHandler(ctx, ls, gls, swarm.ZeroAddress, swarm.ZeroAddress, &publisher.PublicKey, addList, nil)
 
-		grantees, err := c1.GetGrantees(ctx, ls, &publisher.PublicKey, eglRef)
+		grantees, err := c1.Get(ctx, ls, &publisher.PublicKey, eglRef)
 		assert.NoError(t, err)
 		assert.True(t, reflect.DeepEqual(grantees, addList))
 
-		gl, _ := dynamicaccess.NewGranteeListReference(ls, granteeRef)
+		gl, _ := dynamicaccess.NewGranteeListReference(ctx, ls, granteeRef)
 		assert.True(t, reflect.DeepEqual(gl.Get(), addList))
 	})
 	t.Run("get by non-publisher", func(t *testing.T) {
 		addList := []*ecdsa.PublicKey{&grantee.PublicKey}
-		_, eglRef, _, _, _ := c1.HandleGrantees(ctx, ls, gls, swarm.ZeroAddress, swarm.ZeroAddress, &publisher.PublicKey, addList, nil)
-		grantees, err := c2.GetGrantees(ctx, ls, &publisher.PublicKey, eglRef)
+		_, eglRef, _, _, _ := c1.UpdateHandler(ctx, ls, gls, swarm.ZeroAddress, swarm.ZeroAddress, &publisher.PublicKey, addList, nil)
+		grantees, err := c2.Get(ctx, ls, &publisher.PublicKey, eglRef)
 		assert.Error(t, err)
 		assert.Nil(t, grantees)
 	})

@@ -21,8 +21,8 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/postage"
-	storage "github.com/ethersphere/bee/v2/pkg/storage"
-	storer "github.com/ethersphere/bee/v2/pkg/storer"
+	"github.com/ethersphere/bee/v2/pkg/storage"
+	"github.com/ethersphere/bee/v2/pkg/storer"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/gorilla/mux"
 )
@@ -40,7 +40,7 @@ func getAddressFromContext(ctx context.Context) swarm.Address {
 	return swarm.ZeroAddress
 }
 
-// setAddress sets the swarm address in the context
+// setAddressInContext sets the swarm address in the context
 func setAddressInContext(ctx context.Context, address swarm.Address) context.Context {
 	return context.WithValue(ctx, addressKey{}, address)
 }
@@ -113,6 +113,8 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 			ls := loadsave.NewReadonly(s.storer.Download(cache))
 			reference, err := s.dac.DownloadHandler(ctx, ls, paths.Address, headers.Publisher, *headers.HistoryAddress, timestamp)
 			if err != nil {
+				logger.Debug("act failed to decrypt reference", "error", err)
+				logger.Error(nil, "act failed to decrypt reference")
 				jsonhttp.InternalServerError(w, errActDownload)
 				return
 			}
@@ -121,8 +123,8 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 	}
 }
 
-// actEncryptionHandler is a middleware that encrypts the given address using the publisher's public key
-// Uploads the encrypted reference, history and kvs to the store
+// actEncryptionHandler is a middleware that encrypts the given address using the publisher's public key,
+// uploads the encrypted reference, history and kvs to the store
 func (s *Service) actEncryptionHandler(
 	ctx context.Context,
 	w http.ResponseWriter,
@@ -132,7 +134,7 @@ func (s *Service) actEncryptionHandler(
 ) (swarm.Address, error) {
 	logger := s.logger.WithName("act_encryption_handler").Build()
 	publisherPublicKey := &s.publicKey
-	ls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
+	ls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
 	storageReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, ls, reference, publisherPublicKey, historyRootHash)
 	if err != nil {
 		logger.Debug("act failed to encrypt reference", "error", err)
@@ -140,7 +142,7 @@ func (s *Service) actEncryptionHandler(
 		return swarm.ZeroAddress, fmt.Errorf("act failed to encrypt reference: %w", err)
 	}
 	// only need to upload history and kvs if a new history is created,
-	// meaning that the publsher uploaded to the history for the first time
+	// meaning that the publisher uploaded to the history for the first time
 	if !historyReference.Equal(historyRootHash) {
 		err = putter.Done(storageReference)
 		if err != nil {
@@ -185,7 +187,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	}
 	publisher := &s.publicKey
 	ls := loadsave.NewReadonly(s.storer.Download(cache))
-	grantees, err := s.dac.GetGrantees(r.Context(), ls, publisher, paths.GranteesAddress)
+	grantees, err := s.dac.Get(r.Context(), ls, publisher, paths.GranteesAddress)
 	if err != nil {
 		logger.Debug("could not get grantees", "error", err)
 		logger.Error(nil, "could not get grantees")
@@ -199,7 +201,8 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	jsonhttp.OK(w, granteeSlice)
 }
 
-// TODO: actGrantRevokeHandler doc.
+// actGrantRevokeHandler is a middleware that makes updates to the list of grantees,
+// only the publisher is authorized to perform this action
 func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("act_grant_revoke_handler").Build()
 
@@ -323,9 +326,9 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 
 	granteeref := paths.GranteesAddress
 	publisher := &s.publicKey
-	ls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
-	gls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
-	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, ls, gls, granteeref, historyAddress, publisher, grantees.Addlist, grantees.Revokelist)
+	ls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
+	gls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
+	granteeref, encryptedglref, historyref, actref, err := s.dac.UpdateHandler(ctx, ls, gls, granteeref, historyAddress, publisher, grantees.Addlist, grantees.Revokelist)
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
@@ -363,7 +366,8 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// TODO: actCreateGranteesHandler doc.
+// actCreateGranteesHandler is a middleware that creates a new list of grantees,
+// only the publisher is authorized to perform this action
 func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("acthandler").Build()
 
@@ -467,9 +471,9 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	publisher := &s.publicKey
-	ls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
-	gls := loadsave.New(s.storer.ChunkStore(), s.storer.Cache(), requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
-	granteeref, encryptedglref, historyref, actref, err := s.dac.HandleGrantees(ctx, ls, gls, swarm.ZeroAddress, historyAddress, publisher, list, nil)
+	ls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
+	gls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
+	granteeref, encryptedglref, historyref, actref, err := s.dac.UpdateHandler(ctx, ls, gls, swarm.ZeroAddress, historyAddress, publisher, list, nil)
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")

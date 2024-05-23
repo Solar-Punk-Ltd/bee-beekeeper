@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ethersphere/bee/v2/pkg/bmt"
+	"github.com/ethersphere/bee/v2/pkg/cac"
 	"github.com/ethersphere/bee/v2/pkg/postage"
 	"github.com/ethersphere/bee/v2/pkg/soc"
 	chunk "github.com/ethersphere/bee/v2/pkg/storage/testing"
@@ -68,7 +69,7 @@ func MakeSampleUsingChunks(chunks []swarm.Chunk, anchor []byte) (Sample, error) 
 	}
 	items := make([]SampleItem, len(chunks))
 	for i, ch := range chunks {
-		tr, err := transformedAddress(bmt.NewHasher(prefixHasherFactory), ch, swarm.ChunkTypeContentAddressed)
+		tr, err := transformedAddress(bmt.NewHasher(prefixHasherFactory), ch, getChunkType(ch))
 		if err != nil {
 			return Sample{}, err
 		}
@@ -92,6 +93,15 @@ func newStamp(s swarm.Stamp) *postage.Stamp {
 	return postage.NewStamp(s.BatchID(), s.Index(), s.Timestamp(), s.Sig())
 }
 
+func getChunkType(chunk swarm.Chunk) swarm.ChunkType {
+	if cac.Valid(chunk) {
+		return swarm.ChunkTypeContentAddressed
+	} else if soc.Valid(chunk) {
+		return swarm.ChunkTypeSingleOwner
+	}
+	return swarm.ChunkTypeUnspecified
+}
+
 // ReserveSample generates the sample of reserve storage of a node required for the
 // storage incentives agent to participate in the lottery round. In order to generate
 // this sample we need to iterate through all the chunks in the node's reserve and
@@ -111,7 +121,7 @@ func (db *DB) ReserveSample(
 	minBatchBalance *big.Int,
 ) (Sample, error) {
 	g, ctx := errgroup.WithContext(ctx)
-	chunkC := make(chan reserve.ChunkItem, 64)
+	chunkC := make(chan *reserve.ChunkBinItem, 64)
 	allStats := &SampleStats{}
 	statsLock := sync.Mutex{}
 	addStats := func(stats SampleStats) {
@@ -139,7 +149,7 @@ func (db *DB) ReserveSample(
 			addStats(stats)
 		}()
 
-		err := db.reserve.IterateChunksItems(db.repo, storageRadius, func(chi reserve.ChunkItem) (bool, error) {
+		err := db.reserve.IterateChunksItems(storageRadius, func(chi *reserve.ChunkBinItem) (bool, error) {
 			select {
 			case chunkC <- chi:
 				stats.TotalIterated++
@@ -177,25 +187,25 @@ func (db *DB) ReserveSample(
 				}
 
 				// Skip chunks if they are not SOC or CAC
-				if chItem.Type != swarm.ChunkTypeSingleOwner &&
-					chItem.Type != swarm.ChunkTypeContentAddressed {
+				if chItem.ChunkType != swarm.ChunkTypeSingleOwner &&
+					chItem.ChunkType != swarm.ChunkTypeContentAddressed {
 					wstat.RogueChunk++
 					continue
 				}
 
 				chunkLoadStart := time.Now()
 
-				chunk, err := db.ChunkStore().Get(ctx, chItem.ChunkAddress)
+				chunk, err := db.ChunkStore().Get(ctx, chItem.Address)
 				if err != nil {
 					wstat.ChunkLoadFailed++
-					db.logger.Debug("failed loading chunk", "chunk_address", chItem.ChunkAddress, "error", err)
+					db.logger.Debug("failed loading chunk", "chunk_address", chItem.Address, "error", err)
 					continue
 				}
 
 				wstat.ChunkLoadDuration += time.Since(chunkLoadStart)
 
 				taddrStart := time.Now()
-				taddr, err := transformedAddress(hasher, chunk, chItem.Type)
+				taddr, err := transformedAddress(hasher, chunk, chItem.ChunkType)
 				if err != nil {
 					return err
 				}
@@ -264,7 +274,7 @@ func (db *DB) ReserveSample(
 		if le(item.TransformedAddress, currentMaxAddr) || len(sampleItems) < SampleSize {
 			start := time.Now()
 
-			stamp, err := chunkstamp.LoadWithBatchID(db.repo.IndexStore(), "reserve", item.ChunkAddress, item.Stamp.BatchID())
+			stamp, err := chunkstamp.LoadWithBatchID(db.storage.IndexStore(), "reserve", item.ChunkAddress, item.Stamp.BatchID())
 			if err != nil {
 				stats.StampLoadFailed++
 				db.logger.Debug("failed loading stamp", "chunk_address", item.ChunkAddress, "error", err)

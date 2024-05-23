@@ -10,22 +10,23 @@ import (
 	"io"
 	"time"
 
-	encryption "github.com/ethersphere/bee/v2/pkg/encryption"
+	"github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
-type GranteeManager interface {
-	// TODO: doc
-	HandleGrantees(ctx context.Context, ls file.LoadSaver, gls file.LoadSaver, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, swarm.Address, error)
-	// GetGrantees returns the list of grantees for the given publisher.
+type Grantees interface {
+	// UpdateHandler manages the grantees for the given publisher, updating the list based on provided public keys to add or remove.
+	// Only the publisher can make changes to the grantee list.
+	UpdateHandler(ctx context.Context, ls file.LoadSaver, gls file.LoadSaver, granteeref swarm.Address, historyref swarm.Address, publisher *ecdsa.PublicKey, addList, removeList []*ecdsa.PublicKey) (swarm.Address, swarm.Address, swarm.Address, swarm.Address, error)
+	// Get returns the list of grantees for the given publisher.
 	// The list is accessible only by the publisher.
-	GetGrantees(ctx context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error)
+	Get(ctx context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
 type Controller interface {
-	GranteeManager
+	Grantees
 	// DownloadHandler decrypts the encryptedRef using the lookupkey based on the history and timestamp.
 	DownloadHandler(ctx context.Context, ls file.LoadSaver, encryptedRef swarm.Address, publisher *ecdsa.PublicKey, historyRootHash swarm.Address, timestamp int64) (swarm.Address, error)
 	// UploadHandler encrypts the reference and stores it in the history as the latest update.
@@ -33,7 +34,6 @@ type Controller interface {
 	io.Closer
 }
 
-// TODO: option the chose beewteen pot vs manifest storage
 type ControllerStruct struct {
 	accessLogic ActLogic
 }
@@ -68,7 +68,7 @@ func (c *ControllerStruct) DownloadHandler(
 func (c *ControllerStruct) UploadHandler(
 	ctx context.Context,
 	ls file.LoadSaver,
-	refrefence swarm.Address,
+	reference swarm.Address,
 	publisher *ecdsa.PublicKey,
 	historyRootHash swarm.Address,
 ) (swarm.Address, swarm.Address, swarm.Address, error) {
@@ -77,7 +77,6 @@ func (c *ControllerStruct) UploadHandler(
 		storage kvs.KeyValueStore
 		actRef  swarm.Address
 	)
-	now := time.Now().Unix()
 	if historyRef.IsZero() {
 		history, err := NewHistory(ls)
 		if err != nil {
@@ -88,7 +87,7 @@ func (c *ControllerStruct) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		err = c.accessLogic.AddPublisher(ctx, storage, publisher)
+		err = c.accessLogic.AddGrantee(ctx, storage, publisher, publisher)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -96,7 +95,7 @@ func (c *ControllerStruct) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		err = history.Add(ctx, actRef, &now, nil)
+		err = history.Add(ctx, actRef, nil, nil)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -109,19 +108,18 @@ func (c *ControllerStruct) UploadHandler(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		entry, err := history.Lookup(ctx, now)
-		actRef = entry.Reference()
+		entry, err := history.Lookup(ctx, time.Now().Unix())
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		// storage, err = kvs.NewManifestReference(ls, actRef)
-		storage, err = kvs.NewDefaultReference(ls, actRef)
+		// storage, err = kvs.NewManifestReference(ls, entry.Reference())
+		storage, err = kvs.NewDefaultReference(ls, entry.Reference())
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
 
-	encryptedRef, err := c.accessLogic.EncryptRef(ctx, storage, publisher, refrefence)
+	encryptedRef, err := c.accessLogic.EncryptRef(ctx, storage, publisher, reference)
 	return actRef, historyRef, encryptedRef, err
 }
 
@@ -131,7 +129,7 @@ func NewController(accessLogic ActLogic) *ControllerStruct {
 	}
 }
 
-func (c *ControllerStruct) HandleGrantees(
+func (c *ControllerStruct) UpdateHandler(
 	ctx context.Context,
 	ls file.LoadSaver,
 	gls file.LoadSaver,
@@ -173,7 +171,7 @@ func (c *ControllerStruct) HandleGrantees(
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		err = c.accessLogic.AddPublisher(ctx, act, publisher)
+		err = c.accessLogic.AddGrantee(ctx, act, publisher, publisher)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -191,7 +189,7 @@ func (c *ControllerStruct) HandleGrantees(
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 
-		gl, err = NewGranteeListReference(gls, granteeref)
+		gl, err = NewGranteeListReference(ctx, gls, granteeref)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -202,33 +200,27 @@ func (c *ControllerStruct) HandleGrantees(
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 	}
+	granteesToAdd := addList
 	if len(removeList) != 0 {
 		err = gl.Remove(removeList)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-	}
-
-	var granteesToAdd []*ecdsa.PublicKey
-	if len(removeList) != 0 || encryptedglref.IsZero() {
+		// generate new access key and new act
 		// act, err = kvs.NewManifest(ls)
 		act, err = kvs.NewDefault(ls)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
-		if historyref.IsZero() {
-			err = c.accessLogic.AddPublisher(ctx, act, publisher)
-			if err != nil {
-				return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
-			}
+		err = c.accessLogic.AddGrantee(ctx, act, publisher, publisher)
+		if err != nil {
+			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
 		granteesToAdd = gl.Get()
-	} else {
-		granteesToAdd = addList
 	}
 
 	for _, grantee := range granteesToAdd {
-		err := c.accessLogic.AddGrantee(ctx, act, publisher, grantee, nil)
+		err := c.accessLogic.AddGrantee(ctx, act, publisher, grantee)
 		if err != nil {
 			return swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, swarm.ZeroAddress, err
 		}
@@ -269,12 +261,12 @@ func (c *ControllerStruct) HandleGrantees(
 	return glref, eglref, href, actref, nil
 }
 
-func (c *ControllerStruct) GetGrantees(ctx context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error) {
+func (c *ControllerStruct) Get(ctx context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglref swarm.Address) ([]*ecdsa.PublicKey, error) {
 	granteeRef, err := c.decryptRefForPublisher(publisher, encryptedglref)
 	if err != nil {
 		return nil, err
 	}
-	gl, err := NewGranteeListReference(ls, granteeRef)
+	gl, err := NewGranteeListReference(ctx, ls, granteeRef)
 	if err != nil {
 		return nil, err
 	}
@@ -310,6 +302,6 @@ func (c *ControllerStruct) decryptRefForPublisher(publisherPubKey *ecdsa.PublicK
 }
 
 // TODO: what to do in close ?
-func (s *ControllerStruct) Close() error {
+func (c *ControllerStruct) Close() error {
 	return nil
 }

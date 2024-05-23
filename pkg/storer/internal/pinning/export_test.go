@@ -23,12 +23,11 @@ var (
 	ErrInvalidPinCollectionItemSize = errInvalidPinCollectionSize
 	ErrPutterAlreadyClosed          = errPutterAlreadyClosed
 	ErrCollectionRootAddressIsZero  = errCollectionRootAddressIsZero
-	ErrDuplicatePinCollection       = errDuplicatePinCollection
 )
 
 var NewUUID = newUUID
 
-func GetStat(st storage.Store, root swarm.Address) (CollectionStat, error) {
+func GetStat(st storage.Reader, root swarm.Address) (CollectionStat, error) {
 	collection := &pinCollectionItem{Addr: root}
 	err := st.Get(collection)
 	if err != nil {
