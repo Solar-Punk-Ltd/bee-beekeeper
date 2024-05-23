@@ -236,7 +236,7 @@ func TestController_UpdateHandler(t *testing.T) {
 	})
 }
 
-func TestController_GetGrantees(t *testing.T) {
+func TestController_Get(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	publisher := getPrivKey(1)
