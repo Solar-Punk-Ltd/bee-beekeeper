@@ -14,7 +14,7 @@ import (
 
 	"github.com/ethersphere/bee/v2/pkg/crypto"
 	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
-	kvsmock "github.com/ethersphere/bee/v2/pkg/kvs/mock"
+	kvsmock "github.com/ethersphere/bee/v2/pkg/dynamicaccess/kvs/mock"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
 )

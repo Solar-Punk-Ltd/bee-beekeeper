@@ -10,9 +10,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/ethersphere/bee/v2/pkg/dynamicaccess/kvs"
 	"github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/file"
-	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 

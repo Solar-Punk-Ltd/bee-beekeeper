@@ -9,8 +9,8 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
+	"github.com/ethersphere/bee/v2/pkg/dynamicaccess/kvs"
 	"github.com/ethersphere/bee/v2/pkg/encryption"
-	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"golang.org/x/crypto/sha3"
 )

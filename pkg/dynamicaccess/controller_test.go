@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
+	"github.com/ethersphere/bee/v2/pkg/dynamicaccess/kvs"
 	encryption "github.com/ethersphere/bee/v2/pkg/encryption"
 	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
-	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
