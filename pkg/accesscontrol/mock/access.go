@@ -3,11 +3,11 @@
 // license that can be found in the LICENSE file.
 package mock
 
-type AccessLogicMock struct {
+type ActLogicMock struct {
 	GetFunc func(string, string, string) (string, error)
 }
 
-func (ma *AccessLogicMock) Get(encryped_ref string, publisher string, tag string) (string, error) {
+func (ma *ActLogicMock) Get(encryped_ref string, publisher string, tag string) (string, error) {
 	if ma.GetFunc == nil {
 		return "", nil
 	}

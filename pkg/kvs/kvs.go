@@ -14,9 +14,13 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
+// KeyValueStore represents a key-value store.
 type KeyValueStore interface {
+	// Get retrieves the value associated with the given key.
 	Get(ctx context.Context, key []byte) ([]byte, error)
+	// Put stores the given key-value pair in the store.
 	Put(ctx context.Context, key, value []byte) error
+	// Save saves key-value pair to the underlying storage and returns the reference.
 	Save(ctx context.Context) (swarm.Address, error)
 }
 
@@ -27,6 +31,7 @@ type keyValueStore struct {
 
 var _ KeyValueStore = (*keyValueStore)(nil)
 
+// Get retrieves the value associated with the given key.
 func (s *keyValueStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	entry, err := s.manifest.Lookup(ctx, hex.EncodeToString(key))
 	if err != nil {
@@ -36,6 +41,7 @@ func (s *keyValueStore) Get(ctx context.Context, key []byte) ([]byte, error) {
 	return ref.Bytes(), nil
 }
 
+// Put stores the given key-value pair in the store.
 func (s *keyValueStore) Put(ctx context.Context, key []byte, value []byte) error {
 	err := s.manifest.Add(ctx, hex.EncodeToString(key), manifest.NewEntry(swarm.NewAddress(value), map[string]string{}))
 	if err != nil {
@@ -45,6 +51,7 @@ func (s *keyValueStore) Put(ctx context.Context, key []byte, value []byte) error
 	return nil
 }
 
+// Save saves key-value pair to the underlying storage and returns the reference.
 func (s *keyValueStore) Save(ctx context.Context) (swarm.Address, error) {
 	if s.putCnt == 0 {
 		return swarm.ZeroAddress, errors.New("nothing to save")
@@ -57,6 +64,7 @@ func (s *keyValueStore) Save(ctx context.Context) (swarm.Address, error) {
 	return ref, nil
 }
 
+// New creates a new key-value store with a simple manifest.
 func New(ls file.LoadSaver) (KeyValueStore, error) {
 	m, err := manifest.NewSimpleManifest(ls)
 	if err != nil {
@@ -68,6 +76,7 @@ func New(ls file.LoadSaver) (KeyValueStore, error) {
 	}, nil
 }
 
+// NewReference loads a key-value store with a simple manifest.
 func NewReference(ls file.LoadSaver, ref swarm.Address) (KeyValueStore, error) {
 	m, err := manifest.NewSimpleManifestReference(ref, ls)
 	if err != nil {

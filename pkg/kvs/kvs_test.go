@@ -66,9 +66,9 @@ func TestKvs(t *testing.T) {
 
 	t.Run("Get should return value equal to put value", func(t *testing.T) {
 		var (
-			key1 []byte = []byte{1}
-			key2 []byte = []byte{2}
-			key3 []byte = []byte{3}
+			key1 = []byte{1}
+			key2 = []byte{2}
+			key3 = []byte{3}
 		)
 		testCases := []struct {
 			name string

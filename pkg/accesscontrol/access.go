@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dynamicaccess
+package accesscontrol
 
 import (
 	"context"
@@ -44,7 +44,7 @@ type ActLogic struct {
 
 var _ Control = (*ActLogic)(nil)
 
-// EncryptRef encrypts a SWARM reference for a publisher.
+// EncryptRef encrypts a Swarm reference for a publisher.
 func (al ActLogic) EncryptRef(ctx context.Context, storage kvs.KeyValueStore, publisherPubKey *ecdsa.PublicKey, ref swarm.Address) (swarm.Address, error) {
 	accessKey, err := al.getAccessKey(ctx, storage, publisherPubKey)
 	if err != nil {
@@ -114,7 +114,7 @@ func (al *ActLogic) getAccessKey(ctx context.Context, storage kvs.KeyValueStore,
 func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([]byte, []byte, error) {
 	nonces := [][]byte{zeroByteArray, oneByteArray}
 	keys, err := al.Session.Key(publicKey, nonces)
-	if keys == nil {
+	if len(keys) != len(nonces) {
 		return nil, nil, err
 	}
 	return keys[0], keys[1], err
@@ -122,20 +122,7 @@ func (al *ActLogic) getKeys(publicKey *ecdsa.PublicKey) ([]byte, []byte, error) 
 
 // DecryptRef will return a decrypted reference, for given encrypted reference and publisher
 func (al ActLogic) DecryptRef(ctx context.Context, storage kvs.KeyValueStore, encryptedRef swarm.Address, publisher *ecdsa.PublicKey) (swarm.Address, error) {
-	lookupKey, accessKeyDecryptionKey, err := al.getKeys(publisher)
-	if err != nil {
-		return swarm.ZeroAddress, err
-	}
-
-	// Lookup encrypted access key from the ACT manifest
-	encryptedAccessKey, err := storage.Get(ctx, lookupKey)
-	if err != nil {
-		return swarm.ZeroAddress, fmt.Errorf("failed to get access key from KVS: %w", err)
-	}
-
-	// Decrypt access key
-	accessKeyCipher := encryption.New(encryption.Key(accessKeyDecryptionKey), 0, uint32(0), hashFunc)
-	accessKey, err := accessKeyCipher.Decrypt(encryptedAccessKey)
+	accessKey, err := al.getAccessKey(ctx, storage, publisher)
 	if err != nil {
 		return swarm.ZeroAddress, err
 	}
@@ -150,6 +137,7 @@ func (al ActLogic) DecryptRef(ctx context.Context, storage kvs.KeyValueStore, en
 	return swarm.NewAddress(ref), nil
 }
 
+// NewLogic creates a new ACT Logic from a session.
 func NewLogic(s Session) ActLogic {
 	return ActLogic{
 		Session: s,

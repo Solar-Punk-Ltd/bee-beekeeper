@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dynamicaccess
+package accesscontrol
 
 import (
 	"crypto/ecdsa"
@@ -10,12 +10,16 @@ import (
 	"fmt"
 
 	"github.com/ethersphere/bee/v2/pkg/crypto"
-	"github.com/ethersphere/bee/v2/pkg/keystore"
+)
+
+var (
+	ErrInvalidPublicKey  = errors.New("invalid public key")
+	ErrSecretKeyInfinity = errors.New("shared secret is point at infinity")
 )
 
 // Session represents an interface for a Diffie-Helmann key derivation
 type Session interface {
-	// Key returns a derived key for each nonce
+	// Key returns a derived key for each nonce.
 	Key(publicKey *ecdsa.PublicKey, nonces [][]byte) ([][]byte, error)
 }
 
@@ -25,11 +29,7 @@ type SessionStruct struct {
 	key *ecdsa.PrivateKey
 }
 
-var (
-	ErrInvalidPublicKey  = errors.New("invalid public key")
-	ErrSecretKeyInfinity = errors.New("shared secret is point at infinity")
-)
-
+// Key returns a derived key for each nonce.
 func (s *SessionStruct) Key(publicKey *ecdsa.PublicKey, nonces [][]byte) ([][]byte, error) {
 	if publicKey == nil {
 		return nil, ErrInvalidPublicKey
@@ -55,13 +55,9 @@ func (s *SessionStruct) Key(publicKey *ecdsa.PublicKey, nonces [][]byte) ([][]by
 	return keys, nil
 }
 
+// NewDefaultSession creates a new session from a private key.
 func NewDefaultSession(key *ecdsa.PrivateKey) *SessionStruct {
 	return &SessionStruct{
 		key: key,
 	}
-}
-
-// Currently implemented only in mock/session.go
-func NewFromKeystore(keystore.Service, string, string) Session {
-	return nil
 }

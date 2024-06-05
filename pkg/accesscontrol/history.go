@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dynamicaccess
+package accesscontrol
 
 import (
 	"context"
@@ -18,24 +18,30 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
+var (
+	ErrEndIteration     = errors.New("end iteration")
+	ErrUnexpectedType   = errors.New("unexpected type")
+	ErrInvalidTimestamp = errors.New("invalid timestamp")
+)
+
+// History represents the interface for managing access control history.
 type History interface {
+	// Add adds a new entry to the access control history with the given timestamp and metadata.
 	Add(ctx context.Context, ref swarm.Address, timestamp *int64, metadata *map[string]string) error
+	// Lookup retrieves the entry from the history based on the given timestamp or returns error if not found.
 	Lookup(ctx context.Context, timestamp int64) (manifest.Entry, error)
+	// Store stores the history to the underlying storage and returns the reference.
 	Store(ctx context.Context) (swarm.Address, error)
 }
 
 var _ History = (*HistoryStruct)(nil)
-
-var (
-	ErrEndIteration   = errors.New("end iteration")
-	ErrUnexpectedType = errors.New("unexpected type")
-)
 
 type HistoryStruct struct {
 	manifest *manifest.MantarayManifest
 	ls       file.LoadSaver
 }
 
+// NewHistory creates a new history with a mantaray-based manifest.
 func NewHistory(ls file.LoadSaver) (*HistoryStruct, error) {
 	m, err := manifest.NewDefaultManifest(ls, false)
 	if err != nil {
@@ -50,6 +56,7 @@ func NewHistory(ls file.LoadSaver) (*HistoryStruct, error) {
 	return &HistoryStruct{manifest: mm, ls: ls}, nil
 }
 
+// NewHistoryReference loads a history with a mantaray-based manifest.
 func NewHistoryReference(ls file.LoadSaver, ref swarm.Address) (*HistoryStruct, error) {
 	m, err := manifest.NewDefaultManifestReference(ref, ls)
 	if err != nil {
@@ -64,26 +71,23 @@ func NewHistoryReference(ls file.LoadSaver, ref swarm.Address) (*HistoryStruct, 
 	return &HistoryStruct{manifest: mm, ls: ls}, nil
 }
 
+// Add adds a new entry to the access control history with the given timestamp and metadata.
 func (h *HistoryStruct) Add(ctx context.Context, ref swarm.Address, timestamp *int64, metadata *map[string]string) error {
 	mtdt := map[string]string{}
 	if metadata != nil {
 		mtdt = *metadata
 	}
 	// add timestamps transformed so that the latests timestamp becomes the smallest key
-	var unixTime int64
+	unixTime := time.Now().Unix()
 	if timestamp != nil {
 		unixTime = *timestamp
-	} else {
-		unixTime = time.Now().Unix()
 	}
 
 	key := strconv.FormatInt(math.MaxInt64-unixTime, 10)
 	return h.manifest.Add(ctx, key, manifest.NewEntry(ref, mtdt))
 }
 
-var ErrInvalidTimestamp = errors.New("invalid timestamp")
-
-// Lookup finds the entry for a path or returns error if not found
+// Lookup retrieves the entry from the history based on the given timestamp or returns error if not found.
 func (h *HistoryStruct) Lookup(ctx context.Context, timestamp int64) (manifest.Entry, error) {
 	if timestamp <= 0 {
 		return manifest.NewEntry(swarm.ZeroAddress, map[string]string{}), ErrInvalidTimestamp
@@ -147,6 +151,7 @@ func (h *HistoryStruct) lookupNode(ctx context.Context, searchedTimestamp int64)
 	return nil, nil
 }
 
+// Store stores the history to the underlying storage and returns the reference.
 func (h *HistoryStruct) Store(ctx context.Context) (swarm.Address, error) {
 	return h.manifest.Store(ctx)
 }
