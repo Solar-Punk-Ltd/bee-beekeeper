@@ -19,8 +19,11 @@ import (
 )
 
 var (
-	ErrEndIteration     = errors.New("end iteration")
-	ErrUnexpectedType   = errors.New("unexpected type")
+	// ErrEndIteration indicates that the iteration terminated.
+	ErrEndIteration = errors.New("end iteration")
+	// ErrUnexpectedType indicates that an error occurred during the mantary-manifest creation.
+	ErrUnexpectedType = errors.New("unexpected type")
+	// ErrInvalidTimestamp indicates that the timestamp given to Lookup is invalid.
 	ErrInvalidTimestamp = errors.New("invalid timestamp")
 )
 
@@ -36,6 +39,7 @@ type History interface {
 
 var _ History = (*HistoryStruct)(nil)
 
+// HistoryStruct represents an access control histroy with a mantaray-based manifest.
 type HistoryStruct struct {
 	manifest *manifest.MantarayManifest
 	ls       file.LoadSaver
@@ -60,7 +64,7 @@ func NewHistory(ls file.LoadSaver) (*HistoryStruct, error) {
 func NewHistoryReference(ls file.LoadSaver, ref swarm.Address) (*HistoryStruct, error) {
 	m, err := manifest.NewDefaultManifestReference(ref, ls)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create default manifest: %w", err)
+		return nil, fmt.Errorf("failed to create default manifest reference: %w", err)
 	}
 
 	mm, ok := m.(*manifest.MantarayManifest)
@@ -77,14 +81,19 @@ func (h *HistoryStruct) Add(ctx context.Context, ref swarm.Address, timestamp *i
 	if metadata != nil {
 		mtdt = *metadata
 	}
-	// add timestamps transformed so that the latests timestamp becomes the smallest key
+	// add timestamps transformed so that the latests timestamp becomes the smallest key.
 	unixTime := time.Now().Unix()
 	if timestamp != nil {
 		unixTime = *timestamp
 	}
 
 	key := strconv.FormatInt(math.MaxInt64-unixTime, 10)
-	return h.manifest.Add(ctx, key, manifest.NewEntry(ref, mtdt))
+	err := h.manifest.Add(ctx, key, manifest.NewEntry(ref, mtdt))
+	if err != nil {
+		return fmt.Errorf("failed to add to manifest: %w", err)
+	}
+
+	return nil
 }
 
 // Lookup retrieves the entry from the history based on the given timestamp or returns error if not found.

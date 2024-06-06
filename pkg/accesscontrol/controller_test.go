@@ -97,7 +97,7 @@ func TestController_UploadHandler(t *testing.T) {
 		expRef, err := al.EncryptRef(ctx, act, &publisher.PublicKey, ref)
 
 		assert.NoError(t, err)
-		assert.Equal(t, encRef, expRef)
+		assert.Equal(t, expRef, encRef)
 		assert.NotEqual(t, hRef2, swarm.ZeroAddress)
 	})
 }

@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Package accesscontrol provides functionalities needed
+// for managing access control on Swarm
 package accesscontrol
 
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"io"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 )
 
+// Grantees represents an interface for managing and retrieving grantees for a publisher.
 type Grantees interface {
 	// UpdateHandler manages the grantees for the given publisher, updating the list based on provided public keys to add or remove.
 	// Only the publisher can make changes to the grantee list.
@@ -25,6 +29,8 @@ type Grantees interface {
 	Get(ctx context.Context, ls file.LoadSaver, publisher *ecdsa.PublicKey, encryptedglRef swarm.Address) ([]*ecdsa.PublicKey, error)
 }
 
+// Controller the interface for managing access control on Swarm.
+// It provides methods for handling downloads, uploads and updates for grantee lists and references.
 type Controller interface {
 	Grantees
 	// DownloadHandler decrypts the encryptedRef using the lookupkey based on the history and timestamp.
@@ -34,6 +40,7 @@ type Controller interface {
 	io.Closer
 }
 
+// ControllerStruct represents a controller for access control logic.
 type ControllerStruct struct {
 	access ActLogic
 }
@@ -92,7 +99,7 @@ func (c *ControllerStruct) UploadHandler(
 // UpdateHandler manages the grantees for the given publisher, updating the list based on provided public keys to add or remove.
 // Only the publisher can make changes to the grantee list.
 // Limitation: If an upadate is called again within a second from the latest upload/update then mantaray save fails with ErrInvalidInput,
-// because the key (timestamp) is already present, hence a new fork is not created
+// because the key (timestamp) is already present, hence a new fork is not created.
 func (c *ControllerStruct) UpdateHandler(
 	ctx context.Context,
 	ls file.LoadSaver,
@@ -261,7 +268,7 @@ func (c *ControllerStruct) encryptRefForPublisher(publisherPubKey *ecdsa.PublicK
 	refCipher := encryption.New(keys[0], 0, uint32(0), hashFunc)
 	encryptedRef, err := refCipher.Encrypt(ref.Bytes())
 	if err != nil {
-		return swarm.ZeroAddress, err
+		return swarm.ZeroAddress, fmt.Errorf("failed to encrypt reference: %w", err)
 	}
 
 	return swarm.NewAddress(encryptedRef), nil
@@ -275,13 +282,14 @@ func (c *ControllerStruct) decryptRefForPublisher(publisherPubKey *ecdsa.PublicK
 	refCipher := encryption.New(keys[0], 0, uint32(0), hashFunc)
 	ref, err := refCipher.Decrypt(encryptedRef.Bytes())
 	if err != nil {
-		return swarm.ZeroAddress, err
+		return swarm.ZeroAddress, fmt.Errorf("failed to decrypt reference: %w", err)
 	}
 
 	return swarm.NewAddress(ref), nil
 }
 
 // TODO: what to do in close ?
+// Close
 func (c *ControllerStruct) Close() error {
 	return nil
 }

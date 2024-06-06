@@ -32,6 +32,7 @@ import (
 	"gitlab.com/nolash/go-mockbytes"
 )
 
+//nolint:ireturn
 func prepareHistoryFixture(storer api.Storer) (accesscontrol.History, swarm.Address) {
 	ctx := context.Background()
 	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, redundancy.NONE))

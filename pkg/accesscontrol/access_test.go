@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Generates a new test environment with a fix private key
+// Generates a new test environment with a fix private key.
 func setupAccessLogic() accesscontrol.ActLogic {
 	privateKey := getPrivKey(1)
 	diffieHellman := accesscontrol.NewDefaultSession(privateKey)

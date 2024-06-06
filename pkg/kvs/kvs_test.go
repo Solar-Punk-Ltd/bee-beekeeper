@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//nolint:ireturn
 package kvs_test
 
 import (
@@ -20,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:gochecknoglobals
 var mockStorer = mockstorer.New()
 
 func requestPipelineFactory(ctx context.Context, s storage.Putter, encrypt bool, rLevel redundancy.Level) func() pipeline.Interface {

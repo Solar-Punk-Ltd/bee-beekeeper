@@ -13,7 +13,9 @@ import (
 )
 
 var (
-	ErrInvalidPublicKey  = errors.New("invalid public key")
+	// ErrInvalidPublicKey is an error that is returned when a public key is nil.
+	ErrInvalidPublicKey = errors.New("invalid public key")
+	// ErrSecretKeyInfinity is an error that is returned when the shared secret is a point at infinity.
 	ErrSecretKeyInfinity = errors.New("shared secret is point at infinity")
 )
 
@@ -25,6 +27,7 @@ type Session interface {
 
 var _ Session = (*SessionStruct)(nil)
 
+// SessionStruct represents a session with an access control key.
 type SessionStruct struct {
 	key *ecdsa.PrivateKey
 }

@@ -21,8 +21,12 @@ const (
 )
 
 var (
+	// ErrNothingToRemove indicates that the remove list is empty.
 	ErrNothingToRemove = errors.New("nothing to remove")
-	ErrNoGranteeFound  = errors.New("no grantee found")
+	// ErrNoGranteeFound indicates that the grantee list is empty.
+	ErrNoGranteeFound = errors.New("no grantee found")
+	// ErrNothingToAdd indicates that the add list is empty.
+	ErrNothingToAdd = errors.New("nothing to add")
 )
 
 // GranteeList manages a list of public keys.
@@ -37,6 +41,7 @@ type GranteeList interface {
 	Save(ctx context.Context) (swarm.Address, error)
 }
 
+// GranteeListStruct represents a list of grantee public keys.
 type GranteeListStruct struct {
 	grantees []*ecdsa.PublicKey
 	loadSave file.LoadSaver
@@ -52,7 +57,7 @@ func (g *GranteeListStruct) Get() []*ecdsa.PublicKey {
 // Add adds a list of public keys to the grantee list. It filters out duplicates.
 func (g *GranteeListStruct) Add(addList []*ecdsa.PublicKey) error {
 	if len(addList) == 0 {
-		return fmt.Errorf("no public key provided")
+		return ErrNothingToAdd
 	}
 	filteredList := make([]*ecdsa.PublicKey, 0, len(addList))
 	for _, addkey := range addList {
@@ -125,7 +130,7 @@ func NewGranteeList(ls file.LoadSaver) *GranteeListStruct {
 func NewGranteeListReference(ctx context.Context, ls file.LoadSaver, reference swarm.Address) (*GranteeListStruct, error) {
 	data, err := ls.Load(ctx, reference.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("unable to load reference, %w", err)
+		return nil, fmt.Errorf("failed to load grantee list reference, %w", err)
 	}
 	grantees := deserialize(data)
 
