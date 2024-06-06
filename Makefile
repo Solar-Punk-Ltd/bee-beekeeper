@@ -98,7 +98,7 @@ lint-new: linter
 
 .PHONY: linter
 linter:
-	test -f $(GOLANGCI_LINT) || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$($(GO) env GOPATH)/bin $(GOLANGCI_LINT_VERSION)
+	test v"`$(GOLANGCI_LINT) version --format short 2> /dev/null`" = $(GOLANGCI_LINT_VERSION)  || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$($(GO) env GOPATH)/bin $(GOLANGCI_LINT_VERSION)
 
 .PHONY: check-whitespace
 check-whitespace:
