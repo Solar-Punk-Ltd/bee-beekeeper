@@ -9,12 +9,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ethersphere/bee/v2/pkg/accesscontrol/kvs"
 	"github.com/ethersphere/bee/v2/pkg/file"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline"
 	"github.com/ethersphere/bee/v2/pkg/file/pipeline/builder"
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
-	"github.com/ethersphere/bee/v2/pkg/kvs"
 	"github.com/ethersphere/bee/v2/pkg/storage"
 	mockstorer "github.com/ethersphere/bee/v2/pkg/storer/mock"
 	"github.com/ethersphere/bee/v2/pkg/swarm"

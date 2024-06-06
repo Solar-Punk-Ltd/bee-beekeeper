@@ -13,8 +13,8 @@ import (
 	"testing"
 
 	"github.com/ethersphere/bee/v2/pkg/accesscontrol"
+	kvsmock "github.com/ethersphere/bee/v2/pkg/accesscontrol/kvs/mock"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
-	kvsmock "github.com/ethersphere/bee/v2/pkg/kvs/mock"
 	"github.com/ethersphere/bee/v2/pkg/swarm"
 	"github.com/stretchr/testify/assert"
 )
