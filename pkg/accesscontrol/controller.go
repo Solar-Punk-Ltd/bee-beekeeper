@@ -288,8 +288,7 @@ func (c *ControllerStruct) decryptRefForPublisher(publisherPubKey *ecdsa.PublicK
 	return swarm.NewAddress(ref), nil
 }
 
-// TODO: what to do in close ?
-// Close
+// Close simply returns nil
 func (c *ControllerStruct) Close() error {
 	return nil
 }

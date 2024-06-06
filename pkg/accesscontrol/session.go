@@ -19,7 +19,7 @@ var (
 	ErrSecretKeyInfinity = errors.New("shared secret is point at infinity")
 )
 
-// Session represents an interface for a Diffie-Helmann key derivation
+// Session represents an interface for a Diffie-Hellmann key derivation
 type Session interface {
 	// Key returns a derived key for each nonce.
 	Key(publicKey *ecdsa.PublicKey, nonces [][]byte) ([][]byte, error)
