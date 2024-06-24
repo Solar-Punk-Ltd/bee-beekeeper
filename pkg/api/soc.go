@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/ethersphere/bee/v2/pkg/accesscontrol"
 	"github.com/ethersphere/bee/v2/pkg/cac"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
 	"github.com/ethersphere/bee/v2/pkg/postage"
@@ -157,11 +158,22 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	encryptedReference := sch.Address()
+	reference := sch.Address()
 	if headers.Act {
-		encryptedReference, err = s.actEncryptionHandler(r.Context(), w, putter, sch.Address(), headers.HistoryAddress)
+		reference, err = s.actEncryptionHandler(r.Context(), w, putter, reference, headers.HistoryAddress)
 		if err != nil {
-			jsonhttp.InternalServerError(w, errActUpload)
+			logger.Debug("access control upload failed", "error", err)
+			logger.Error(nil, "access control upload failed")
+			switch {
+			case errors.Is(err, accesscontrol.ErrNotFound):
+				jsonhttp.NotFound(w, "act or history entry not found")
+			case errors.Is(err, accesscontrol.ErrInvalidPublicKey) || errors.Is(err, accesscontrol.ErrSecretKeyInfinity):
+				jsonhttp.BadRequest(w, "invalid public key")
+			case errors.Is(err, accesscontrol.ErrUnexpectedType):
+				jsonhttp.BadRequest(w, "failed to create history")
+			default:
+				jsonhttp.InternalServerError(w, errActUpload)
+			}
 			return
 		}
 	}
@@ -182,5 +194,5 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonhttp.Created(w, socPostResponse{Reference: encryptedReference})
+	jsonhttp.Created(w, socPostResponse{Reference: reference})
 }

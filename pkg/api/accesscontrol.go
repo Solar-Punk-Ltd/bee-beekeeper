@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/ethersphere/bee/v2/pkg/accesscontrol"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
@@ -31,7 +32,7 @@ type addressKey struct{}
 
 const granteeListEncrypt = true
 
-// getAddressFromContext is a helper function to extract the address from the context
+// getAddressFromContext is a helper function to extract the address from the context.
 func getAddressFromContext(ctx context.Context) swarm.Address {
 	v, ok := ctx.Value(addressKey{}).(swarm.Address)
 	if ok {
@@ -40,37 +41,52 @@ func getAddressFromContext(ctx context.Context) swarm.Address {
 	return swarm.ZeroAddress
 }
 
-// setAddressInContext sets the swarm address in the context
+// setAddressInContext sets the swarm address in the context.
 func setAddressInContext(ctx context.Context, address swarm.Address) context.Context {
 	return context.WithValue(ctx, addressKey{}, address)
 }
 
+// GranteesPatchRequest represents a request to patch the list of grantees.
 type GranteesPatchRequest struct {
-	Addlist    []string `json:"add"`
+	// Addlist contains the list of grantees to add.
+	Addlist []string `json:"add"`
+
+	// Revokelist contains the list of grantees to revoke.
 	Revokelist []string `json:"revoke"`
 }
 
+// GranteesPatchResponse represents the response structure for patching grantees.
 type GranteesPatchResponse struct {
-	Reference        swarm.Address `json:"ref"`
+	// Reference represents the swarm address.
+	Reference swarm.Address `json:"ref"`
+	// HistoryReference represents the reference to the history of an access control entry.
 	HistoryReference swarm.Address `json:"historyref"`
 }
 
+// GranteesPostRequest represents the request structure for adding grantees.
 type GranteesPostRequest struct {
+	// GranteeList represents the list of grantees to be saves on Swarm.
 	GranteeList []string `json:"grantees"`
 }
 
+// GranteesPostResponse represents the response structure for adding grantees.
 type GranteesPostResponse struct {
-	Reference        swarm.Address `json:"ref"`
+	// Reference represents the saved grantee list Swarm address.
+	Reference swarm.Address `json:"ref"`
+	// HistoryReference represents the reference to the history of an access control entry.
 	HistoryReference swarm.Address `json:"historyref"`
 }
 
+// GranteesPatch represents a structure for modifying the list of grantees.
 type GranteesPatch struct {
-	Addlist    []*ecdsa.PublicKey
+	// Addlist is a list of ecdsa.PublicKeys to be added to a grantee list.
+	Addlist []*ecdsa.PublicKey
+	// Revokelist is a list of ecdsa.PublicKeys to be removed from a grantee list
 	Revokelist []*ecdsa.PublicKey
 }
 
 // actDecryptionHandler is a middleware that looks up and decrypts the given address,
-// if the act headers are present
+// if the act headers are present.
 func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -111,11 +127,22 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 			}
 			ctx := r.Context()
 			ls := loadsave.NewReadonly(s.storer.Download(cache))
-			reference, err := s.dac.DownloadHandler(ctx, ls, paths.Address, headers.Publisher, *headers.HistoryAddress, timestamp)
+			reference, err := s.accesscontrol.DownloadHandler(ctx, ls, paths.Address, headers.Publisher, *headers.HistoryAddress, timestamp)
 			if err != nil {
-				logger.Debug("act failed to decrypt reference", "error", err)
-				logger.Error(nil, "act failed to decrypt reference")
-				jsonhttp.InternalServerError(w, errActDownload)
+				logger.Debug("access control download failed", "error", err)
+				logger.Error(nil, "access control download failed")
+				switch {
+				case errors.Is(err, accesscontrol.ErrNotFound):
+					jsonhttp.NotFound(w, "act or history entry not found")
+				case errors.Is(err, accesscontrol.ErrInvalidTimestamp):
+					jsonhttp.BadRequest(w, "invalid timestamp")
+				case errors.Is(err, accesscontrol.ErrInvalidPublicKey) || errors.Is(err, accesscontrol.ErrSecretKeyInfinity):
+					jsonhttp.BadRequest(w, "invalid public key")
+				case errors.Is(err, accesscontrol.ErrUnexpectedType):
+					jsonhttp.BadRequest(w, "failed to create history")
+				default:
+					jsonhttp.InternalServerError(w, errActDownload)
+				}
 				return
 			}
 			h.ServeHTTP(w, r.WithContext(setAddressInContext(ctx, reference)))
@@ -124,7 +151,7 @@ func (s *Service) actDecryptionHandler() func(h http.Handler) http.Handler {
 }
 
 // actEncryptionHandler is a middleware that encrypts the given address using the publisher's public key,
-// uploads the encrypted reference, history and kvs to the store
+// uploads the encrypted reference, history and kvs to the store.
 func (s *Service) actEncryptionHandler(
 	ctx context.Context,
 	w http.ResponseWriter,
@@ -132,28 +159,21 @@ func (s *Service) actEncryptionHandler(
 	reference swarm.Address,
 	historyRootHash swarm.Address,
 ) (swarm.Address, error) {
-	logger := s.logger.WithName("act_encryption_handler").Build()
 	publisherPublicKey := &s.publicKey
 	ls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
-	storageReference, historyReference, encryptedReference, err := s.dac.UploadHandler(ctx, ls, reference, publisherPublicKey, historyRootHash)
+	storageReference, historyReference, encryptedReference, err := s.accesscontrol.UploadHandler(ctx, ls, reference, publisherPublicKey, historyRootHash)
 	if err != nil {
-		logger.Debug("act failed to encrypt reference", "error", err)
-		logger.Error(nil, "act failed to encrypt reference")
-		return swarm.ZeroAddress, fmt.Errorf("act failed to encrypt reference: %w", err)
+		return swarm.ZeroAddress, err
 	}
 	// only need to upload history and kvs if a new history is created,
 	// meaning that the publisher uploaded to the history for the first time
 	if !historyReference.Equal(historyRootHash) {
 		err = putter.Done(storageReference)
 		if err != nil {
-			logger.Debug("done split keyvaluestore failed", "error", err)
-			logger.Error(nil, "done split keyvaluestore failed")
-			return swarm.ZeroAddress, fmt.Errorf("done split keyvaluestore failed: %w", err)
+			return swarm.ZeroAddress, fmt.Errorf("done split key-value store failed: %w", err)
 		}
 		err = putter.Done(historyReference)
 		if err != nil {
-			logger.Debug("done split history failed", "error", err)
-			logger.Error(nil, "done split history failed")
 			return swarm.ZeroAddress, fmt.Errorf("done split history failed: %w", err)
 		}
 	}
@@ -163,7 +183,7 @@ func (s *Service) actEncryptionHandler(
 }
 
 // actListGranteesHandler is a middleware that decrypts the given address and returns the list of grantees,
-// only the publisher is authorized to access the list
+// only the publisher is authorized to access the list.
 func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("act_list_grantees_handler").Build()
 	paths := struct {
@@ -187,7 +207,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 	}
 	publisher := &s.publicKey
 	ls := loadsave.NewReadonly(s.storer.Download(cache))
-	grantees, err := s.dac.Get(r.Context(), ls, publisher, paths.GranteesAddress)
+	grantees, err := s.accesscontrol.Get(r.Context(), ls, publisher, paths.GranteesAddress)
 	if err != nil {
 		logger.Debug("could not get grantees", "error", err)
 		logger.Error(nil, "could not get grantees")
@@ -202,7 +222,7 @@ func (s *Service) actListGranteesHandler(w http.ResponseWriter, r *http.Request)
 }
 
 // actGrantRevokeHandler is a middleware that makes updates to the list of grantees,
-// only the publisher is authorized to perform this action
+// only the publisher is authorized to perform this action.
 func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("act_grant_revoke_handler").Build()
 
@@ -281,23 +301,23 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	grantees := GranteesPatch{}
-	paresAddlist, err := parseKeys(gpr.Addlist)
+	parsedAddlist, err := parseKeys(gpr.Addlist)
 	if err != nil {
 		logger.Debug("add list key parse failed", "error", err)
 		logger.Error(nil, "add list key parse failed")
-		jsonhttp.InternalServerError(w, "error add list key parsing")
+		jsonhttp.BadRequest(w, "invalid add list")
 		return
 	}
-	grantees.Addlist = append(grantees.Addlist, paresAddlist...)
+	grantees.Addlist = append(grantees.Addlist, parsedAddlist...)
 
-	paresRevokelist, err := parseKeys(gpr.Revokelist)
+	parsedRevokelist, err := parseKeys(gpr.Revokelist)
 	if err != nil {
 		logger.Debug("revoke list key parse failed", "error", err)
 		logger.Error(nil, "revoke list key parse failed")
-		jsonhttp.InternalServerError(w, "error revoke list key parsing")
+		jsonhttp.BadRequest(w, "invalid revoke list")
 		return
 	}
-	grantees.Revokelist = append(grantees.Revokelist, paresRevokelist...)
+	grantees.Revokelist = append(grantees.Revokelist, parsedRevokelist...)
 
 	ctx := r.Context()
 	putter, err := s.newStamperPutter(ctx, putterOptions{
@@ -328,11 +348,20 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 	publisher := &s.publicKey
 	ls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
 	gls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
-	granteeref, encryptedglref, historyref, actref, err := s.dac.UpdateHandler(ctx, ls, gls, granteeref, historyAddress, publisher, grantees.Addlist, grantees.Revokelist)
+	granteeref, encryptedglref, historyref, actref, err := s.accesscontrol.UpdateHandler(ctx, ls, gls, granteeref, historyAddress, publisher, grantees.Addlist, grantees.Revokelist)
 	if err != nil {
 		logger.Debug("failed to update grantee list", "error", err)
 		logger.Error(nil, "failed to update grantee list")
-		jsonhttp.InternalServerError(w, "failed to update grantee list")
+		switch {
+		case errors.Is(err, accesscontrol.ErrNotFound):
+			jsonhttp.NotFound(w, "act or history entry not found")
+		case errors.Is(err, accesscontrol.ErrNoGranteeFound):
+			jsonhttp.BadRequest(w, "remove from empty grantee list")
+		case errors.Is(err, accesscontrol.ErrUnexpectedType):
+			jsonhttp.BadRequest(w, "failed to create history")
+		default:
+			jsonhttp.InternalServerError(w, errActGranteeList)
+		}
 		return
 	}
 
@@ -367,7 +396,7 @@ func (s *Service) actGrantRevokeHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 // actCreateGranteesHandler is a middleware that creates a new list of grantees,
-// only the publisher is authorized to perform this action
+// only the publisher is authorized to perform this action.
 func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("acthandler").Build()
 
@@ -441,7 +470,7 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		logger.Debug("create list key parse failed", "error", err)
 		logger.Error(nil, "create list key parse failed")
-		jsonhttp.InternalServerError(w, "error create list key parsing")
+		jsonhttp.BadRequest(w, "invalid grantee list")
 		return
 	}
 
@@ -473,11 +502,18 @@ func (s *Service) actCreateGranteesHandler(w http.ResponseWriter, r *http.Reques
 	publisher := &s.publicKey
 	ls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, false, redundancy.NONE))
 	gls := loadsave.New(s.storer.Download(true), s.storer.Cache(), requestPipelineFactory(ctx, putter, granteeListEncrypt, redundancy.NONE))
-	granteeref, encryptedglref, historyref, actref, err := s.dac.UpdateHandler(ctx, ls, gls, swarm.ZeroAddress, historyAddress, publisher, list, nil)
+	granteeref, encryptedglref, historyref, actref, err := s.accesscontrol.UpdateHandler(ctx, ls, gls, swarm.ZeroAddress, historyAddress, publisher, list, nil)
 	if err != nil {
-		logger.Debug("failed to update grantee list", "error", err)
-		logger.Error(nil, "failed to update grantee list")
-		jsonhttp.InternalServerError(w, "failed to update grantee list")
+		logger.Debug("failed to create grantee list", "error", err)
+		logger.Error(nil, "failed to create grantee list")
+		switch {
+		case errors.Is(err, accesscontrol.ErrNotFound):
+			jsonhttp.NotFound(w, "act or history entry not found")
+		case errors.Is(err, accesscontrol.ErrUnexpectedType):
+			jsonhttp.BadRequest(w, "failed to create history")
+		default:
+			jsonhttp.InternalServerError(w, errActGranteeList)
+		}
 		return
 	}
 
@@ -516,11 +552,11 @@ func parseKeys(list []string) ([]*ecdsa.PublicKey, error) {
 	for _, g := range list {
 		h, err := hex.DecodeString(g)
 		if err != nil {
-			return []*ecdsa.PublicKey{}, err
+			return []*ecdsa.PublicKey{}, fmt.Errorf("failed to decode grantee: %w", err)
 		}
 		k, err := btcec.ParsePubKey(h)
 		if err != nil {
-			return []*ecdsa.PublicKey{}, err
+			return []*ecdsa.PublicKey{}, fmt.Errorf("failed to parse grantee public key: %w", err)
 		}
 		parsedList = append(parsedList, k.ToECDSA())
 	}

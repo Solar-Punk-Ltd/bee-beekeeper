@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethersphere/bee/v2/pkg/accesscontrol"
+	mockac "github.com/ethersphere/bee/v2/pkg/accesscontrol/mock"
 	"github.com/ethersphere/bee/v2/pkg/api"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
-	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
-	mockdac "github.com/ethersphere/bee/v2/pkg/dynamicaccess/mock"
 	"github.com/ethersphere/bee/v2/pkg/file/loadsave"
 	"github.com/ethersphere/bee/v2/pkg/file/redundancy"
 	"github.com/ethersphere/bee/v2/pkg/jsonhttp"
@@ -32,11 +32,12 @@ import (
 	"gitlab.com/nolash/go-mockbytes"
 )
 
-func prepareHistoryFixture(storer api.Storer) (dynamicaccess.History, swarm.Address) {
+//nolint:ireturn
+func prepareHistoryFixture(storer api.Storer) (accesscontrol.History, swarm.Address) {
 	ctx := context.Background()
 	ls := loadsave.New(storer.ChunkStore(), storer.Cache(), pipelineFactory(storer.Cache(), false, redundancy.NONE))
 
-	h, _ := dynamicaccess.NewHistory(ls)
+	h, _ := accesscontrol.NewHistory(ls)
 
 	testActRef1 := swarm.NewAddress([]byte("39a5ea87b141fe44aa609c3327ecd891"))
 	firstTime := time.Date(1994, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
@@ -62,12 +63,10 @@ func prepareHistoryFixture(storer api.Storer) (dynamicaccess.History, swarm.Addr
 	return h, ref
 }
 
-// TODO: test tag, pin, deferred, stamp
-// TODO: feed test
 // nolint:paralleltest,tparallel
-// TestDacWithoutActHeader [positive tests]:
+// TestAccessLogicEachEndpointWithAct [positive tests]:
 // On each endpoint: upload w/ "Swarm-Act" header then download and check the decrypted data
-func TestDacEachEndpointWithAct(t *testing.T) {
+func TestAccessLogicEachEndpointWithAct(t *testing.T) {
 	t.Parallel()
 	var (
 		spk, _         = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
@@ -185,11 +184,11 @@ func TestDacEachEndpointWithAct(t *testing.T) {
 		}
 		t.Run(v.name, func(t *testing.T) {
 			client, _, _, _ := newTestServer(t, testServerOptions{
-				Storer:    storerMock,
-				Logger:    logger,
-				Post:      mockpost.New(mockpost.WithAcceptAll()),
-				PublicKey: pk.PublicKey,
-				Dac:       mockdac.New(),
+				Storer:        storerMock,
+				Logger:        logger,
+				Post:          mockpost.New(mockpost.WithAcceptAll()),
+				PublicKey:     pk.PublicKey,
+				AccessControl: mockac.New(),
 			})
 			header := jsonhttptest.Request(t, client, http.MethodPost, v.upurl, http.StatusCreated,
 				upTestOpts...,
@@ -221,12 +220,12 @@ func TestDacEachEndpointWithAct(t *testing.T) {
 	}
 }
 
-// TestDacWithoutActHeader [negative tests]:
+// TestAccessLogicWithoutActHeader [negative tests]:
 // 1. upload w/ "Swarm-Act" header then try to dowload w/o the header.
 // 2. upload w/o "Swarm-Act" header then try to dowload w/ the header.
 //
 //nolint:paralleltest,tparallel
-func TestDacWithoutAct(t *testing.T) {
+func TestAccessLogicWithoutAct(t *testing.T) {
 	t.Parallel()
 	var (
 		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
@@ -244,11 +243,11 @@ func TestDacWithoutAct(t *testing.T) {
 
 	t.Run("upload-w/-act-then-download-w/o-act", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String())),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String())),
 		})
 		var (
 			testfile     = "testfile1"
@@ -277,11 +276,11 @@ func TestDacWithoutAct(t *testing.T) {
 
 	t.Run("upload-w/o-act-then-download-w/-act", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(),
 		})
 		var (
 			rootHash   = "0cb947ccbc410c43139ba4409d83bf89114cb0d79556a651c06c888cf73f4d7e"
@@ -309,23 +308,23 @@ func TestDacWithoutAct(t *testing.T) {
 			jsonhttptest.WithExpectedResponseHeader(api.ETagHeader, fmt.Sprintf("%q", rootHash)),
 		)
 
-		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(rootHash), http.StatusInternalServerError,
+		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(rootHash), http.StatusNotFound,
 			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
 			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, fixtureHref.String()),
 			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
 			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
-				Message: api.ErrActDownload.Error(),
-				Code:    http.StatusInternalServerError,
+				Message: "act or history entry not found",
+				Code:    http.StatusNotFound,
 			}),
 			jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, "application/json; charset=utf-8"),
 		)
 	})
 }
 
-// TestDacInvalidPath [negative test]: Expect Bad request when the path address is invalid.
+// TestAccessLogicInvalidPath [negative test]: Expect Bad request when the path address is invalid.
 //
 //nolint:paralleltest,tparallel
-func TestDacInvalidPath(t *testing.T) {
+func TestAccessLogicInvalidPath(t *testing.T) {
 	t.Parallel()
 	var (
 		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
@@ -341,11 +340,11 @@ func TestDacInvalidPath(t *testing.T) {
 
 	t.Run("invalid-path-params", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(),
 		})
 		encryptedRef := "asd"
 
@@ -369,12 +368,12 @@ func TestDacInvalidPath(t *testing.T) {
 }
 
 // nolint:paralleltest,tparallel
-// TestDacHistory tests:
+// TestAccessLogicHistory tests:
 // [positive tests] 1., 2.: uploading a file w/ and w/o history address then downloading it and checking the data.
 // [negative test] 3. uploading a file then downloading it with a wrong history address.
 // [negative test] 4. uploading a file to a wrong history address.
 // [negative test] 5. downloading a file to w/o history address.
-func TestDacHistory(t *testing.T) {
+func TestAccessLogicHistory(t *testing.T) {
 	t.Parallel()
 	var (
 		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
@@ -392,11 +391,11 @@ func TestDacHistory(t *testing.T) {
 
 	t.Run("empty-history-upload-then-download-and-check-data", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(),
 		})
 		var (
 			testfile     = "testfile1"
@@ -428,11 +427,11 @@ func TestDacHistory(t *testing.T) {
 
 	t.Run("with-history-upload-then-download-and-check-data", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String())),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String())),
 		})
 		var (
 			encryptedRef = "c611199e1b3674d6bf89a83e518bd16896bf5315109b4a23dcb4682a02d17b97"
@@ -474,11 +473,11 @@ func TestDacHistory(t *testing.T) {
 
 	t.Run("upload-then-download-wrong-history", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String())),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String())),
 		})
 		var (
 			testfile     = "testfile1"
@@ -496,13 +495,13 @@ func TestDacHistory(t *testing.T) {
 			jsonhttptest.WithExpectedResponseHeader(api.ETagHeader, fmt.Sprintf("%q", encryptedRef)),
 		)
 
-		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusInternalServerError,
+		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusNotFound,
 			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
 			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, "fc4e9fe978991257b897d987bc4ff13058b66ef45a53189a0b4fe84bb3346396"),
 			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
 			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
-				Message: api.ErrActDownload.Error(),
-				Code:    http.StatusInternalServerError,
+				Message: "act or history entry not found",
+				Code:    http.StatusNotFound,
 			}),
 			jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, "application/json; charset=utf-8"),
 		)
@@ -510,22 +509,22 @@ func TestDacHistory(t *testing.T) {
 
 	t.Run("upload-wrong-history", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(),
 		})
 		testfile := "testfile1"
 
-		jsonhttptest.Request(t, client, http.MethodPost, fileUploadResource+"?name="+fileName, http.StatusInternalServerError,
+		jsonhttptest.Request(t, client, http.MethodPost, fileUploadResource+"?name="+fileName, http.StatusNotFound,
 			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
 			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
 			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, fixtureHref.String()),
 			jsonhttptest.WithRequestBody(strings.NewReader(testfile)),
 			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
-				Message: api.ErrActUpload.Error(),
-				Code:    http.StatusInternalServerError,
+				Message: "act or history entry not found",
+				Code:    http.StatusNotFound,
 			}),
 			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
 		)
@@ -533,11 +532,11 @@ func TestDacHistory(t *testing.T) {
 
 	t.Run("download-w/o-history", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String())),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String())),
 		})
 		encryptedRef := "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
 
@@ -550,10 +549,10 @@ func TestDacHistory(t *testing.T) {
 }
 
 // nolint:paralleltest,tparallel
-// TestDacTimestamp
+// TestAccessLogicTimestamp
 // [positive test] 1.: uploading a file w/ ACT then download it w/ timestamp and check the data.
 // [negative test] 2.: try to download a file w/o timestamp.
-func TestDacTimestamp(t *testing.T) {
+func TestAccessLogicTimestamp(t *testing.T) {
 	t.Parallel()
 	var (
 		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
@@ -569,11 +568,11 @@ func TestDacTimestamp(t *testing.T) {
 	)
 	t.Run("upload-then-download-with-timestamp-and-check-data", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String())),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String())),
 		})
 		var (
 			thirdTime    = time.Date(2015, time.April, 1, 0, 0, 0, 0, time.UTC).Unix()
@@ -617,11 +616,11 @@ func TestDacTimestamp(t *testing.T) {
 	t.Run("download-w/o-timestamp", func(t *testing.T) {
 		encryptedRef := "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String())),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String())),
 		})
 
 		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusNotFound,
@@ -630,15 +629,39 @@ func TestDacTimestamp(t *testing.T) {
 			jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, "application/json; charset=utf-8"),
 		)
 	})
+	t.Run("download-w/-invalid-timestamp", func(t *testing.T) {
+		client, _, _, _ := newTestServer(t, testServerOptions{
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String())),
+		})
+		var (
+			invalidTime  = int64(-1)
+			encryptedRef = "c611199e1b3674d6bf89a83e518bd16896bf5315109b4a23dcb4682a02d17b97"
+		)
+
+		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusBadRequest,
+			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(invalidTime, 10)),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, fixtureHref.String()),
+			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, publisher),
+			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
+				Code:    http.StatusBadRequest,
+				Message: accesscontrol.ErrInvalidTimestamp.Error(),
+			}),
+			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
+		)
+	})
 }
 
 // nolint:paralleltest,tparallel
-// TestDacPublisher
+// TestAccessLogicPublisher
 // [positive test] 1.: uploading a file w/ ACT then download it w/ the publisher address and check the data.
 // [negative test] 2.: expect Bad request when the public key is invalid.
 // [negative test] 3.: try to download a file w/ an incorrect publisher address.
 // [negative test] 3.: try to download a file w/o a publisher address.
-func TestDacPublisher(t *testing.T) {
+func TestAccessLogicPublisher(t *testing.T) {
 	t.Parallel()
 	var (
 		spk, _               = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
@@ -656,11 +679,11 @@ func TestDacPublisher(t *testing.T) {
 
 	t.Run("upload-then-download-w/-publisher-and-check-data", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String()), mockdac.WithPublisher(publisher)),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String()), mockac.WithPublisher(publisher)),
 		})
 		var (
 			encryptedRef = "a5a26b4915d7ce1622f9ca52252092cf2445f98d359dabaf52588c05911aaf4f"
@@ -702,11 +725,11 @@ func TestDacPublisher(t *testing.T) {
 
 	t.Run("upload-then-download-invalid-publickey", func(t *testing.T) {
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithPublisher(publisher)),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithPublisher(publisher)),
 		})
 		var (
 			publickey    = "b786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfb"
@@ -760,33 +783,59 @@ func TestDacPublisher(t *testing.T) {
 			encryptedRef = "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
 		)
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String()), mockdac.WithPublisher(publisher)),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String()), mockac.WithPublisher(publisher)),
 		})
 
-		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusInternalServerError,
+		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusBadRequest,
 			jsonhttptest.WithRequestHeader(api.SwarmActTimestampHeader, strconv.FormatInt(now, 10)),
 			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, fixtureHref.String()),
 			jsonhttptest.WithRequestHeader(api.SwarmActPublisherHeader, downloader),
 			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
-				Message: api.ErrActDownload.Error(),
-				Code:    http.StatusInternalServerError,
+				Message: accesscontrol.ErrInvalidPublicKey.Error(),
+				Code:    http.StatusBadRequest,
 			}),
 			jsonhttptest.WithExpectedResponseHeader(api.ContentTypeHeader, "application/json; charset=utf-8"),
 		)
 	})
 
+	t.Run("re-upload-with-invalid-publickey", func(t *testing.T) {
+		var (
+			downloader = "03c712a7e29bc792ac8d8ae49793d28d5bda27ed70f0d90697b2fb456c0a168bd2"
+			testfile   = "testfile1"
+		)
+		downloaderClient, _, _, _ := newTestServer(t, testServerOptions{
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithPublisher(downloader)),
+		})
+
+		jsonhttptest.Request(t, downloaderClient, http.MethodPost, fileUploadResource+"?name="+fileName, http.StatusBadRequest,
+			jsonhttptest.WithRequestHeader(api.SwarmActHeader, "true"),
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestBody(strings.NewReader(testfile)),
+			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
+				Code:    http.StatusBadRequest,
+				Message: "invalid public key",
+			}),
+			jsonhttptest.WithRequestHeader(api.ContentTypeHeader, "text/html; charset=utf-8"),
+		)
+
+	})
+
 	t.Run("download-w/o-publisher", func(t *testing.T) {
 		encryptedRef := "a5df670544eaea29e61b19d8739faa4573b19e4426e58a173e51ed0b5e7e2ade"
 		client, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String()), mockdac.WithPublisher(publisher)),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String()), mockac.WithPublisher(publisher)),
 		})
 
 		jsonhttptest.Request(t, client, http.MethodGet, fileDownloadResource(encryptedRef), http.StatusNotFound,
@@ -798,7 +847,7 @@ func TestDacPublisher(t *testing.T) {
 	})
 }
 
-func TestDacGrantees(t *testing.T) {
+func TestAccessLogicGrantees(t *testing.T) {
 	t.Parallel()
 	var (
 		spk, _          = hex.DecodeString("a786dd84b61485de12146fd9c4c02d87e8fd95f0542765cb7fc3d2e428c0bcfa")
@@ -808,11 +857,11 @@ func TestDacGrantees(t *testing.T) {
 		logger          = log.Noop
 		addr            = swarm.RandAddress(t)
 		client, _, _, _ = newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String())),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String())),
 		})
 	)
 	t.Run("get-grantees", func(t *testing.T) {
@@ -821,11 +870,11 @@ func TestDacGrantees(t *testing.T) {
 			publisher      = hex.EncodeToString(publicKeyBytes)
 		)
 		clientwihtpublisher, _, _, _ := newTestServer(t, testServerOptions{
-			Storer:    storerMock,
-			Logger:    logger,
-			Post:      mockpost.New(mockpost.WithAcceptAll()),
-			PublicKey: pk.PublicKey,
-			Dac:       mockdac.New(mockdac.WithHistory(h, fixtureHref.String()), mockdac.WithPublisher(publisher)),
+			Storer:        storerMock,
+			Logger:        logger,
+			Post:          mockpost.New(mockpost.WithAcceptAll()),
+			PublicKey:     pk.PublicKey,
+			AccessControl: mockac.New(mockac.WithHistory(h, fixtureHref.String()), mockac.WithPublisher(publisher)),
 		})
 		expected := []string{
 			"03d7660772cc3142f8a7a2dfac46ce34d12eac1718720cef0e3d94347902aa96a2",
@@ -867,6 +916,49 @@ func TestDacGrantees(t *testing.T) {
 		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusOK,
 			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
 			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, addr.String()),
+			jsonhttptest.WithJSONRequestBody(body),
+		)
+	})
+	t.Run("add-revoke-grantees-wrong-history", func(t *testing.T) {
+		body := api.GranteesPatchRequest{
+			Addlist:    []string{"02ab7473879005929d10ce7d4f626412dad9fe56b0a6622038931d26bd79abf0a4"},
+			Revokelist: []string{"02ab7473879005929d10ce7d4f626412dad9fe56b0a6622038931d26bd79abf0a4"},
+		}
+		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusNotFound,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, swarm.EmptyAddress.String()),
+			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
+				Message: "act or history entry not found",
+				Code:    http.StatusNotFound,
+			}),
+			jsonhttptest.WithJSONRequestBody(body),
+		)
+	})
+	t.Run("invlaid-add-grantees", func(t *testing.T) {
+		body := api.GranteesPatchRequest{
+			Addlist: []string{"random-string"},
+		}
+		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusBadRequest,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, addr.String()),
+			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
+				Message: "invalid add list",
+				Code:    http.StatusBadRequest,
+			}),
+			jsonhttptest.WithJSONRequestBody(body),
+		)
+	})
+	t.Run("invlaid-revoke-grantees", func(t *testing.T) {
+		body := api.GranteesPatchRequest{
+			Revokelist: []string{"random-string"},
+		}
+		jsonhttptest.Request(t, client, http.MethodPatch, "/grantee/"+addr.String(), http.StatusBadRequest,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestHeader(api.SwarmActHistoryAddressHeader, addr.String()),
+			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
+				Message: "invalid revoke list",
+				Code:    http.StatusBadRequest,
+			}),
 			jsonhttptest.WithJSONRequestBody(body),
 		)
 	})
@@ -930,6 +1022,20 @@ func TestDacGrantees(t *testing.T) {
 				Message: "could not validate request",
 				Code:    http.StatusBadRequest,
 			}),
+		)
+	})
+	t.Run("create-granteelist-invalid-body", func(t *testing.T) {
+		body := api.GranteesPostRequest{
+			GranteeList: []string{"random-string"},
+		}
+		jsonhttptest.Request(t, client, http.MethodPost, "/grantee", http.StatusBadRequest,
+			jsonhttptest.WithRequestHeader(api.SwarmPostageBatchIdHeader, batchOkStr),
+			jsonhttptest.WithRequestBody(bytes.NewReader(nil)),
+			jsonhttptest.WithExpectedJSONResponse(jsonhttp.StatusResponse{
+				Message: "invalid grantee list",
+				Code:    http.StatusBadRequest,
+			}),
+			jsonhttptest.WithJSONRequestBody(body),
 		)
 	})
 }

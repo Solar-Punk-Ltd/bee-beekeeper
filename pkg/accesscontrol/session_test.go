@@ -2,20 +2,22 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dynamicaccess_test
+package accesscontrol_test
 
 import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"testing"
 
+	"github.com/ethersphere/bee/v2/pkg/accesscontrol"
+	"github.com/ethersphere/bee/v2/pkg/accesscontrol/mock"
 	"github.com/ethersphere/bee/v2/pkg/crypto"
-	"github.com/ethersphere/bee/v2/pkg/dynamicaccess"
-	"github.com/ethersphere/bee/v2/pkg/dynamicaccess/mock"
 	memkeystore "github.com/ethersphere/bee/v2/pkg/keystore/mem"
+	"github.com/stretchr/testify/assert"
 )
 
 func mockKeyFunc(*ecdsa.PublicKey, [][]byte) ([][]byte, error) {
@@ -24,12 +26,10 @@ func mockKeyFunc(*ecdsa.PublicKey, [][]byte) ([][]byte, error) {
 
 func TestSessionNewDefaultSession(t *testing.T) {
 	pk, err := crypto.GenerateSecp256k1Key()
-	if err != nil {
-		t.Fatalf("Error generating private key: %v", err)
-	}
-	si := dynamicaccess.NewDefaultSession(pk)
+	assertNoError(t, "generating private key", err)
+	si := accesscontrol.NewDefaultSession(pk)
 	if si == nil {
-		t.Fatal("Session instance is nil")
+		assert.FailNow(t, "Session instance is nil")
 	}
 }
 
@@ -37,7 +37,7 @@ func TestSessionNewFromKeystore(t *testing.T) {
 	ks := memkeystore.New()
 	si := mock.NewFromKeystore(ks, "tag", "password", mockKeyFunc)
 	if si == nil {
-		t.Fatal("Session instance is nil")
+		assert.FailNow(t, "Session instance is nil")
 	}
 }
 
@@ -45,38 +45,30 @@ func TestSessionKey(t *testing.T) {
 	t.Parallel()
 
 	key1, err := crypto.GenerateSecp256k1Key()
-	if err != nil {
-		t.Fatal(err)
-	}
-	si1 := dynamicaccess.NewDefaultSession(key1)
+	assertNoError(t, "key1 GenerateSecp256k1Key", err)
+	si1 := accesscontrol.NewDefaultSession(key1)
 
 	key2, err := crypto.GenerateSecp256k1Key()
-	if err != nil {
-		t.Fatal(err)
-	}
-	si2 := dynamicaccess.NewDefaultSession(key2)
+	assertNoError(t, "key2 GenerateSecp256k1Key", err)
+	si2 := accesscontrol.NewDefaultSession(key2)
 
 	nonces := make([][]byte, 2)
 	for i := range nonces {
 		if _, err := io.ReadFull(rand.Reader, nonces[i]); err != nil {
-			t.Fatal(err)
+			assert.FailNow(t, err.Error())
 		}
 	}
 
 	keys1, err := si1.Key(&key2.PublicKey, nonces)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "", err)
 	keys2, err := si2.Key(&key1.PublicKey, nonces)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "", err)
 
 	if !bytes.Equal(keys1[0], keys2[0]) {
-		t.Fatalf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[0]), hex.EncodeToString(keys2[0]))
+		assert.FailNowf(t, fmt.Sprintf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[0]), hex.EncodeToString(keys2[0])), "")
 	}
 	if !bytes.Equal(keys1[1], keys2[1]) {
-		t.Fatalf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[0]), hex.EncodeToString(keys2[0]))
+		assert.FailNowf(t, fmt.Sprintf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[1]), hex.EncodeToString(keys2[1])), "")
 	}
 }
 
@@ -84,28 +76,20 @@ func TestSessionKeyWithoutNonces(t *testing.T) {
 	t.Parallel()
 
 	key1, err := crypto.GenerateSecp256k1Key()
-	if err != nil {
-		t.Fatal(err)
-	}
-	si1 := dynamicaccess.NewDefaultSession(key1)
+	assertNoError(t, "key1 GenerateSecp256k1Key", err)
+	si1 := accesscontrol.NewDefaultSession(key1)
 
 	key2, err := crypto.GenerateSecp256k1Key()
-	if err != nil {
-		t.Fatal(err)
-	}
-	si2 := dynamicaccess.NewDefaultSession(key2)
+	assertNoError(t, "key2 GenerateSecp256k1Key", err)
+	si2 := accesscontrol.NewDefaultSession(key2)
 
 	keys1, err := si1.Key(&key2.PublicKey, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "session1 key", err)
 	keys2, err := si2.Key(&key1.PublicKey, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "session2 key", err)
 
 	if !bytes.Equal(keys1[0], keys2[0]) {
-		t.Fatalf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[0]), hex.EncodeToString(keys2[0]))
+		assert.FailNowf(t, fmt.Sprintf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[0]), hex.EncodeToString(keys2[0])), "")
 	}
 }
 
@@ -119,59 +103,44 @@ func TestSessionKeyFromKeystore(t *testing.T) {
 	password2 := "password2"
 
 	si1 := mock.NewFromKeystore(ks, tag1, password1, mockKeyFunc)
-	// si1 := dynamicaccess.NewFromKeystore(ks, tag1, password1)
 	exists, err := ks.Exists(tag1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "", err)
 	if !exists {
-		t.Fatal("Key1 should exist")
+		assert.FailNow(t, "Key1 should exist")
+
 	}
 	key1, created, err := ks.Key(tag1, password1, crypto.EDGSecp256_K1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "", err)
 	if created {
-		t.Fatal("Key1 should not be created")
+		assert.FailNow(t, "Key1 should not be created")
+
 	}
 
 	si2 := mock.NewFromKeystore(ks, tag2, password2, mockKeyFunc)
-	// si2 := dynamicaccess.NewFromKeystore(ks, tag2, password2)
 	exists, err = ks.Exists(tag2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "", err)
 	if !exists {
-		t.Fatal("Key2 should exist")
+		assert.FailNow(t, "Key2 should exist")
 	}
 	key2, created, err := ks.Key(tag2, password2, crypto.EDGSecp256_K1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "", err)
 	if created {
-		t.Fatal("Key2 should not be created")
+		assert.FailNow(t, "Key2 should not be created")
 	}
 
 	nonces := make([][]byte, 1)
 	for i := range nonces {
 		if _, err := io.ReadFull(rand.Reader, nonces[i]); err != nil {
-			t.Fatal(err)
+			assert.FailNow(t, err.Error())
 		}
 	}
 
 	keys1, err := si1.Key(&key2.PublicKey, nonces)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "", err)
 	keys2, err := si2.Key(&key1.PublicKey, nonces)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoError(t, "", err)
 
 	if !bytes.Equal(keys1[0], keys2[0]) {
-		t.Fatalf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[0]), hex.EncodeToString(keys2[0]))
+		assert.FailNowf(t, fmt.Sprintf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[0]), hex.EncodeToString(keys2[0])), "")
 	}
-	// if !bytes.Equal(keys1[1], keys2[1]) {
-	// 	t.Fatalf("shared secrets do not match %s, %s", hex.EncodeToString(keys1[0]), hex.EncodeToString(keys2[0]))
-	// }
 }
