@@ -19,7 +19,7 @@ env:
   BEEKEEPER_METRICS_ENABLED: false
   REACHABILITY_OVERRIDE_PUBLIC: true
   BATCHFACTOR_OVERRIDE_PUBLIC: 2
-  TIMEOUT: 30m
+  TIMEOUT: 9m
   BUCKET_NAME: swarm-beekeeper-artifacts
   AWS_ACCESS_KEY_ID: ${{ secrets.DO_AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_AWS_SECRET_ACCESS_KEY }}
@@ -134,8 +134,7 @@ jobs:
         run: |
           bash .github/bin/beekeeper_artifacts.sh local-dns
           export FAILED='no-test'
-          if ${{ steps.act.outcome=='failure' }}; then FAILED=pingpong; fi
-          curl -sSf -X POST -H "Content-Type: application/json" -d "{\"text\": \"**${RUN_TYPE}** Beekeeper Error\nBranch: \`${{ github.head_ref }}\`\nUser: @${{ github.event.pull_request.user.login }}\nDebugging artifacts: [click](https://$BUCKET_NAME.$AWS_ENDPOINT/artifacts_$VERTAG.tar.gz)\nStep failed: \`${FAILED}\`\"}" https://beehive.ethswarm.org/hooks/${{ secrets.TUNSHELL_KEY }}
+          if ${{ steps.act.outcome=='failure' }}; then FAILED=act; fi
           echo "Failed test: ${FAILED}"
       - name: Create tunshell session for debug
         if: failure() && contains(needs.init.outputs.msg, '[debug]')
