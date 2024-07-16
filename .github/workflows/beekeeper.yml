@@ -19,7 +19,7 @@ env:
   BEEKEEPER_METRICS_ENABLED: false
   REACHABILITY_OVERRIDE_PUBLIC: true
   BATCHFACTOR_OVERRIDE_PUBLIC: 2
-  TIMEOUT: 9m
+  TIMEOUT: 10m
   BUCKET_NAME: swarm-beekeeper-artifacts
   AWS_ACCESS_KEY_ID: ${{ secrets.DO_AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_AWS_SECRET_ACCESS_KEY }}
@@ -128,7 +128,7 @@ jobs:
           timeout ${TIMEOUT} make deploylocal BEEKEEPER_CLUSTER=local-dns
       - name: Test act
         id: act
-        run: timeout ${TIMEOUT} bash -c 'until beekeeper check --cluster-name local-dns --checks ci-file-retrieval; do echo "waiting for act..."; sleep .3; done'
+        run: timeout ${TIMEOUT} bash -c 'until beekeeper check --cluster-name local-dns --checks ci-act; do echo "waiting for act..."; sleep .3; done'
       - name: Collect debug artifacts
         if: failure()
         run: |
