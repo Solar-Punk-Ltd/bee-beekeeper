@@ -167,6 +167,7 @@ type Options struct {
 	TargetNeighborhood            string
 	NeighborhoodSuggester         string
 	WhitelistedWithdrawalAddress  []string
+	TrxDebugMode                  bool
 }
 
 const (
@@ -248,16 +249,6 @@ func NewBee(
 	if err != nil {
 		return nil, err
 	}
-	b.stateStoreCloser = stateStore
-
-	// Check if the batchstore exists. If not, we can assume it's missing
-	// due to a migration or it's a fresh install.
-	batchStoreExists, err := batchStoreExists(stateStore)
-	if err != nil {
-		return nil, fmt.Errorf("batchstore: exists: %w", err)
-	}
-
-	addressbook := addressbook.New(stateStore)
 
 	pubKey, err := signer.PublicKey()
 	if err != nil {
@@ -274,37 +265,71 @@ func NewBee(
 		return nil, fmt.Errorf("compute overlay address: %w", err)
 	}
 
-	if nonceExists && o.TargetNeighborhood != "" {
-		logger.Warning("an overlay has already been created before, skipping targeting the selected neighborhood")
+	targetNeighborhood := o.TargetNeighborhood
+	if targetNeighborhood == "" && !nonceExists && o.NeighborhoodSuggester != "" {
+		logger.Info("fetching target neighborhood from suggester", "url", o.NeighborhoodSuggester)
+		targetNeighborhood, err = nbhdutil.FetchNeighborhood(&http.Client{}, o.NeighborhoodSuggester)
+		if err != nil {
+			return nil, fmt.Errorf("neighborhood suggestion: %w", err)
+		}
 	}
 
-	if !nonceExists {
-		// mine the overlay
-		targetNeighborhood := o.TargetNeighborhood
-		if o.TargetNeighborhood == "" && o.NeighborhoodSuggester != "" {
-			logger.Info("fetching target neighborhood from suggester", "url", o.NeighborhoodSuggester)
-			targetNeighborhood, err = nbhdutil.FetchNeighborhood(&http.Client{}, o.NeighborhoodSuggester)
-			if err != nil {
-				return nil, fmt.Errorf("neighborhood suggestion: %w", err)
-			}
+	var changedOverlay bool
+	if targetNeighborhood != "" {
+		neighborhood, err := swarm.ParseBitStrAddress(targetNeighborhood)
+		if err != nil {
+			return nil, fmt.Errorf("invalid neighborhood. %s", targetNeighborhood)
 		}
 
-		if targetNeighborhood != "" {
+		if swarm.Proximity(swarmAddress.Bytes(), neighborhood.Bytes()) < uint8(len(targetNeighborhood)) {
+			// mine the overlay
 			logger.Info("mining an overlay address for the fresh node to target the selected neighborhood", "target", targetNeighborhood)
-			swarmAddress, nonce, err = nbhdutil.MineOverlay(ctx, *pubKey, networkID, targetNeighborhood)
+			newSwarmAddress, newNonce, err := nbhdutil.MineOverlay(ctx, *pubKey, networkID, targetNeighborhood)
 			if err != nil {
 				return nil, fmt.Errorf("mine overlay address: %w", err)
 			}
-		}
 
-		err = setOverlay(stateStore, swarmAddress, nonce)
-		if err != nil {
-			return nil, fmt.Errorf("statestore: save new overlay: %w", err)
+			if nonceExists {
+				logger.Info("Override nonce %d to %d and clean state for neighborhood %s", nonce, newNonce, targetNeighborhood)
+				logger.Warning("you have another 10 seconds to change your mind and kill this process with CTRL-C...")
+				time.Sleep(10 * time.Second)
+
+				dirsToNuke := []string{ioutil.DataPathLocalstore, ioutil.DataPathKademlia}
+				for _, dir := range dirsToNuke {
+					err := ioutil.RemoveContent(filepath.Join(o.DataDir, dir))
+					if err != nil {
+						return nil, fmt.Errorf("delete %s: %w", dir, err)
+					}
+				}
+
+				if err := stateStore.ClearForHopping(); err != nil {
+					return nil, fmt.Errorf("clearing stateStore %w", err)
+				}
+			}
+
+			swarmAddress = newSwarmAddress
+			nonce = newNonce
+			err = setOverlay(stateStore, swarmAddress, nonce)
+			if err != nil {
+				return nil, fmt.Errorf("statestore: save new overlay: %w", err)
+			}
+			changedOverlay = true
 		}
 	}
 
+	b.stateStoreCloser = stateStore
+	// Check if the batchstore exists. If not, we can assume it's missing
+	// due to a migration or it's a fresh install.
+	batchStoreExists, err := batchStoreExists(stateStore)
+	if err != nil {
+		return nil, fmt.Errorf("batchstore: exists: %w", err)
+	}
+
+	addressbook := addressbook.New(stateStore)
+
 	logger.Info("using overlay address", "address", swarmAddress)
 
+	// this will set overlay if it was not set before
 	if err = checkOverlay(stateStore, swarmAddress); err != nil {
 		return nil, fmt.Errorf("check overlay address: %w", err)
 	}
@@ -632,6 +657,7 @@ func NewBee(
 		post,
 		batchStore,
 		chainEnabled,
+		o.TrxDebugMode,
 	)
 
 	eventListener = listener.New(b.syncingStopped, logger, chainBackend, postageStampContractAddress, postageStampContractABI, o.BlockTime, postageSyncingStallingTimeout, postageSyncingBackoffTimeout)
@@ -672,7 +698,7 @@ func NewBee(
 
 	if o.DataDir != "" {
 		logger.Info("using datadir", "path", o.DataDir)
-		path = filepath.Join(o.DataDir, "localstore")
+		path = filepath.Join(o.DataDir, ioutil.DataPathLocalstore)
 	}
 
 	lo := &storer.Options{
@@ -942,7 +968,22 @@ func NewBee(
 		stakingContractAddress = common.HexToAddress(o.StakingContractAddress)
 	}
 
-	stakingContract := staking.New(swarmAddress, overlayEthAddress, stakingContractAddress, abiutil.MustParseABI(chainCfg.StakingABI), bzzTokenAddress, transactionService, common.BytesToHash(nonce))
+	stakingContract := staking.New(overlayEthAddress, stakingContractAddress, abiutil.MustParseABI(chainCfg.StakingABI), bzzTokenAddress, transactionService, common.BytesToHash(nonce), o.TrxDebugMode)
+
+	if chainEnabled && changedOverlay {
+		stake, err := stakingContract.GetPotentialStake(ctx)
+		if err != nil {
+			return nil, errors.New("getting stake balance")
+		}
+		if stake.Cmp(big.NewInt(0)) > 0 {
+			logger.Debug("changing overlay address in staking contract")
+			tx, err := stakingContract.ChangeStakeOverlay(ctx, common.BytesToHash(nonce))
+			if err != nil {
+				return nil, fmt.Errorf("cannot change staking overlay address: %v", err.Error())
+			}
+			logger.Info("overlay address changed in staking contract", "transaction", tx)
+		}
+	}
 
 	var (
 		pullerService *puller.Puller
@@ -970,7 +1011,7 @@ func NewBee(
 				return localStore.ReserveSize() >= reserveTreshold && pullerService.SyncRate() == 0
 			}
 
-			redistributionContract := redistribution.New(swarmAddress, logger, transactionService, redistributionContractAddress, abiutil.MustParseABI(chainCfg.RedistributionABI))
+			redistributionContract := redistribution.New(overlayEthAddress, logger, transactionService, redistributionContractAddress, abiutil.MustParseABI(chainCfg.RedistributionABI), o.TrxDebugMode)
 			agent, err = storageincentives.New(
 				swarmAddress,
 				overlayEthAddress,
