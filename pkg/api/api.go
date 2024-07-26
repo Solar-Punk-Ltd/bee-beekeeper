@@ -78,6 +78,7 @@ const (
 	SwarmFeedIndexNextHeader          = "Swarm-Feed-Index-Next"
 	SwarmCollectionHeader             = "Swarm-Collection"
 	SwarmPostageBatchIdHeader         = "Swarm-Postage-Batch-Id"
+	SwarmPostageStampHeader           = "Swarm-Postage-Stamp"
 	SwarmDeferredUploadHeader         = "Swarm-Deferred-Upload"
 	SwarmRedundancyLevelHeader        = "Swarm-Redundancy-Level"
 	SwarmRedundancyStrategyHeader     = "Swarm-Redundancy-Strategy"
@@ -123,6 +124,8 @@ var (
 	errActDownload                      = errors.New("act download failed")
 	errActUpload                        = errors.New("act upload failed")
 	errActGranteeList                   = errors.New("failed to create or update grantee list")
+
+	batchIdOrStampSig = fmt.Sprintf("Either '%s' or '%s' header must be set in the request", SwarmPostageStampHeader, SwarmPostageBatchIdHeader)
 )
 
 // Storer interface provides the functionality required from the local storage
@@ -517,7 +520,7 @@ func (s *Service) corsHandler(h http.Handler) http.Handler {
 	allowedHeaders := []string{
 		"User-Agent", "Accept", "X-Requested-With", "Access-Control-Request-Headers", "Access-Control-Request-Method", "Accept-Ranges", "Content-Encoding",
 		AuthorizationHeader, AcceptEncodingHeader, ContentTypeHeader, ContentDispositionHeader, RangeHeader, OriginHeader,
-		SwarmTagHeader, SwarmPinHeader, SwarmEncryptHeader, SwarmIndexDocumentHeader, SwarmErrorDocumentHeader, SwarmCollectionHeader, SwarmPostageBatchIdHeader, SwarmDeferredUploadHeader, SwarmRedundancyLevelHeader, SwarmRedundancyStrategyHeader, SwarmRedundancyFallbackModeHeader, SwarmChunkRetrievalTimeoutHeader, SwarmLookAheadBufferSizeHeader, SwarmFeedIndexHeader, SwarmFeedIndexNextHeader, GasPriceHeader, GasLimitHeader, ImmutableHeader,
+		SwarmTagHeader, SwarmPinHeader, SwarmEncryptHeader, SwarmIndexDocumentHeader, SwarmErrorDocumentHeader, SwarmCollectionHeader, SwarmPostageBatchIdHeader, SwarmPostageStampHeader, SwarmDeferredUploadHeader, SwarmRedundancyLevelHeader, SwarmRedundancyStrategyHeader, SwarmRedundancyFallbackModeHeader, SwarmChunkRetrievalTimeoutHeader, SwarmLookAheadBufferSizeHeader, SwarmFeedIndexHeader, SwarmFeedIndexNextHeader, GasPriceHeader, GasLimitHeader, ImmutableHeader,
 	}
 	allowedHeadersStr := strings.Join(allowedHeaders, ", ")
 
@@ -733,6 +736,35 @@ func (s *Service) newStamperPutter(ctx context.Context, opts putterOptions) (sto
 		PutterSession: session,
 		stamper:       stamper,
 		save:          save,
+	}, nil
+}
+
+func (s *Service) newStampedPutter(ctx context.Context, opts putterOptions, stamp *postage.Stamp) (storer.PutterSession, error) {
+	if !opts.Deferred && s.beeMode == DevMode {
+		return nil, errUnsupportedDevNodeOperation
+	}
+
+	storedBatch, err := s.batchStore.Get(stamp.BatchID())
+	if err != nil {
+		return nil, errInvalidPostageBatch
+	}
+
+	var session storer.PutterSession
+	if opts.Deferred || opts.Pin {
+		session, err = s.storer.Upload(ctx, opts.Pin, opts.TagID)
+		if err != nil {
+			return nil, fmt.Errorf("failed creating session: %w", err)
+		}
+	} else {
+		session = s.storer.DirectUpload()
+	}
+
+	stamper := postage.NewPresignedStamper(stamp, storedBatch.Owner)
+
+	return &putterSessionWrapper{
+		PutterSession: session,
+		stamper:       stamper,
+		save:          func() error { return nil },
 	}, nil
 }
 

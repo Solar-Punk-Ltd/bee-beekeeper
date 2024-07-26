@@ -322,7 +322,7 @@ func NewDevBee(logger log.Logger, o *DevOptions) (b *DevBee, err error) {
 		stakingContractMock.WithGetStake(func(ctx context.Context) (*big.Int, error) {
 			return nil, staking.ErrNotImplemented
 		}),
-		stakingContractMock.WithWithdrawAllStake(func(ctx context.Context) (common.Hash, error) {
+		stakingContractMock.WithWithdrawStake(func(ctx context.Context) (common.Hash, error) {
 			return common.Hash{}, staking.ErrNotImplemented
 		}),
 		stakingContractMock.WithIsFrozen(func(ctx context.Context, block uint64) (bool, error) {
@@ -434,7 +434,7 @@ func (b *DevBee) Shutdown() error {
 	tryClose(b.accesscontrolCloser, "accesscontrol")
 	tryClose(b.tracerCloser, "tracer")
 	tryClose(b.stateStoreCloser, "statestore")
-	tryClose(b.localstoreCloser, "localstore")
+	tryClose(b.localstoreCloser, ioutil.DataPathLocalstore)
 
 	return mErr
 }
