@@ -83,6 +83,7 @@ const (
 	optionNameNeighborhoodSuggester        = "neighborhood-suggester"
 	optionNameWhitelistedWithdrawalAddress = "withdrawal-addresses-whitelist"
 	optionNameTransactionDebugMode         = "transaction-debug-mode"
+	optionReserveMinimumRadius             = "reserve-minimum-radius"
 )
 
 // nolint:gochecknoinits
@@ -243,7 +244,7 @@ func (c *command) setAllFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool(optionNameDBDisableSeeksCompaction, true, "disables db compactions triggered by seeks")
 	cmd.Flags().String(optionNamePassword, "", "password for decrypting keys")
 	cmd.Flags().String(optionNamePasswordFile, "", "path to a file that contains password for decrypting keys")
-	cmd.Flags().String(optionNameAPIAddr, ":1633", "HTTP API listen address")
+	cmd.Flags().String(optionNameAPIAddr, "127.0.0.1:1633", "HTTP API listen address")
 	cmd.Flags().String(optionNameP2PAddr, ":1634", "P2P listen address")
 	cmd.Flags().String(optionNameNATAddr, "", "NAT exposed address")
 	cmd.Flags().Bool(optionNameP2PWSEnable, false, "enable P2P WebSocket transport")
@@ -294,6 +295,7 @@ func (c *command) setAllFlags(cmd *cobra.Command) {
 	cmd.Flags().String(optionNameNeighborhoodSuggester, "https://api.swarmscan.io/v1/network/neighborhoods/suggestion", "suggester for target neighborhood")
 	cmd.Flags().StringSlice(optionNameWhitelistedWithdrawalAddress, []string{}, "withdrawal target addresses")
 	cmd.Flags().Bool(optionNameTransactionDebugMode, false, "skips the gas estimate step for contract transactions")
+	cmd.Flags().Uint(optionReserveMinimumRadius, 0, "minimum radius storage treshold")
 }
 
 func newLogger(cmd *cobra.Command, verbosity string) (log.Logger, error) {

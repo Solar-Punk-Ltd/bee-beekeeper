@@ -284,9 +284,14 @@ paths:
         - Chunk
       parameters:
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmTagParameter"
-        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
+        - in: header
+          name: swarm-postage-batch-id
+          schema:
+            $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
+          required: false
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageStamp"
       requestBody:
         description: Chunk binary data that has to have at least 8 bytes.
         content:
@@ -836,6 +841,7 @@ paths:
           description: Signature
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPinParameter"
         - in: header
+          name: swarm-postage-batch-id
           schema:
             $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
 <<<<<<< HEAD
@@ -1298,6 +1304,7 @@ paths:
         - Envelope
       parameters:
         - in: header
+          name: swarm-postage-batch-id
           schema:
             $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
           required: true
@@ -2091,13 +2098,13 @@ paths:
         - in: path
           name: anchor1
           schema:
-            $ref: "#/components/schemas/HexString"
+            $ref: "SwarmCommon.yaml#/components/schemas/HexString"
           required: true
           description: The first anchor.
         - in: path
           name: anchor2
           schema:
-            $ref: "#/components/schemas/HexString"
+            $ref: "SwarmCommon.yaml#/components/schemas/HexString"
           required: true
           description: The second anchor.
       responses:
@@ -2173,17 +2180,17 @@ paths:
         name: amount
         required: true
         schema:
-          $ref: "#/components/schemas/BigInt"
+          $ref: "SwarmCommon.yaml#/components/schemas/BigInt"
       - in: query
         name: address
         required: true
         schema:
-          $ref: "#/components/schemas/EthereumAddress"
+          $ref: "SwarmCommon.yaml#/components/schemas/EthereumAddress"
       - in: path
         name: coin
         required: true
         schema:
-          $ref: "#/components/schemas/SwarmAddress"
+          $ref: "SwarmCommon.yaml#/components/schemas/SwarmAddress"
       responses:
         "200":
           content:
@@ -2226,6 +2233,23 @@ paths:
           $ref: "SwarmCommon.yaml#/components/responses/500"
         default:
           description: Default response
+    delete:
+      summary: Withdraw the extra withdrawable staked amount.
+      description: This endpoint withdraws any amount that is possible to withdraw as surplus.
+      tags:
+        - Staking
+      parameters:
+        - $ref: "SwarmCommon.yaml#/components/parameters/GasPriceParameter"
+        - $ref: "SwarmCommon.yaml#/components/parameters/GasLimitParameter"
+      responses:
+        "200":
+          $ref: "SwarmCommon.yaml#/components/schemas/StakeTransactionResponse"
+        "400":
+          $ref: "SwarmCommon.yaml#/components/responses/400"
+        "500":
+          $ref: "SwarmCommon.yaml#/components/responses/500"
+        default:
+          description: Default response
 
   "/stake/{amount}":
     post:
@@ -2238,6 +2262,7 @@ paths:
           name: amount
           schema:
             type: string
+          required: true
           description: Amount of BZZ added that will be deposited for staking.
         - $ref: "SwarmCommon.yaml#/components/parameters/GasPriceParameter"
         - $ref: "SwarmCommon.yaml#/components/parameters/GasLimitParameter"
@@ -2265,8 +2290,8 @@ paths:
         default:
           description: Default response
     delete:
-      summary: Withdraw the extra withdrawable staked amount.
-      description: This endpoint withdraws any amount that is possible to withdraw as surplus.
+      summary: Withdraws all past staked amount back to the wallet.
+      description: Be aware, this endpoint can only be called when the contract is paused and is in the process of being migrated to a new contract.
       tags:
         - Staking
       parameters:
