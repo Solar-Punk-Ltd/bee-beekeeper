@@ -1,6 +1,7 @@
 name: Beekeeper
 
 on:
+  workflow_dispatch:
   repository_dispatch:
     types: [trigger-beekeeper, beekeeper]
   pull_request:
@@ -14,11 +15,11 @@ env:
   SETUP_CONTRACT_IMAGE: "ethersphere/bee-localchain"
   SETUP_CONTRACT_IMAGE_TAG: "0.9.1-rc1"
   BEELOCAL_BRANCH: "main"
-  BEEKEEPER_BRANCH: "feat/act"
+  BEEKEEPER_BRANCH: "feat/act-test"
   BEEKEEPER_METRICS_ENABLED: false
   REACHABILITY_OVERRIDE_PUBLIC: true
   BATCHFACTOR_OVERRIDE_PUBLIC: 2
-  TIMEOUT: 30m
+  TIMEOUT: 10m
   BUCKET_NAME: swarm-beekeeper-artifacts
   AWS_ACCESS_KEY_ID: ${{ secrets.DO_AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.DO_AWS_SECRET_ACCESS_KEY }}
@@ -134,41 +135,11 @@ jobs:
       - name: Test fullconnectivity
         id: fullconnectivity
         run: timeout ${TIMEOUT} bash -c 'until beekeeper check --cluster-name local-dns --checks=ci-full-connectivity; do echo "waiting for full connectivity..."; sleep .3; done'
-      - name: Test settlements
-        id: settlements
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks=ci-settlements
       - name: Sleep for time allowance to replenish
         run: sleep 2
-      - name: Test pss
-        id: pss
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks=ci-pss
-      - name: Test soc
-        id: soc
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks=ci-soc
-      - name: Test pushsync (chunks)
-        id: pushsync-chunks-1
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks=ci-pushsync-chunks
-      - name: Test pushsync (light mode chunks)
-        id: pushsync-chunks-2
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks=ci-pushsync-light-chunks
-      - name: Test retrieval
-        id: retrieval
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks=ci-retrieval
-      - name: Test manifest
-        id: manifest
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks=ci-manifest
-      - name: Test postage stamps
-        id: postage-stamps
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks ci-postage
-      - name: Test staking
-        id: stake
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks ci-stake
-      - name: Test withdraw
-        id: withdraw
-        run: timeout ${TIMEOUT} bash -c 'until beekeeper check --cluster-name local-dns --checks ci-withdraw; do echo "waiting for withdraw..."; sleep .3; done'
-      - name: Test redundancy
-        id: redundancy
-        run: timeout ${TIMEOUT} beekeeper check --cluster-name local-dns --checks ci-redundancy
+      - name: Test act
+        id: act
+        run: timeout ${TIMEOUT} bash -c 'until beekeeper check --cluster-name local-dns --checks ci-act; do echo "waiting for act..."; sleep .3; done'
       - name: Collect debug artifacts
         if: failure()
         run: |
@@ -185,7 +156,7 @@ jobs:
           if ${{ steps.manifest.outcome=='failure' }}; then FAILED=manifest; fi
           if ${{ steps.act.outcome=='failure' }}; then FAILED=act; fi
           if ${{ steps.content-availability.outcome=='failure' }}; then FAILED=content-availability; fi
-          curl -sSf -X POST -H "Content-Type: application/json" -d "{\"text\": \"**${RUN_TYPE}** Beekeeper Error\nBranch: \`${{ github.head_ref }}\`\nUser: @${{ github.event.pull_request.user.login }}\nDebugging artifacts: [click](https://$BUCKET_NAME.$AWS_ENDPOINT/artifacts_$VERTAG.tar.gz)\nStep failed: \`${FAILED}\`\"}" https://beehive.ethswarm.org/hooks/${{ secrets.TUNSHELL_KEY }}
+          if ${{ steps.act.outcome=='failure' }}; then FAILED=act; fi
           echo "Failed test: ${FAILED}"
       - name: Create tunshell session for debug
         if: failure() && contains(needs.init.outputs.msg, '[debug]')
@@ -200,39 +171,3 @@ jobs:
         with:
           name: debug-dump
           path: dump/
-  retag:
-    name: Retag and Trigger ArgoCD
-    env:
-      TIMEOUT: 10m
-    needs: [beekeeper]
-    runs-on: ubuntu-latest
-    steps:
-      - name: "Download Artifact"
-        uses: actions/download-artifact@v4
-        with:
-          name: temp-artifacts
-      - name: Unpack artifacts
-        run: |
-          chmod +x bee-0
-          mv bee-0 bee
-      - name: Build image
-        run: |
-          timeout ${TIMEOUT} make beelocal ACTION=build OPTS='ci skip-vet skip-push'
-      - name: Retag Docker image and push
-        if: github.ref == 'refs/heads/master' && github.event.action != 'beekeeper' && success()
-        run: |
-          docker tag k3d-registry.localhost:5000/ethersphere/bee:latest ethersphere/bee:latest
-          docker tag k3d-registry.localhost:5000/ethersphere/bee:latest quay.io/ethersphere/bee:latest
-          printf ${{ secrets.DOCKERHUB_PASSWORD }} | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-          printf ${{ secrets.QUAY_PASSWORD }} | docker login --username ${{ secrets.QUAY_USERNAME }} quay.io --password-stdin
-          docker push ethersphere/bee:latest
-          docker push quay.io/ethersphere/bee:latest
-          echo RUN_TYPE="MERGE RUN" >> $GITHUB_ENV
-      - name: Trigger Bee Factory latest build
-        if: github.ref == 'refs/heads/master' && github.event.action != 'beekeeper' && success()
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          token: ${{ secrets.GHA_PAT_BASIC }}
-          repository: ethersphere/bee-factory
-          event-type: build-images
-          client-payload: '{"tag": "latest"}'

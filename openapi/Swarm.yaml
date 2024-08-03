@@ -284,6 +284,8 @@ paths:
         - Chunk
       parameters:
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmTagParameter"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
         - in: header
           name: swarm-postage-batch-id
           schema:

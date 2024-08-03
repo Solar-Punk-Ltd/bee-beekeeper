@@ -8,7 +8,7 @@ BEEKEEPER_INSTALL_DIR ?= $(GOBIN)
 BEEKEEPER_USE_SUDO ?= false
 BEEKEEPER_CLUSTER ?= local
 BEELOCAL_BRANCH ?= main
-BEEKEEPER_BRANCH ?= feat/act
+BEEKEEPER_BRANCH ?= feat/act-test
 REACHABILITY_OVERRIDE_PUBLIC ?= false
 BATCHFACTOR_OVERRIDE_PUBLIC ?= 5
 
@@ -65,7 +65,7 @@ deploylocal:
 .PHONY: testlocal
 testlocal:
 	export PATH=${PATH}:$(GOBIN)
-	beekeeper check --cluster-name local --checks=ci-full-connectivity,ci-manifest,ci-pingpong,ci-pss,ci-pushsync-chunks,ci-retrieval,ci-settlements,ci-soc
+	beekeeper check --cluster-name local --checks=ci-full-connectivity,ci-manifest,ci-pingpong,ci-act,ci-pss,ci-pushsync-chunks,ci-retrieval,ci-settlements,ci-soc
 
 .PHONY: testlocal-all
 testlocal-all: beekeeper beelocal deploylocal testlocal
