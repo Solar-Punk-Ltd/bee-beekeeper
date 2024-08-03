@@ -45,11 +45,11 @@ func (s *Service) socUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	headers := struct {
-		BatchID        []byte        `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		BatchID        []byte        `map:"Swarm-Postage-Batch-Id"`
+		StampSig       []byte        `map:"Swarm-Postage-Stamp"`
 		Pin            bool          `map:"Swarm-Pin"`
 		Act            bool          `map:"Swarm-Act"`
 		HistoryAddress swarm.Address `map:"Swarm-Act-History-Address"`
-		StampSig       []byte        `map:"Swarm-Postage-Stamp"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)

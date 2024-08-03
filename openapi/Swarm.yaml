@@ -292,6 +292,8 @@ paths:
             $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
           required: false
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageStamp"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
       requestBody:
         description: Chunk binary data that has to have at least 8 bytes.
         content:
@@ -844,15 +846,10 @@ paths:
           name: swarm-postage-batch-id
           schema:
             $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageBatchId"
-<<<<<<< HEAD
-          name: swarm-postage-batch-id
-          required: true
-        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
-        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
-=======
           required: false
         - $ref: "SwarmCommon.yaml#/components/parameters/SwarmPostageStamp"
->>>>>>> origin/emaster
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmAct"
+        - $ref: "SwarmCommon.yaml#/components/parameters/SwarmActHistoryAddress"
       requestBody:
         required: true
         description: The SOC binary data is composed of the span (8 bytes) and the at most 4KB payload.

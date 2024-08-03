@@ -32,11 +32,11 @@ func (s *Service) chunkUploadHandler(w http.ResponseWriter, r *http.Request) {
 	logger := s.logger.WithName("post_chunk").Build()
 
 	headers := struct {
-		BatchID        []byte        `map:"Swarm-Postage-Batch-Id" validate:"required"`
+		BatchID        []byte        `map:"Swarm-Postage-Batch-Id"`
+		StampSig       []byte        `map:"Swarm-Postage-Stamp"`
 		SwarmTag       uint64        `map:"Swarm-Tag"`
 		Act            bool          `map:"Swarm-Act"`
 		HistoryAddress swarm.Address `map:"Swarm-Act-History-Address"`
-		StampSig       []byte        `map:"Swarm-Postage-Stamp"`
 	}{}
 	if response := s.mapStructure(r.Header, &headers); response != nil {
 		response("invalid header params", logger, w)
